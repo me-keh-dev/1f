@@ -286,7 +286,7 @@ The acceleration term `(dy / height)` ensures the curve increases toward the tip
 
 ### 6.3 Shading Model
 
-Four-color palette inspired by pixel-art conventions (reference: moshi-nara.com pixel art grass tutorial):
+Each grass blade uses a 4-color height-based shading:
 
 ```
 shade = f(dy / height):
