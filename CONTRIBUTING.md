@@ -6,7 +6,7 @@
 
 ### バグ報告・機能リクエスト
 
-[GitHub Issues](https://github.com/me-keh-dev/1f-yuragi-grass/issues) で報告してください。
+[GitHub Issues](https://github.com/me-keh-dev/1f/issues) で報告してください。
 
 ### プルリクエスト
 
@@ -19,8 +19,8 @@
 ### 開発環境のセットアップ
 
 ```bash
-git clone https://github.com/me-keh-dev/1f-yuragi-grass.git
-cd 1f-yuragi-grass
+git clone https://github.com/me-keh-dev/1f.git
+cd 1f
 pip install -r requirements.txt
 python main.py
 ```
@@ -39,7 +39,7 @@ Contributions are welcome!
 
 ### Bug Reports & Feature Requests
 
-Please report on [GitHub Issues](https://github.com/me-keh-dev/1f-yuragi-grass/issues).
+Please report on [GitHub Issues](https://github.com/me-keh-dev/1f/issues).
 
 ### Pull Requests
 
@@ -52,8 +52,8 @@ Please report on [GitHub Issues](https://github.com/me-keh-dev/1f-yuragi-grass/i
 ### Development Setup
 
 ```bash
-git clone https://github.com/me-keh-dev/1f-yuragi-grass.git
-cd 1f-yuragi-grass
+git clone https://github.com/me-keh-dev/1f.git
+cd 1f
 pip install -r requirements.txt
 python main.py
 ```

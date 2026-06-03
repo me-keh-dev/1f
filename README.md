@@ -1,4 +1,4 @@
-# 1/f Yuragi Grass - ADHD Focus Support Overlay
+# 1/f Yuragi - ADHD Focus Support Overlay
 
 **タスクバーの上にドット絵の草を生やし、1/fゆらぎの風で揺らすWindows用デスクトップオーバーレイ**
 

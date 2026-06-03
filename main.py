@@ -1,5 +1,5 @@
 """
-1/f ゆらぎ草 - ADHDの集中支援デスクトップオーバーレイ
+1/f Yuragi - ADHDの集中支援デスクトップオーバーレイ
 タスクバーの上にプロシージャル生成のドット絵草を表示し、1/fゆらぎで揺らす
 風が左から右に波のように伝播し、高原の草原のようになびく
 """
@@ -415,13 +415,13 @@ class SettingsDialog(QDialog):
         self.on_apply = on_apply
         self.on_save = on_save
         self.on_load = on_load
-        self.setWindowTitle("1/f ゆらぎ草 - 設定")
+        self.setWindowTitle("1/f Yuragi - 設定")
         self.setFixedWidth(400)
         self._build_ui()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        title = QLabel("1/f ゆらぎ草 設定")
+        title = QLabel("1/f Yuragi 設定")
         title.setFont(QFont("Meiryo", 12, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
@@ -945,7 +945,7 @@ def main():
     menu.addAction(quit_action)
 
     tray.setContextMenu(menu)
-    tray.setToolTip("1/f ゆらぎ草 (Win+Ctrl+Shift+W で表示切替)")
+    tray.setToolTip("1/f Yuragi (Win+Ctrl+Shift+W で表示切替)")
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 

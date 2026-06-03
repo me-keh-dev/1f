@@ -1,4 +1,4 @@
-# 1/f Yuragi Grass — Documentation
+# 1/f Yuragi — Documentation
 
 ## Documents
 

@@ -1,4 +1,4 @@
-# 1/f Yuragi Grass — Technical Report
+# 1/f Yuragi — Technical Report
 
 **Visual Ambient Noise for ADHD Focus Support: A Desktop Overlay System Based on 1/f Fluctuation**
 
@@ -10,7 +10,7 @@ Author: Yoshihide Tsuruha
 
 ## Abstract
 
-This document describes the design, scientific rationale, and implementation of **1/f Yuragi Grass**, a Windows desktop overlay application that renders procedurally generated pixel-art grass above the taskbar, animated with 1/f (pink) noise fluctuation. The system is designed as a **non-pharmacological visual aid for individuals with Attention-Deficit/Hyperactivity Disorder (ADHD)**, based on the established neuroscientific principle that moderate external noise improves cognitive performance in ADHD populations through stochastic resonance.
+This document describes the design, scientific rationale, and implementation of **1/f Yuragi**, a Windows desktop overlay application that renders procedurally generated pixel-art grass above the taskbar, animated with 1/f (pink) noise fluctuation. The system is designed as a **non-pharmacological visual aid for individuals with Attention-Deficit/Hyperactivity Disorder (ADHD)**, based on the established neuroscientific principle that moderate external noise improves cognitive performance in ADHD populations through stochastic resonance.
 
 While auditory noise interventions (white noise, pink noise) have been extensively validated, **visual ambient noise** — meaningless, non-narrative visual motion delivered passively during work — remains an unexplored modality. This application occupies that gap, providing a practical tool grounded in peer-reviewed research.
 
