@@ -510,7 +510,7 @@ class SettingsDialog(QDialog):
 
         g_startup = QGroupBox("システム")
         g_sl = QVBoxLayout(g_startup)
-        self.startup_check = QCheckBox("Windows起動時に自動で起動する")
+        self.startup_check = QCheckBox("PC起動時に自動で起動する")
         self.startup_check.setChecked(is_startup_enabled())
         self.startup_check.toggled.connect(lambda c: set_startup_enabled(c))
         g_sl.addWidget(self.startup_check)
@@ -913,7 +913,8 @@ def main():
             QTimer.singleShot(100, overlay._set_click_through)
 
     menu = QMenu()
-    toggle_action = QAction("表示切替 (Win+Ctrl+Shift+W)")
+    hotkey_label = "Cmd+Ctrl+Shift+W" if sys.platform == "darwin" else "Win+Ctrl+Shift+W"
+    toggle_action = QAction(f"表示切替 ({hotkey_label})")
     toggle_action.triggered.connect(toggle_overlay)
     menu.addAction(toggle_action)
     settings_action = QAction("設定")
@@ -928,7 +929,7 @@ def main():
     menu.addAction(quit_action)
 
     tray.setContextMenu(menu)
-    tray.setToolTip("1/f Yuragi (Win+Ctrl+Shift+W で表示切替)")
+    tray.setToolTip(f"1/f Yuragi ({hotkey_label} で表示切替)")
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 

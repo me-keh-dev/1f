@@ -1,6 +1,6 @@
 # 1/f Yuragi - ADHD Focus Support Overlay
 
-**タスクバーの上にドット絵の草を生やし、1/fゆらぎの風で揺らすWindows用デスクトップオーバーレイ**
+**タスクバー（Windows）/ Dock（macOS）の上にドット絵の草を生やし、1/fゆらぎの風で揺らすデスクトップオーバーレイ**
 
 [English](#english) | [日本語](#日本語)
 
@@ -33,33 +33,43 @@ ADHDなど多動傾向のある方の**集中支援**を目的としたデスク
 - **8色パレット**: フォレスト、エメラルド、オータム、オーシャン、サクラ、ラベンダー、サンセット、モス
 - **詳細な設定UI**: 長さ、密集度、まばら具合、風の強さ、色、マウス透過をすべてスライダーで調整
 - **設定の分離保存**: 草プリセット（配置）と環境設定（風・マウス）を別々に保存/読み込み
-- **表示切替**: Win+Ctrl+Shift+W でON/OFF
+- **表示切替**: Win+Ctrl+Shift+W（Windows）/ Cmd+Ctrl+Shift+W（macOS）でON/OFF
 
 ### ダウンロード
 
-[Releases](https://github.com/me-keh-dev/1f/releases) から **1f.exe** をダウンロードしてください。
+[Releases](https://github.com/me-keh-dev/1f/releases) からダウンロードしてください。
 
+**Windows:**
 1. `1f.exe` をダウンロード
 2. 好きな場所に置く（例: デスクトップ、`C:\Tools\1f\` など）
 3. ダブルクリックで起動
 
+**macOS:**
+1. `1f-macos` をダウンロード（GitHub Actions経由で提供予定）
+2. 好きな場所に置く
+3. ターミナルで `chmod +x 1f-macos && ./1f-macos` で起動
+
 インストール作業は不要です。ダウンロードしたファイルをそのまま開けば使えます。
-設定ファイルや保存データは `1f.exe` と同じフォルダに自動で作られます。
+設定ファイルや保存データは実行ファイルと同じフォルダに自動で作られます。
 
 ### 開発者向け（ソースから実行）
 
 ```bash
 # Python 3.9以上が必要です
 pip install -r requirements.txt
+
+# macOSの場合は追加で:
+# pip install pyobjc-core pyobjc-framework-Cocoa
+
 python main.py
 ```
 
 ### 使い方
 
-起動するとタスクバーの上に草が生えます。
+起動するとタスクバー（Windows）/ Dock（macOS）の上に草が生えます。
 
-- **Win+Ctrl+Shift+W**: 表示/非表示の切り替え
-- **設定画面**: システムトレイの緑のアイコンを右クリック → 「設定」
+- **Win+Ctrl+Shift+W**（Windows）/ **Cmd+Ctrl+Shift+W**（macOS）: 表示/非表示の切り替え
+- **設定画面**: システムトレイ / メニューバーの緑のアイコンを右クリック → 「設定」
 - **再生成**: 右クリック → 「再生成」で新しい草原を生成
 - **終了**: 右クリック → 「終了」
 
@@ -86,6 +96,7 @@ python main.py
 ### 動作環境
 
 - Windows 10 / 11
+- macOS 12+
 
 ### 学術的背景
 
@@ -101,9 +112,9 @@ python main.py
 
 ### What is this?
 
-A desktop overlay app for **ADHD focus support** on Windows.
+A desktop overlay app for **ADHD focus support** on Windows and macOS.
 
-Pixel-art grass grows above the taskbar and sways with 1/f fluctuation. Wind waves propagate from left to right, creating a natural meadow-like animation.
+Pixel-art grass grows above the taskbar (Windows) or Dock (macOS) and sways with 1/f fluctuation. Wind waves propagate from left to right, creating a natural meadow-like animation.
 
 ### Why does swaying grass help focus?
 
@@ -122,39 +133,44 @@ This app provides **meaningless visual fluctuation** — not distracting content
 - **8 color palettes**: Forest, Emerald, Autumn, Ocean, Sakura, Lavender, Sunset, Moss
 - **Detailed settings UI**: Length, density, sparseness, wind, colors, mouse fade
 - **Separate save slots**: Grass presets (layout) and environment settings (wind/mouse) saved independently
-- **Toggle hotkey**: Win+Ctrl+Shift+W to show/hide
+- **Toggle hotkey**: Win+Ctrl+Shift+W (Windows) / Cmd+Ctrl+Shift+W (macOS)
 
 ### Download
 
-Download **1f.exe** from [Releases](https://github.com/me-keh-dev/1f/releases).
+Download from [Releases](https://github.com/me-keh-dev/1f/releases).
 
-1. Download `1f.exe`
-2. Place it anywhere you like
-3. Double-click to run
+**Windows:** Download `1f.exe`, place it anywhere, double-click to run.
+
+**macOS:** Download `1f-macos`, place it anywhere, run `chmod +x 1f-macos && ./1f-macos` in Terminal.
 
 No installation required. Just open the downloaded file and it works.
-Settings and save data are automatically stored in the same folder as `1f.exe`.
+Settings and save data are automatically stored in the same folder as the executable.
 
 ### For Developers (run from source)
 
 ```bash
 # Requires Python 3.9+
 pip install -r requirements.txt
+
+# macOS additionally requires:
+# pip install pyobjc-core pyobjc-framework-Cocoa
+
 python main.py
 ```
 
 ### Usage
 
-Grass will appear above the taskbar on launch.
+Grass will appear above the taskbar (Windows) / Dock (macOS) on launch.
 
-- **Win+Ctrl+Shift+W**: Toggle visibility
-- **Settings**: Right-click the green tray icon → "設定" (Settings)
+- **Win+Ctrl+Shift+W** (Windows) / **Cmd+Ctrl+Shift+W** (macOS): Toggle visibility
+- **Settings**: Right-click the tray / menu bar icon → "設定" (Settings)
 - **Regenerate**: Right-click → "再生成" (Regenerate)
 - **Quit**: Right-click → "終了" (Quit)
 
 ### System Requirements
 
 - Windows 10 / 11
+- macOS 12+
 
 ### Academic Background
 
