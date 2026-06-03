@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.0 (2026-06-03)
+
+### Features
+- Global hotkey to toggle visibility (Win+Ctrl+Shift+W)
+- Portable exe: config.json and saves/ stored next to the executable
+
 ## v1.0.0 (2026-06-03)
 
 ### Features

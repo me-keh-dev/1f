@@ -844,11 +844,71 @@ class OverlayWindow(QWidget):
         painter.end()
 
 
+# --- グローバルホットキー ---
+import threading
+from PyQt5.QtCore import pyqtSignal, QObject
+
+MOD_WIN = 0x0008
+MOD_CTRL = 0x0002
+MOD_SHIFT = 0x0004
+VK_W = 0x57
+HOTKEY_TOGGLE = 1
+WM_HOTKEY = 0x0312
+
+class HotkeySignal(QObject):
+    triggered = pyqtSignal()
+
+class HotkeyListener:
+    """別スレッドでWin32メッセージループを回してホットキーを監視"""
+    def __init__(self, callback):
+        self.signal = HotkeySignal()
+        self.signal.triggered.connect(callback)
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        result = ctypes.windll.user32.RegisterHotKey(
+            None, HOTKEY_TOGGLE,
+            MOD_WIN | MOD_CTRL | MOD_SHIFT, VK_W
+        )
+        if not result:
+            return
+        msg = wintypes.MSG()
+        while self._running:
+            ret = ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if ret <= 0:
+                break
+            if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_TOGGLE:
+                self.signal.triggered.emit()
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_TOGGLE)
+
+    def cleanup(self):
+        self._running = False
+        # GetMessageW を抜けさせるためにダミーメッセージを投げる
+        tid = self._thread.ident
+        if tid:
+            ctypes.windll.user32.PostThreadMessageW(tid, 0x0000, 0, 0)  # WM_NULL
+
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
     overlay = OverlayWindow()
+    overlay_visible = [True]
+
+    def toggle_overlay():
+        if overlay_visible[0]:
+            overlay.hide()
+            overlay.timer.stop()
+        else:
+            overlay.show()
+            overlay.timer.start(33)
+            QTimer.singleShot(100, overlay._set_click_through)
+        overlay_visible[0] = not overlay_visible[0]
+
+    hotkey = HotkeyListener(toggle_overlay)
 
     pixmap = QPixmap(16, 16)
     pixmap.fill(QColor(0x6b, 0xb7, 0x58))
@@ -870,6 +930,9 @@ def main():
         settings_dialog.show()
 
     menu = QMenu()
+    toggle_action = QAction("表示切替 (Win+Ctrl+Shift+W)")
+    toggle_action.triggered.connect(toggle_overlay)
+    menu.addAction(toggle_action)
     settings_action = QAction("設定")
     settings_action.triggered.connect(open_settings)
     menu.addAction(settings_action)
@@ -878,11 +941,11 @@ def main():
     menu.addAction(regen_action)
     menu.addSeparator()
     quit_action = QAction("終了")
-    quit_action.triggered.connect(app.quit)
+    quit_action.triggered.connect(lambda: (hotkey.cleanup(), app.quit()))
     menu.addAction(quit_action)
 
     tray.setContextMenu(menu)
-    tray.setToolTip("1/f ゆらぎ草")
+    tray.setToolTip("1/f ゆらぎ草 (Win+Ctrl+Shift+W で表示切替)")
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 
