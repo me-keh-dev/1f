@@ -81,7 +81,7 @@ python main.py
 
 ### スクリーンショット
 
-*（あなたの草原のスクリーンショットをここに追加してください）*
+![1/f Yuragi Screenshot](screenshot.png)
 
 ### 動作環境
 
