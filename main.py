@@ -42,8 +42,15 @@ def get_cursor_pos():
     ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
     return pt.x, pt.y
 
-SAVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saves")
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+def _app_dir():
+    """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+APP_DIR = _app_dir()
+SAVE_DIR = os.path.join(APP_DIR, "saves")
+CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 
 
 class PinkNoiseGenerator:
