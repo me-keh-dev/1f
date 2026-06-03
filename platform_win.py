@@ -1,4 +1,6 @@
 """Windows固有のプラットフォーム実装"""
+import os
+import sys
 import ctypes
 from ctypes import wintypes
 import threading
@@ -71,3 +73,41 @@ class HotkeyListener:
         tid = self._thread.ident
         if tid:
             ctypes.windll.user32.PostThreadMessageW(tid, 0x0000, 0, 0)
+
+# --- スタートアップ ---
+def _startup_shortcut_path():
+    startup = os.path.join(os.environ["APPDATA"],
+                           "Microsoft", "Windows", "Start Menu",
+                           "Programs", "Startup", "1f Yuragi.lnk")
+    return startup
+
+def _get_exe_path():
+    if getattr(sys, 'frozen', False):
+        return sys.executable
+    return os.path.abspath(sys.argv[0])
+
+def is_startup_enabled():
+    return os.path.exists(_startup_shortcut_path())
+
+def set_startup_enabled(enabled):
+    shortcut_path = _startup_shortcut_path()
+    if enabled:
+        target = _get_exe_path()
+        working_dir = os.path.dirname(target)
+        try:
+            import winreg
+            # vbscriptでショートカット作成（外部依存なし）
+            vbs = os.path.join(os.environ["TEMP"], "create_shortcut.vbs")
+            with open(vbs, "w") as f:
+                f.write(f'Set ws = CreateObject("WScript.Shell")\n')
+                f.write(f'Set sc = ws.CreateShortcut("{shortcut_path}")\n')
+                f.write(f'sc.TargetPath = "{target}"\n')
+                f.write(f'sc.WorkingDirectory = "{working_dir}"\n')
+                f.write(f'sc.Save\n')
+            os.system(f'cscript //nologo "{vbs}"')
+            os.remove(vbs)
+        except Exception:
+            pass
+    else:
+        if os.path.exists(shortcut_path):
+            os.remove(shortcut_path)
