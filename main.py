@@ -889,9 +889,19 @@ def main():
 
     hotkey = HotkeyListener(toggle_overlay)
 
-    pixmap = QPixmap(16, 16)
-    pixmap.fill(QColor(0x6b, 0xb7, 0x58))
-    tray = QSystemTrayIcon(QIcon(pixmap), app)
+    # PyInstallerバンドル時は _MEIPASS から、通常時は APP_DIR から読む
+    if getattr(sys, 'frozen', False):
+        bundle_dir = getattr(sys, '_MEIPASS', APP_DIR)
+    else:
+        bundle_dir = APP_DIR
+    icon_path = os.path.join(bundle_dir, "icon.png")
+    if os.path.exists(icon_path):
+        tray_icon = QIcon(icon_path)
+    else:
+        pixmap = QPixmap(16, 16)
+        pixmap.fill(QColor(0x6b, 0xb7, 0x58))
+        tray_icon = QIcon(pixmap)
+    tray = QSystemTrayIcon(tray_icon, app)
 
     settings_dialog = None
 

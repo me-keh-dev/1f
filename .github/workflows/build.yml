@@ -19,10 +19,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller Pillow
+
+      - name: Create ICO
+        run: python -c "from PIL import Image; Image.open('icon.png').save('icon.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
 
       - name: Build exe
-        run: pyinstaller --onefile --noconsole --name "1f" main.py
+        run: pyinstaller --onefile --noconsole --name "1f" --icon icon.ico --add-data "icon.png;." main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -46,7 +49,7 @@ jobs:
           pip install pyinstaller pyobjc-core pyobjc-framework-Cocoa
 
       - name: Build app
-        run: pyinstaller --onefile --noconsole --name "1f" main.py
+        run: pyinstaller --onefile --noconsole --name "1f" --icon icon.png --add-data "icon.png:." main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
