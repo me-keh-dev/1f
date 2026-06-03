@@ -692,20 +692,34 @@ class OverlayWindow(QWidget):
     def _set_click_through(self):
         set_click_through(int(self.winId()))
 
+    # 基準設定（画面幅2400pxで調整済み）
+    BASE_WIDTH = 2400
+    DEFAULT_CONFIG = {
+        "min_height": 4, "max_height": 20,
+        "num_clusters": 5, "cluster_count": 90,
+        "cluster_density": 70, "sparseness": 50,
+        "scatter_count": 20, "scatter_density": 20,
+        "wind": 52, "slim_ratio": 74, "flower_ratio": 44,
+        "palette_indices": [0],
+        "mouse_fade_enabled": True, "mouse_fade_inner": 100,
+        "mouse_fade_range": 120, "mouse_fade_alpha": 0,
+        "seed": 535401,
+    }
+    # 画面幅に比例してスケーリングするキー
+    SCALE_KEYS = ["cluster_count", "scatter_count", "num_clusters"]
+
     def _load_config(self):
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        return {
-            "min_height": 4, "max_height": 20,
-            "num_clusters": 5, "cluster_count": 40,
-            "cluster_density": 70, "sparseness": 50,
-            "scatter_count": 20, "scatter_density": 20,
-            "wind": 50, "slim_ratio": 40, "flower_ratio": 15,
-            "palette_indices": [0],
-            "mouse_fade_enabled": True, "mouse_fade_inner": 30,
-            "mouse_fade_range": 120, "mouse_fade_alpha": 15,
-        }
+        # 初回起動: 画面幅に応じてデフォルト設定をスケーリング
+        screen = QApplication.primaryScreen()
+        actual_width = screen.geometry().width() if screen else self.BASE_WIDTH
+        ratio = actual_width / self.BASE_WIDTH
+        config = self.DEFAULT_CONFIG.copy()
+        for key in self.SCALE_KEYS:
+            config[key] = max(1, round(config[key] * ratio))
+        return config
 
     def _save_config(self):
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
