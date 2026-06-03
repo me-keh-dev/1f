@@ -78,15 +78,16 @@ A systematic review and meta-analysis of 13 studies (N=335) published in the *Jo
 
 **Helps et al. (2014)** [4]
 
-Measured neural background noise directly in ADHD vs. controls:
+Tested the MBA model across the attentional spectrum by dividing children into sub-attentive, normal, and super-attentive groups:
 
-- Background neural noise amplitude was **138% higher** in ADHD patients
-- However, this internal noise correlated with **inattention**, not improved performance
-- Interpretation: ADHD brains have high-amplitude but low-quality internal noise; structured external noise can compensate
+- White noise **improved** performance in sub-attentive children
+- White noise **impaired** performance in super-attentive children
+- Normal-attention children showed no significant change
+- This supports the inverted-U model: each individual has an optimal noise level determined by their baseline neural arousal
 
-**Comparison with Stimulant Medication** [5]
+**White Noise and Memory in Inattentive Children** [5]
 
-A pilot study comparing auditory noise treatment with methylphenidate found that noise exposure produced **similar improvements** in cognitive task performance, suggesting noise may function as a non-pharmacological alternative for some individuals.
+Söderlund et al. (2010) tested the MBA model prediction that background white noise would enhance memory in inattentive children while impairing it in attentive children. Results confirmed the prediction: white noise **improved** recall for the inattentive group and **worsened** it for the attentive group, providing further support for the stochastic resonance mechanism.
 
 ### 2.3 Visual Noise: The Emerging Frontier
 
@@ -120,7 +121,8 @@ The choice of 1/f noise over white noise or periodic signals is motivated by:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Overlay Window                        │
-│  (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOPMOST)  │
+│  (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW) │
+│  + Qt.WindowStaysOnTopHint                              │
 │                                                         │
 │  ┌─────────┐  ┌─────────┐       ┌─────────┐           │
 │  │ Grass 1 │  │ Grass 2 │  ...  │ Grass N │           │
@@ -275,7 +277,7 @@ curve_strength = random(0.08, 0.40)  # type-dependent
 
 For dy = 0 to height:
     cx += curve_direction × curve_strength × (dy / height)
-    If random() < 0.06~0.08:
+    If random() < 0.06:          # leafy/flower types only
         curve_direction *= -1   # occasional direction reversal
     pixel(round(cx), dy, shade_for(dy/height))
 ```
@@ -440,7 +442,7 @@ Unlike auditory noise applications, visual ambient noise carries **no risk of se
 
 [2] Sikström, S., & Söderlund, G. (2007). Stimulus-dependent dopamine release in attention-deficit/hyperactivity disorder. *Psychological Review*, 114(4), 1047–1075.
 
-[3] Nigg, J.T., et al. (2024). Systematic Review and Meta-Analysis: Do White Noise or Pink Noise Help With Task Performance in Youth With Attention-Deficit/Hyperactivity Disorder or With Elevated Attention Problems? *Journal of the American Academy of Child & Adolescent Psychiatry*. https://doi.org/10.1016/j.jaac.2024.01.042
+[3] Nigg, J.T., et al. (2024). Systematic Review and Meta-Analysis: Do White Noise or Pink Noise Help With Task Performance in Youth With Attention-Deficit/Hyperactivity Disorder or With Elevated Attention Problems? *Journal of the American Academy of Child & Adolescent Psychiatry*. https://doi.org/10.1016/j.jaac.2023.12.014
 
 [4] Helps, S.K., Bamford, S., Sonuga-Barke, E.J.S., & Söderlund, G. (2014). Different effects of adding white noise on cognitive performance of sub-, normal and super-attentive school children. *PLOS ONE*, 9(11), e112768.
 

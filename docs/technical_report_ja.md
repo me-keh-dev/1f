@@ -80,15 +80,16 @@ ADHD（低ドーパミン）  → より多くの外部ノイズが必要
 
 **Helps et al. (2014)** [4]
 
-ADHD者と対照群の神経バックグラウンドノイズを直接測定：
+注意力のスペクトラム全体でMBAモデルを検証するため、子どもを低注意・通常・高注意の3群に分類：
 
-- バックグラウンド神経ノイズの振幅はADHD患者で**138%高かった**
-- しかしこの内部ノイズは**不注意**と相関（パフォーマンス改善とではなく）
-- 解釈：ADHD脳は高振幅だが低品質の内部ノイズを持つ；構造化された外部ノイズで補償可能
+- ホワイトノイズは低注意児のパフォーマンスを**改善**
+- ホワイトノイズは高注意児のパフォーマンスを**低下**
+- 通常注意の子どもには有意な変化なし
+- これは逆U字モデルを支持：各個人はベースラインの神経覚醒によって決定される最適ノイズレベルを持つ
 
-**刺激薬との比較** [5]
+**不注意児に対するホワイトノイズと記憶** [5]
 
-聴覚ノイズ治療とメチルフェニデートを比較したパイロット研究では、ノイズ曝露が認知タスクパフォーマンスに**類似した改善**をもたらし、一部の個人にとってノイズが非薬物的代替となり得ることを示唆した。
+Söderlund et al. (2010) は、バックグラウンドのホワイトノイズが不注意児の記憶を改善し、注意力の高い児童では低下させるというMBAモデルの予測を検証した。結果は予測を確認：ホワイトノイズは不注意群の想起を**改善**し、注意群では**悪化**させ、確率共鳴メカニズムのさらなる支持を提供した。
 
 ### 2.3 視覚ノイズ：新たなフロンティア
 
@@ -122,7 +123,8 @@ ADHD児における聴覚・視覚ホワイトノイズの眼球運動制御へ�
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                  オーバーレイウィンドウ                    │
-│  (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOPMOST)  │
+│  (WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW) │
+│  + Qt.WindowStaysOnTopHint                              │
 │                                                         │
 │  ┌─────────┐  ┌─────────┐       ┌─────────┐           │
 │  │  草 1   │  │  草 2   │  ...  │  草 N   │           │
@@ -268,7 +270,7 @@ curve_strength = random(0.08, 0.40)  # タイプ依存
 
 For dy = 0 to height:
     cx += curve_direction × curve_strength × (dy / height)
-    If random() < 0.06~0.08:
+    If random() < 0.06:          # 葉付き/花付きタイプのみ
         curve_direction *= -1   # 時折の方向反転
     pixel(round(cx), dy, shade_for(dy/height))
 ```
@@ -431,7 +433,7 @@ dist > inner_radius + fade_range の場合:
 
 [2] Sikström, S., & Söderlund, G. (2007). Stimulus-dependent dopamine release in attention-deficit/hyperactivity disorder. *Psychological Review*, 114(4), 1047–1075.
 
-[3] Nigg, J.T., et al. (2024). Systematic Review and Meta-Analysis: Do White Noise or Pink Noise Help With Task Performance in Youth With Attention-Deficit/Hyperactivity Disorder or With Elevated Attention Problems? *Journal of the American Academy of Child & Adolescent Psychiatry*. https://doi.org/10.1016/j.jaac.2024.01.042
+[3] Nigg, J.T., et al. (2024). Systematic Review and Meta-Analysis: Do White Noise or Pink Noise Help With Task Performance in Youth With Attention-Deficit/Hyperactivity Disorder or With Elevated Attention Problems? *Journal of the American Academy of Child & Adolescent Psychiatry*. https://doi.org/10.1016/j.jaac.2023.12.014
 
 [4] Helps, S.K., Bamford, S., Sonuga-Barke, E.J.S., & Söderlund, G. (2014). Different effects of adding white noise on cognitive performance of sub-, normal and super-attentive school children. *PLOS ONE*, 9(11), e112768.
 
