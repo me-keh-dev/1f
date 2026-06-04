@@ -309,6 +309,66 @@ def generate_grass_data(config, screen_width):
     return positions, seed
 
 
+# --- 時間帯ライティング ---
+import datetime
+
+# 時間帯ごとの色調 (r_mult, g_mult, b_mult) — 1.0が元の色
+TIME_LIGHTING = [
+    # (hour, r, g, b)
+    (0,   0.25, 0.28, 0.55),  # 深夜: 青い月明かり
+    (4,   0.30, 0.30, 0.55),  # 未明: 暗い青
+    (5,   0.55, 0.40, 0.50),  # 薄明: 紫がかった暗さ
+    (6,   0.90, 0.60, 0.50),  # 朝焼け: オレンジピンク
+    (7,   1.00, 0.85, 0.70),  # 早朝: 暖かい光
+    (8,   1.00, 0.95, 0.90),  # 朝: ほぼ自然光
+    (10,  1.00, 1.00, 1.00),  # 日中: そのまま
+    (16,  1.00, 1.00, 0.95),  # 午後: わずかに暖色
+    (17,  1.00, 0.90, 0.70),  # 夕方: 暖かい光
+    (18,  1.00, 0.65, 0.45),  # 夕暮れ: オレンジ
+    (19,  0.80, 0.50, 0.45),  # 日没: 赤みがかる
+    (20,  0.45, 0.38, 0.55),  # 薄暮: 紫
+    (21,  0.30, 0.32, 0.55),  # 夜: 青い月明かり
+    (24,  0.25, 0.28, 0.55),  # 深夜（ループ）
+]
+
+def _get_time_tint():
+    """現在時刻に基づいて色の掛け算値 (r, g, b) を返す"""
+    now = datetime.datetime.now()
+    hour = now.hour + now.minute / 60.0
+
+    # 補間
+    for i in range(len(TIME_LIGHTING) - 1):
+        h1, r1, g1, b1 = TIME_LIGHTING[i]
+        h2, r2, g2, b2 = TIME_LIGHTING[i + 1]
+        if h1 <= hour < h2:
+            t = (hour - h1) / (h2 - h1)
+            return (
+                r1 + (r2 - r1) * t,
+                g1 + (g2 - g1) * t,
+                b1 + (b2 - b1) * t,
+            )
+    return (1.0, 1.0, 1.0)
+
+# 手動で選べる固定プリセット
+LIGHTING_PRESETS = {
+    "sunrise": (0.90, 0.60, 0.50),   # 朝焼け
+    "daytime": (1.00, 1.00, 1.00),   # 日中
+    "sunset":  (1.00, 0.65, 0.45),   # 夕暮れ
+    "night":   (0.30, 0.32, 0.55),   # 夜（月明かり）
+}
+
+def _apply_tint(color, tint):
+    """QColorにtint (r,g,b)の掛け算を適用して新しいQColorを返す"""
+    if tint is None:
+        return QColor(color)
+    r, g, b = tint
+    return QColor(
+        min(255, int(color.red() * r)),
+        min(255, int(color.green() * g)),
+        min(255, int(color.blue() * b)),
+    )
+
+
 class GrassBlade:
     def __init__(self, data, palettes):
         self.base_x = data["x"]
@@ -337,14 +397,14 @@ class GrassBlade:
         local = self.noise_gen.next()
         self.sway = (wind_wave * 0.7 + local * 0.3) * self.sway_base
 
-    def draw(self, painter, ground_y, alpha=255):
+    def draw(self, painter, ground_y, alpha=255, tint=None):
         ps = PIXEL_SIZE
         md = max(self.max_dy, 1)
         for dx, dy, shade in self.pixels:
             sf = dy / md
             draw_x = int(self.base_x + (dx + self.sway * sf) * ps)
             draw_y = int(ground_y - (dy + 1) * ps)
-            c = QColor(self.colors[shade])
+            c = _apply_tint(self.colors[shade], tint)
             c.setAlpha(alpha)
             painter.fillRect(draw_x, draw_y, ps, ps, c)
         if self.flower_color:
@@ -352,7 +412,7 @@ class GrassBlade:
                 sf = fy / md
                 draw_x = int(self.base_x + (fx + self.sway * sf) * ps)
                 draw_y = int(ground_y - (fy + 1) * ps)
-                c = QColor(self.flower_color)
+                c = _apply_tint(self.flower_color, tint)
                 c.setAlpha(alpha)
                 painter.fillRect(draw_x, draw_y, ps, ps, c)
 
@@ -415,7 +475,7 @@ class SettingsDialog(QDialog):
         self.on_save = on_save
         self.on_load = on_load
         self.setWindowTitle("1/f Yuragi - 設定")
-        self.setFixedWidth(400)
+        self.setFixedWidth(480)
         self._build_ui()
 
     def _build_ui(self):
@@ -524,7 +584,37 @@ class SettingsDialog(QDialog):
 
         tabs.addTab(tab_env, "環境")
 
-        # === タブ4: 保存 ===
+        # === タブ4: オプション ===
+        tab_opt = QWidget()
+        tol = QVBoxLayout(tab_opt)
+
+        g_light = QGroupBox("時間帯ライティング")
+        g_ll = QVBoxLayout(g_light)
+        light_desc = QLabel("現在時刻に合わせて草の色が変化します\n朝焼け → 日中 → 夕暮れ → 夜（月明かり）")
+        light_desc.setStyleSheet("color: #666; font-size: 11px;")
+        light_desc.setWordWrap(True)
+        g_ll.addWidget(light_desc)
+
+        self.lighting_combo = QComboBox()
+        self.lighting_combo.addItem("OFF", "off")
+        self.lighting_combo.addItem("自動（現在時刻に連動）", "auto")
+        self.lighting_combo.addItem("朝焼け", "sunrise")
+        self.lighting_combo.addItem("日中", "daytime")
+        self.lighting_combo.addItem("夕暮れ", "sunset")
+        self.lighting_combo.addItem("夜（月明かり）", "night")
+        current_mode = self.config.get("lighting_mode", "off")
+        for i in range(self.lighting_combo.count()):
+            if self.lighting_combo.itemData(i) == current_mode:
+                self.lighting_combo.setCurrentIndex(i)
+                break
+        self.lighting_combo.currentIndexChanged.connect(self._on_lighting_changed)
+        g_ll.addWidget(self.lighting_combo)
+        tol.addWidget(g_light)
+
+        tol.addStretch()
+        tabs.addTab(tab_opt, "オプション")
+
+        # === タブ5: 保存 ===
         tab_save = QWidget()
         tsl = QVBoxLayout(tab_save)
 
@@ -628,7 +718,12 @@ class SettingsDialog(QDialog):
             "mouse_fade_inner": self.fade_inner_slider.value(),
             "mouse_fade_range": self.fade_range_slider.value(),
             "mouse_fade_alpha": self.fade_alpha_slider.value(),
+            "lighting_mode": self.lighting_combo.currentData(),
         }
+
+    def _on_lighting_changed(self):
+        mode = self.lighting_combo.currentData()
+        self.on_apply({"lighting_mode": mode})
 
     def _on_regenerate(self):
         cfg = self._gather_config()
@@ -648,7 +743,7 @@ class SettingsDialog(QDialog):
     # 環境設定のキー
     ENV_KEYS = [
         "wind", "mouse_fade_enabled", "mouse_fade_inner",
-        "mouse_fade_range", "mouse_fade_alpha",
+        "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
     ]
 
     def _on_save_grass(self):
@@ -749,6 +844,14 @@ class ScreenOverlay(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
+        # 時間帯ライティング
+        lighting_mode = self.config.get("lighting_mode", "off")
+        if lighting_mode == "auto":
+            tint = _get_time_tint()
+        elif lighting_mode in LIGHTING_PRESETS:
+            tint = LIGHTING_PRESETS[lighting_mode]
+        else:
+            tint = None
         fade_enabled = self.config.get("mouse_fade_enabled", True)
         if fade_enabled:
             mx, my = get_cursor_pos()
@@ -766,10 +869,10 @@ class ScreenOverlay(QWidget):
                     alpha = int(min_alpha + (255 - min_alpha) * t)
                 else:
                     alpha = 255
-                g.draw(painter, self.ground_y, alpha)
+                g.draw(painter, self.ground_y, alpha, tint)
         else:
             for g in self.grasses:
-                g.draw(painter, self.ground_y)
+                g.draw(painter, self.ground_y, tint=tint)
         painter.end()
 
 

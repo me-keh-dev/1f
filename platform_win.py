@@ -93,21 +93,33 @@ def set_startup_enabled(enabled):
     shortcut_path = _startup_shortcut_path()
     if enabled:
         target = _get_exe_path()
-        working_dir = os.path.dirname(target)
+        working_dir = os.path.dirname(os.path.abspath(target))
+        # exe以外（python main.py）の場合はpythonw経由で起動するショートカットを作る
+        if not getattr(sys, 'frozen', False):
+            python_exe = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            if not os.path.exists(python_exe):
+                python_exe = sys.executable
+            args = f'"{python_exe}" "{os.path.abspath(target)}"'
+            sc_target = python_exe
+            sc_args = f'"{os.path.abspath(target)}"'
+        else:
+            sc_target = target
+            sc_args = ""
         try:
-            import winreg
-            # vbscriptでショートカット作成（外部依存なし）
             vbs = os.path.join(os.environ["TEMP"], "create_shortcut.vbs")
             with open(vbs, "w") as f:
                 f.write(f'Set ws = CreateObject("WScript.Shell")\n')
                 f.write(f'Set sc = ws.CreateShortcut("{shortcut_path}")\n')
-                f.write(f'sc.TargetPath = "{target}"\n')
+                f.write(f'sc.TargetPath = "{sc_target}"\n')
+                if sc_args:
+                    f.write(f'sc.Arguments = {sc_args}\n')
                 f.write(f'sc.WorkingDirectory = "{working_dir}"\n')
                 f.write(f'sc.Save\n')
             os.system(f'cscript //nologo "{vbs}"')
-            os.remove(vbs)
-        except Exception:
-            pass
+            if os.path.exists(vbs):
+                os.remove(vbs)
+        except Exception as e:
+            print(f"[WARN] Failed to create startup shortcut: {e}")
     else:
         if os.path.exists(shortcut_path):
             os.remove(shortcut_path)

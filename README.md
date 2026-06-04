@@ -14,13 +14,33 @@ ADHDなど多動傾向のある方の**集中支援**を目的としたデスク
 
 タスクバーのすぐ上にファミコン風のドット絵の草が生え、1/fゆらぎで自然に揺れます。風が左から右に波のように伝播し、まるで高原の草原のような動きを作り出します。
 
-### なぜ草が揺れると集中できるのか？
+### 背景：なぜこのアプリが必要なのか
 
-- **確率共鳴（Stochastic Resonance）**: ADHDの脳は内部ノイズが低く、外部からの適度なノイズが信号処理を改善します（[Söderlund et al., 2007](https://acamh.onlinelibrary.wiley.com/doi/abs/10.1111/j.1469-7610.2007.01749.x)）
-- **MBAモデル**: ホワイトノイズがADHD児の認知パフォーマンスを向上させることがメタ分析で確認されています（[Nigg et al., 2024](https://www.jaacap.org/article/S0890-8567(24)00074-1/abstract)）
-- **視覚的環境ノイズ**: 聴覚ノイズの研究は豊富ですが、視覚的な環境ノイズによるADHD支援はまだ研究段階のフロンティアです
+ADHDなど多動傾向を持つ方は、静かすぎる環境では脳の覚醒レベルが下がり集中を維持しにくくなることが知られています。一方で、動画や音楽など意味のある刺激は、意識がそちらに引き込まれてしまいます。
 
-静かすぎると集中しにくい——かといってYouTubeを流すと引き込まれる。このアプリは**意味を持たない純粋な視覚的ゆらぎ**を提供することで、過集中のスイッチを入れるための環境を作ります。
+これまで、こうした「適度な環境ノイズ」を提供するツールは**聴覚**の領域では数多く存在していました（Lo-Fiミュージック、カフェの環境音、ホワイトノイズアプリなど）。しかし**視覚**の領域では、デスクトップを飾る装飾ツールや、逆に刺激を制限するブロッカー系ツールしかなく、**「意味を持たない視覚的ゆらぎを提供して集中を支援する」** というアプローチのアプリは存在していませんでした。
+
+### 科学的根拠
+
+本アプリのコンセプトは、以下の確立された研究に基づいています。
+
+**適度なノイズがADHDの認知パフォーマンスを改善する**
+
+ADHDの脳は、内部の神経ノイズが最適レベルに満たないため、外部からの適度なランダムノイズが脳内の信号検出能力を向上させます。これは**確率共鳴（Stochastic Resonance）** と呼ばれる現象です。Söderlund, Sikström & Smart (2007) は、ホワイトノイズがADHD児の認知パフォーマンスを**向上**させる一方、定型発達児では**低下**させることを実証しました（[Journal of Child Psychology and Psychiatry, 48(8), 840-847](https://acamh.onlinelibrary.wiley.com/doi/abs/10.1111/j.1469-7610.2007.01749.x)）。
+
+**13研究のメタ分析で効果が確認されている**
+
+Nigg et al. (2024) による335名を対象としたメタ分析では、ホワイトノイズがADHD傾向を持つ児童・若年成人の課題パフォーマンスに統計的に有意な改善効果をもたらすことが確認されました（[Journal of the American Academy of Child & Adolescent Psychiatry](https://www.jaacap.org/article/S0890-8567(24)00074-1/abstract)）。
+
+**視覚ノイズも臨床研究が進行中**
+
+聴覚ノイズの研究は豊富ですが、視覚ノイズによるADHD支援は現在進行形の研究フロンティアです。ClinicalTrials.gov には「聴覚・視覚ノイズによるADHD児の非薬物治療」の臨床試験（NCT06057441）が登録されています。さらに Rijmen et al. (2026) は、ランダムノイズだけでなく構造化された刺激（純音）でも神経ノイズが改善されることを示しており、**リズミカルに揺れる草のような視覚刺激**にも同様の効果が期待されます（[Journal of Attention Disorders](https://journals.sagepub.com/doi/10.1177/10870547251357074)）。
+
+### 本アプリの手法
+
+1/f Yuragi は、これらの研究知見に基づき、**1/fゆらぎ（自然界に遍在するゆっくりとした不規則な変動）** によって草を揺らします。風の波が画面を左から右に伝播し、各草が個別の1/fノイズで微妙に異なる動きをすることで、**意味を持たない純粋な視覚的環境ノイズ** を作業中のデスクトップに提供します。
+
+静かすぎると集中しにくい——かといってYouTubeを流すと引き込まれる。このアプリはその中間にある「最適な視覚刺激」を目指しています。
 
 ### 特徴
 
@@ -98,13 +118,12 @@ python main.py
 - Windows 10 / 11
 - macOS 12+
 
-### 学術的背景
-
-このアプリのコンセプトは以下の研究に基づいています：
+### 参考文献
 
 - Söderlund, G., Sikström, S., & Smart, A. (2007). *Listen to the noise: Noise is beneficial for cognitive performance in ADHD.* Journal of Child Psychology and Psychiatry, 48(8), 840-847.
 - Nigg, J.T., et al. (2024). *Systematic Review and Meta-Analysis: Do White Noise or Pink Noise Help With Task Performance in Youth With ADHD?* Journal of the American Academy of Child & Adolescent Psychiatry.
 - Rijmen, J., Senoussi, M., & Wiersema, J.R. (2026). *Pink Noise and a Pure Tone Both Reduce 1/f Neural Noise in Adults With Elevated ADHD Traits.* Journal of Attention Disorders.
+- 詳細な技術レポート（9件の査読付き論文を引用）: [docs/technical_report_ja.md](docs/technical_report_ja.md)
 
 ---
 
