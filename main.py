@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QComboBox,
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont
+from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
 if sys.platform == "win32":
@@ -32,6 +32,12 @@ def _app_dir():
     """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+def _resource_dir():
+    """バンドル内リソース（読み取り専用）のディレクトリ"""
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
 
 APP_DIR = _app_dir()
@@ -682,84 +688,39 @@ class SettingsDialog(QDialog):
                     self.env_combo.addItem(f[:-5])
 
 
-# --- オーバーレイウィンドウ ---
-class OverlayWindow(QWidget):
-    def __init__(self):
+# --- 1画面分のオーバーレイ ---
+class ScreenOverlay(QWidget):
+    def __init__(self, screen, config, wind_sim):
         super().__init__()
+        self.screen = screen
+        self.config = config
+        self.wind_sim = wind_sim
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-
-        self.config = self._load_config()
-        self.wind_sim = WindSimulator()
-        self.wind_sim.set_wind(self.config.get("wind", 50))
-        self.last_time = time.monotonic()
-
-        self._position_window()
         self.grasses = []
+        self._position_window()
         self._rebuild_grasses()
-
-        self.timer = QTimer()
-        self.timer.timeout.connect(self._tick)
-        self.timer.start(33)
-
-        self.reposition_timer = QTimer()
-        self.reposition_timer.timeout.connect(self._position_window)
-        self.reposition_timer.start(5000)
-
         self.show()
         QTimer.singleShot(100, self._set_click_through)
 
     def _set_click_through(self):
         set_click_through(int(self.winId()))
 
-    # 基準設定（画面幅2400pxで調整済み）
-    BASE_WIDTH = 2400
-    DEFAULT_CONFIG = {
-        "min_height": 4, "max_height": 20,
-        "num_clusters": 5, "cluster_count": 90,
-        "cluster_density": 70, "sparseness": 50,
-        "scatter_count": 20, "scatter_density": 20,
-        "wind": 52, "slim_ratio": 74, "flower_ratio": 44,
-        "palette_indices": [0],
-        "mouse_fade_enabled": True, "mouse_fade_inner": 100,
-        "mouse_fade_range": 120, "mouse_fade_alpha": 0,
-        "seed": 535401,
-    }
-    # 画面幅に比例してスケーリングするキー
-    SCALE_KEYS = ["cluster_count", "scatter_count", "num_clusters"]
-
-    def _load_config(self):
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        # 初回起動: 画面幅に応じてデフォルト設定をスケーリング
-        screen = QApplication.primaryScreen()
-        actual_width = screen.geometry().width() if screen else self.BASE_WIDTH
-        ratio = actual_width / self.BASE_WIDTH
-        config = self.DEFAULT_CONFIG.copy()
-        for key in self.SCALE_KEYS:
-            config[key] = max(1, round(config[key] * ratio))
-        return config
-
-    def _save_config(self):
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=2)
-
     def _position_window(self):
-        screen = QApplication.primaryScreen()
-        full = screen.geometry()
-        avail = screen.availableGeometry()
-        taskbar_top = avail.height()
-        if full.height() - avail.height() < 10:
-            taskbar_top = full.height() - 48
+        full = self.screen.geometry()
+        avail = self.screen.availableGeometry()
+        taskbar_h = full.height() - avail.height()
+        taskbar_top = avail.y() + avail.height()
+        if taskbar_h < 10:
+            taskbar_top = full.y() + full.height() - 48
         max_h = self.config.get("max_height", 20)
         self.grass_area_height = max(80, max_h * PIXEL_SIZE + 30)
         self.ground_y = self.grass_area_height
         self.setGeometry(
-            full.left(), taskbar_top - self.grass_area_height,
+            full.x(), taskbar_top - self.grass_area_height,
             full.width(), self.grass_area_height,
         )
 
@@ -769,80 +730,25 @@ class OverlayWindow(QWidget):
         palettes = [PALETTE_PRESETS[i] for i in palette_indices if i < len(PALETTE_PRESETS)]
         if not palettes:
             palettes = [PALETTE_PRESETS[0]]
-        data_list, seed = generate_grass_data(self.config, width)
-        self.config["seed"] = seed
+        # 画面幅に応じてスケーリングしたconfigで生成
+        screen_w = self.screen.geometry().width()
+        ratio = screen_w / 2400
+        scaled_config = self.config.copy()
+        for key in ["cluster_count", "scatter_count", "num_clusters"]:
+            if key in scaled_config:
+                scaled_config[key] = max(1, round(scaled_config[key] * ratio))
+        data_list, _ = generate_grass_data(scaled_config, width)
         self.grasses = [GrassBlade(d, palettes) for d in data_list]
 
-    def apply_config(self, new_config):
-        self.config.update(new_config)
-        self.wind_sim.set_wind(self.config.get("wind", 50))
-        self._save_config()
-        self._position_window()
-        self._rebuild_grasses()
-
-    def save_preset(self, category, data):
-        """category: 'grass' or 'env'"""
-        cat_dir = os.path.join(SAVE_DIR, category)
-        os.makedirs(cat_dir, exist_ok=True)
-        self.config.update(data)
-        seed = self.config.get("seed", 0)
-        name = f"{category}_{seed}" if category == "grass" else f"env_{int(time.time()) % 100000}"
-        path = os.path.join(cat_dir, f"{name}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        self._save_config()
-
-    def load_preset(self, category, name):
-        path = os.path.join(SAVE_DIR, category, f"{name}.json")
-        if os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.config.update(data)
-            self.wind_sim.set_wind(self.config.get("wind", 50))
-            self._save_config()
-            if category == "grass":
-                self._position_window()
-                self._rebuild_grasses()
-
-    def _tick(self):
-        now = time.monotonic()
-        dt = now - self.last_time
-        self.last_time = now
-        self.wind_sim.update(dt)
+    def update_grasses(self):
         for g in self.grasses:
             wave = self.wind_sim.get_wave_at(g.base_x)
             g.update(wave)
         self.update()
 
-    def _calc_alpha(self, grass_screen_x):
-        """マウスとの距離に応じたアルファ値を計算"""
-        if not self.config.get("mouse_fade_enabled", True):
-            return 255
-        # マウス位置取得（スクリーン座標）
-        mx, my = get_cursor_pos()
-        # ウィンドウのスクリーン座標に変換
-        win_pos = self.mapToGlobal(self.pos())
-        gx = self.x() + grass_screen_x
-        gy = self.y() + self.ground_y // 2  # 草の中間あたり
-
-        dist = math.sqrt((mx - gx) ** 2 + (my - gy) ** 2)
-
-        inner_r = self.config.get("mouse_fade_inner", 30)   # 中心の透過エリア
-        fade_r = self.config.get("mouse_fade_range", 120)    # グラデーション距離
-        min_alpha = self.config.get("mouse_fade_alpha", 15)  # 最も薄い時のアルファ
-
-        if dist <= inner_r:
-            return min_alpha
-        elif dist <= inner_r + fade_r:
-            t = (dist - inner_r) / fade_r  # 0.0 ~ 1.0
-            return int(min_alpha + (255 - min_alpha) * t)
-        else:
-            return 255
-
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
-        # マウス位置を1回だけ取得してキャッシュ
         fade_enabled = self.config.get("mouse_fade_enabled", True)
         if fade_enabled:
             mx, my = get_cursor_pos()
@@ -867,6 +773,139 @@ class OverlayWindow(QWidget):
         painter.end()
 
 
+# --- マルチモニター対応マネージャー ---
+class OverlayManager:
+    BASE_WIDTH = 2400
+    DEFAULT_CONFIG = {
+        "min_height": 4, "max_height": 20,
+        "num_clusters": 5, "cluster_count": 90,
+        "cluster_density": 70, "sparseness": 50,
+        "scatter_count": 20, "scatter_density": 20,
+        "wind": 52, "slim_ratio": 74, "flower_ratio": 44,
+        "palette_indices": [0],
+        "mouse_fade_enabled": True, "mouse_fade_inner": 100,
+        "mouse_fade_range": 120, "mouse_fade_alpha": 0,
+        "seed": 535401,
+    }
+    SCALE_KEYS = ["cluster_count", "scatter_count", "num_clusters"]
+
+    def __init__(self):
+        self.config = self._load_config()
+        self.wind_sim = WindSimulator()
+        self.wind_sim.set_wind(self.config.get("wind", 50))
+        self.last_time = time.monotonic()
+        self.overlays = []
+        self._create_overlays()
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(33)
+
+        self.reposition_timer = QTimer()
+        self.reposition_timer.timeout.connect(self._refresh_screens)
+        self.reposition_timer.start(5000)
+
+    def _create_overlays(self):
+        for o in self.overlays:
+            o.close()
+        self.overlays = []
+        for screen in QApplication.screens():
+            overlay = ScreenOverlay(screen, self.config, self.wind_sim)
+            self.overlays.append(overlay)
+
+    def _refresh_screens(self):
+        current_screens = set(id(s) for s in QApplication.screens())
+        overlay_screens = set(id(o.screen) for o in self.overlays)
+        if current_screens != overlay_screens:
+            self._create_overlays()
+        else:
+            for o in self.overlays:
+                o._position_window()
+
+    def _load_config(self):
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        screen = QApplication.primaryScreen()
+        actual_width = screen.geometry().width() if screen else self.BASE_WIDTH
+        ratio = actual_width / self.BASE_WIDTH
+        config = self.DEFAULT_CONFIG.copy()
+        for key in self.SCALE_KEYS:
+            config[key] = max(1, round(config[key] * ratio))
+        return config
+
+    def _save_config(self):
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.config, f, ensure_ascii=False, indent=2)
+
+    def apply_config(self, new_config):
+        self.config.update(new_config)
+        self.wind_sim.set_wind(self.config.get("wind", 50))
+        self._save_config()
+        for o in self.overlays:
+            o.config = self.config
+            o._position_window()
+            o._rebuild_grasses()
+
+    def save_preset(self, category, data):
+        cat_dir = os.path.join(SAVE_DIR, category)
+        os.makedirs(cat_dir, exist_ok=True)
+        self.config.update(data)
+        seed = self.config.get("seed", 0)
+        name = f"{category}_{seed}" if category == "grass" else f"env_{int(time.time()) % 100000}"
+        path = os.path.join(cat_dir, f"{name}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        self._save_config()
+
+    def load_preset(self, category, name):
+        path = os.path.join(SAVE_DIR, category, f"{name}.json")
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.config.update(data)
+            self.wind_sim.set_wind(self.config.get("wind", 50))
+            self._save_config()
+            if category == "grass":
+                for o in self.overlays:
+                    o.config = self.config
+                    o._position_window()
+                    o._rebuild_grasses()
+
+    def show_all(self):
+        for o in self.overlays:
+            o.show()
+            QTimer.singleShot(100, o._set_click_through)
+
+    def hide_all(self):
+        for o in self.overlays:
+            o.hide()
+
+    def _tick(self):
+        now = time.monotonic()
+        dt = now - self.last_time
+        self.last_time = now
+        self.wind_sim.update(dt)
+        for o in self.overlays:
+            o.update_grasses()
+
+
+def _make_rounded_pixmap(icon_path, size=44, radius_ratio=0.22):
+    """QPainterPath で角丸クリッピングしたピクスマップを返す"""
+    src = QPixmap(icon_path).scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    pix = QPixmap(size, size)
+    pix.fill(Qt.transparent)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.Antialiasing)
+    clip = QPainterPath()
+    r = size * radius_ratio
+    clip.addRoundedRect(0, 0, size, size, r, r)
+    p.setClipPath(clip)
+    p.drawPixmap(0, 0, src)
+    p.end()
+    return pix
+
+
 def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -874,31 +913,25 @@ def main():
     if sys.platform == "darwin":
         setup_mac_app()
 
-    overlay = OverlayWindow()
+    manager = OverlayManager()
     overlay_visible = [True]
 
     def toggle_overlay():
         if overlay_visible[0]:
-            overlay.hide()
-            overlay.timer.stop()
+            manager.hide_all()
+            manager.timer.stop()
         else:
-            overlay.show()
-            overlay.timer.start(33)
-            QTimer.singleShot(100, overlay._set_click_through)
+            manager.show_all()
+            manager.timer.start(33)
         overlay_visible[0] = not overlay_visible[0]
 
     hotkey = HotkeyListener(toggle_overlay)
 
-    # PyInstallerバンドル時は _MEIPASS から、通常時は APP_DIR から読む
-    if getattr(sys, 'frozen', False):
-        bundle_dir = getattr(sys, '_MEIPASS', APP_DIR)
-    else:
-        bundle_dir = APP_DIR
-    icon_path = os.path.join(bundle_dir, "icon.png")
+    icon_path = os.path.join(_resource_dir(), "icon.png")
     if os.path.exists(icon_path):
-        tray_icon = QIcon(icon_path)
+        tray_icon = QIcon(_make_rounded_pixmap(icon_path, size=44, radius_ratio=0.22))
     else:
-        pixmap = QPixmap(16, 16)
+        pixmap = QPixmap(22, 22)
         pixmap.fill(QColor(0x6b, 0xb7, 0x58))
         tray_icon = QIcon(pixmap)
     tray = QSystemTrayIcon(tray_icon, app)
@@ -911,16 +944,15 @@ def main():
             settings_dialog.raise_()
             return
         settings_dialog = SettingsDialog(
-            overlay.config,
-            on_apply=overlay.apply_config,
-            on_save=overlay.save_preset,
-            on_load=overlay.load_preset,
+            manager.config,
+            on_apply=manager.apply_config,
+            on_save=manager.save_preset,
+            on_load=manager.load_preset,
         )
         settings_dialog.show()
         # macOS: ダイアログ表示でオーバーレイが隠れることがあるため再表示
         if sys.platform == "darwin" and overlay_visible[0]:
-            overlay.show()
-            QTimer.singleShot(100, overlay._set_click_through)
+            manager.show_all()
 
     menu = QMenu()
     hotkey_label = "Cmd+Ctrl+Shift+W" if sys.platform == "darwin" else "Win+Ctrl+Shift+W"
@@ -931,7 +963,7 @@ def main():
     settings_action.triggered.connect(open_settings)
     menu.addAction(settings_action)
     regen_action = QAction("再生成")
-    regen_action.triggered.connect(lambda: overlay.apply_config({"seed": random.randint(0, 999999)}))
+    regen_action.triggered.connect(lambda: manager.apply_config({"seed": random.randint(0, 999999)}))
     menu.addAction(regen_action)
     menu.addSeparator()
     quit_action = QAction("終了")
