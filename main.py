@@ -28,6 +28,8 @@ else:
 
 init_dpi()
 
+from i18n import t, set_language, get_language, detect_language
+
 def _app_dir():
     """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
     if getattr(sys, 'frozen', False):
@@ -480,7 +482,7 @@ class SettingsDialog(QDialog):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        title = QLabel("1/f Yuragi")
+        title = QLabel(t("settings_title"))
         title.setFont(QFont("Meiryo", 12, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
@@ -492,16 +494,19 @@ class SettingsDialog(QDialog):
         tab_grass = QWidget()
         tgl = QVBoxLayout(tab_grass)
 
-        g1 = QGroupBox("草の長さ")
+        g1 = QGroupBox(t("grass_length"))
         g1l = QVBoxLayout(g1)
-        self.min_h_slider = self._add_slider(g1l, "最小", 2, 15, self.config.get("min_height", 4))
-        self.max_h_slider = self._add_slider(g1l, "最大", 5, 30, self.config.get("max_height", 20))
+        self.min_h_slider = self._add_slider(g1l, t("min"), 2, 15, self.config.get("min_height", 4))
+        self.max_h_slider = self._add_slider(g1l, t("max"), 5, 30, self.config.get("max_height", 20))
         tgl.addWidget(g1)
 
-        g_type = QGroupBox("草のタイプ")
+        g_type = QGroupBox(t("grass_type"))
         g_type_l = QVBoxLayout(g_type)
-        self.slim_slider = self._add_slider(g_type_l, "細い草", 0, 100, self.config.get("slim_ratio", 40))
-        self.flower_slider = self._add_slider(g_type_l, "花", 0, 100, self.config.get("flower_ratio", 15))
+        desc = QLabel(t("type_desc"))
+        desc.setStyleSheet("color: #666; font-size: 11px;")
+        g_type_l.addWidget(desc)
+        self.slim_slider = self._add_slider(g_type_l, t("slim"), 0, 100, self.config.get("slim_ratio", 40))
+        self.flower_slider = self._add_slider(g_type_l, t("flower"), 0, 100, self.config.get("flower_ratio", 15))
         self.balance_label = QLabel()
         self.balance_label.setStyleSheet("color: #444; font-size: 11px;")
         g_type_l.addWidget(self.balance_label)
@@ -510,7 +515,7 @@ class SettingsDialog(QDialog):
         self._update_balance_label()
         tgl.addWidget(g_type)
 
-        g5 = QGroupBox("色の系統")
+        g5 = QGroupBox(t("color_palette"))
         g5l = QVBoxLayout(g5)
         self.palette_checks = []
         for i, p in enumerate(PALETTE_PRESETS):
@@ -527,81 +532,87 @@ class SettingsDialog(QDialog):
             self.palette_checks.append(btn)
         tgl.addWidget(g5)
 
-        tabs.addTab(tab_grass, "草")
+        tabs.addTab(tab_grass, t("tab_grass"))
 
         # === タブ2: 配置 ===
         tab_layout = QWidget()
         tll = QVBoxLayout(tab_layout)
 
-        gc = QGroupBox("密集エリア (茂み)")
+        gc = QGroupBox(t("cluster_area"))
         gcl = QVBoxLayout(gc)
-        self.num_clusters_slider = self._add_slider(gcl, "塊の数", 0, 20, self.config.get("num_clusters", 5))
-        self.cluster_count_slider = self._add_slider(gcl, "総本数", 0, 150, self.config.get("cluster_count", 40))
-        self.cluster_density_slider = self._add_slider(gcl, "密集度", 0, 100, self.config.get("cluster_density", 70))
-        self.sparseness_slider = self._add_slider(gcl, "間隔", 0, 100, self.config.get("sparseness", 50))
+        self.num_clusters_slider = self._add_slider(gcl, t("num_clusters"), 0, 20, self.config.get("num_clusters", 5))
+        self.cluster_count_slider = self._add_slider(gcl, t("total_count"), 0, 150, self.config.get("cluster_count", 40))
+        self.cluster_density_slider = self._add_slider(gcl, t("density"), 0, 100, self.config.get("cluster_density", 70))
+        self.sparseness_slider = self._add_slider(gcl, t("spacing"), 0, 100, self.config.get("sparseness", 50))
+        cd_desc = QLabel(t("cluster_desc"))
+        cd_desc.setStyleSheet("color: #666; font-size: 10px;")
+        gcl.addWidget(cd_desc)
         tll.addWidget(gc)
 
-        gs = QGroupBox("散在エリア (バラバラ)")
+        gs = QGroupBox(t("scatter_area"))
         gsl = QVBoxLayout(gs)
-        self.scatter_count_slider = self._add_slider(gsl, "本数", 0, 150, self.config.get("scatter_count", 20))
-        self.scatter_density_slider = self._add_slider(gsl, "密度", 0, 100, self.config.get("scatter_density", 20))
+        self.scatter_count_slider = self._add_slider(gsl, t("count"), 0, 150, self.config.get("scatter_count", 20))
+        self.scatter_density_slider = self._add_slider(gsl, t("scatter_density"), 0, 100, self.config.get("scatter_density", 20))
+        sd_desc = QLabel(t("scatter_desc"))
+        sd_desc.setStyleSheet("color: #666; font-size: 10px;")
+        gsl.addWidget(sd_desc)
         tll.addWidget(gs)
 
-        tabs.addTab(tab_layout, "配置")
+        tabs.addTab(tab_layout, t("tab_layout"))
 
         # === タブ3: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
 
-        g4 = QGroupBox("風の強さ")
+        g4 = QGroupBox(t("wind_strength"))
         g4l = QVBoxLayout(g4)
-        self.wind_slider = self._add_slider(g4l, "風", 0, 100, self.config.get("wind", 50))
+        self.wind_slider = self._add_slider(g4l, t("wind"), 0, 100, self.config.get("wind", 50))
         tel.addWidget(g4)
 
-        gm = QGroupBox("マウス近接で透過")
+        gm = QGroupBox(t("mouse_fade"))
         gml = QVBoxLayout(gm)
         self.mouse_fade_btn = QPushButton("ON" if self.config.get("mouse_fade_enabled", True) else "OFF")
         self.mouse_fade_btn.setCheckable(True)
         self.mouse_fade_btn.setChecked(self.config.get("mouse_fade_enabled", True))
         self.mouse_fade_btn.toggled.connect(lambda c: self.mouse_fade_btn.setText("ON" if c else "OFF"))
         gml.addWidget(self.mouse_fade_btn)
-        self.fade_inner_slider = self._add_slider(gml, "中心", 0, 200, self.config.get("mouse_fade_inner", 30))
-        self.fade_range_slider = self._add_slider(gml, "範囲", 10, 500, self.config.get("mouse_fade_range", 120))
-        self.fade_alpha_slider = self._add_slider(gml, "透過度", 0, 200, self.config.get("mouse_fade_alpha", 15))
-        fade_desc = QLabel("中心: 透過半径 / 範囲: グラデ距離 / 透過度: 最小の濃さ")
+        self.fade_inner_slider = self._add_slider(gml, t("fade_center"), 0, 200, self.config.get("mouse_fade_inner", 30))
+        self.fade_range_slider = self._add_slider(gml, t("fade_range"), 10, 500, self.config.get("mouse_fade_range", 120))
+        self.fade_alpha_slider = self._add_slider(gml, t("fade_alpha"), 0, 200, self.config.get("mouse_fade_alpha", 15))
+        fade_desc = QLabel(t("fade_desc"))
         fade_desc.setStyleSheet("color: #666; font-size: 10px;")
         fade_desc.setWordWrap(True)
         gml.addWidget(fade_desc)
         tel.addWidget(gm)
 
-        g_startup = QGroupBox("システム")
+        g_startup = QGroupBox(t("system"))
         g_sl = QVBoxLayout(g_startup)
-        self.startup_check = QCheckBox("PC起動時に自動で起動する")
+        self.startup_check = QCheckBox(t("auto_startup"))
         self.startup_check.setChecked(is_startup_enabled())
         self.startup_check.toggled.connect(lambda c: set_startup_enabled(c))
         g_sl.addWidget(self.startup_check)
         tel.addWidget(g_startup)
 
-        tabs.addTab(tab_env, "環境")
+        tabs.addTab(tab_env, t("tab_env"))
 
         # === タブ4: オプション ===
         tab_opt = QWidget()
         tol = QVBoxLayout(tab_opt)
 
-        g_light = QGroupBox("時間帯ライティング")
+        g_light = QGroupBox(t("lighting"))
         g_ll = QVBoxLayout(g_light)
-        light_desc = QLabel("現在時刻に合わせて草の色が変化します\n朝焼け → 日中 → 夕暮れ → 夜（月明かり）")
+        light_desc = QLabel(t("lighting_desc"))
         light_desc.setStyleSheet("color: #666; font-size: 11px;")
         light_desc.setWordWrap(True)
         g_ll.addWidget(light_desc)
 
         self.lighting_combo = QComboBox()
-        self.lighting_combo.addItem("OFF", "off")
-        self.lighting_combo.addItem("自動（現在時刻に連動）", "auto")
-        self.lighting_combo.addItem("朝焼け", "sunrise")
-        self.lighting_combo.addItem("日中", "daytime")
-        self.lighting_combo.addItem("夕暮れ", "sunset")
-        self.lighting_combo.addItem("夜（月明かり）", "night")
+        self.lighting_combo.addItem(t("light_off"), "off")
+        self.lighting_combo.addItem(t("light_auto"), "auto")
+        self.lighting_combo.addItem(t("light_sunrise"), "sunrise")
+        self.lighting_combo.addItem(t("light_daytime"), "daytime")
+        self.lighting_combo.addItem(t("light_sunset"), "sunset")
+        self.lighting_combo.addItem(t("light_night"), "night")
         current_mode = self.config.get("lighting_mode", "off")
         for i in range(self.lighting_combo.count()):
             if self.lighting_combo.itemData(i) == current_mode:
@@ -609,52 +620,71 @@ class SettingsDialog(QDialog):
                 break
         self.lighting_combo.currentIndexChanged.connect(self._on_lighting_changed)
         g_ll.addWidget(self.lighting_combo)
+
+        # 言語切替
+        g_lang = QGroupBox("Language")
+        g_lang_l = QVBoxLayout(g_lang)
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItem("日本語", "ja")
+        self.lang_combo.addItem("English", "en")
+        current_lang = self.config.get("language", get_language())
+        for i in range(self.lang_combo.count()):
+            if self.lang_combo.itemData(i) == current_lang:
+                self.lang_combo.setCurrentIndex(i)
+                break
+        self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
+        g_lang_l.addWidget(self.lang_combo)
+        lang_note = QLabel("* Restart settings to apply" if get_language() == "en" else "* 設定画面を開き直すと反映されます")
+        lang_note.setStyleSheet("color: #888; font-size: 10px;")
+        g_lang_l.addWidget(lang_note)
+        g_lang.setLayout(g_lang_l)
         tol.addWidget(g_light)
+        tol.addWidget(g_lang)
 
         tol.addStretch()
-        tabs.addTab(tab_opt, "オプション")
+        tabs.addTab(tab_opt, t("tab_option"))
 
         # === タブ5: 保存 ===
         tab_save = QWidget()
         tsl = QVBoxLayout(tab_save)
 
         btn_row = QHBoxLayout()
-        regen_btn = QPushButton("再生成")
+        regen_btn = QPushButton(t("regenerate"))
         regen_btn.clicked.connect(self._on_regenerate)
-        apply_btn = QPushButton("適用")
+        apply_btn = QPushButton(t("apply"))
         apply_btn.clicked.connect(self._on_apply)
         btn_row.addWidget(regen_btn)
         btn_row.addWidget(apply_btn)
         tsl.addLayout(btn_row)
 
-        g_save_grass = QGroupBox("草プリセット (配置・形状・色)")
+        g_save_grass = QGroupBox(t("grass_preset"))
         g_sg_l = QVBoxLayout(g_save_grass)
         sg_row1 = QHBoxLayout()
-        save_grass_btn = QPushButton("草を保存")
+        save_grass_btn = QPushButton(t("save_grass"))
         save_grass_btn.clicked.connect(self._on_save_grass)
         sg_row1.addWidget(save_grass_btn)
         g_sg_l.addLayout(sg_row1)
         sg_row2 = QHBoxLayout()
         self.grass_combo = QComboBox()
         self._refresh_grass_saves()
-        load_grass_btn = QPushButton("読み込み")
+        load_grass_btn = QPushButton(t("load"))
         load_grass_btn.clicked.connect(self._on_load_grass)
         sg_row2.addWidget(self.grass_combo, 1)
         sg_row2.addWidget(load_grass_btn)
         g_sg_l.addLayout(sg_row2)
         tsl.addWidget(g_save_grass)
 
-        g_save_env = QGroupBox("環境設定 (風・マウス透過)")
+        g_save_env = QGroupBox(t("env_preset"))
         g_se_l = QVBoxLayout(g_save_env)
         se_row1 = QHBoxLayout()
-        save_env_btn = QPushButton("環境を保存")
+        save_env_btn = QPushButton(t("save_env"))
         save_env_btn.clicked.connect(self._on_save_env)
         se_row1.addWidget(save_env_btn)
         g_se_l.addLayout(se_row1)
         se_row2 = QHBoxLayout()
         self.env_combo = QComboBox()
         self._refresh_env_saves()
-        load_env_btn = QPushButton("読み込み")
+        load_env_btn = QPushButton(t("load"))
         load_env_btn.clicked.connect(self._on_load_env)
         se_row2.addWidget(self.env_combo, 1)
         se_row2.addWidget(load_env_btn)
@@ -662,7 +692,12 @@ class SettingsDialog(QDialog):
         tsl.addWidget(g_save_env)
 
         tsl.addStretch()
-        tabs.addTab(tab_save, "保存")
+        tabs.addTab(tab_save, t("tab_save"))
+
+    def _on_language_changed(self):
+        lang = self.lang_combo.currentData()
+        set_language(lang)
+        self.on_apply({"language": lang})
 
     def _update_balance_label(self):
         s = self.slim_slider.value()
@@ -678,7 +713,7 @@ class SettingsDialog(QDialog):
             s_pct = s
             f_pct = f
         self.balance_label.setText(
-            f"  → 細い草 {s_pct}% : 葉付き {leafy}% : 花 {f_pct}%"
+            t("balance_fmt").format(s=s_pct, l=leafy, f=f_pct)
         )
 
     def _add_slider(self, layout, label, min_val, max_val, current):
@@ -719,6 +754,7 @@ class SettingsDialog(QDialog):
             "mouse_fade_range": self.fade_range_slider.value(),
             "mouse_fade_alpha": self.fade_alpha_slider.value(),
             "lighting_mode": self.lighting_combo.currentData(),
+            "language": self.lang_combo.currentData(),
         }
 
     def _on_lighting_changed(self):
@@ -896,6 +932,10 @@ class OverlayManager:
 
     def __init__(self):
         self.config = self._load_config()
+        # 保存済み言語設定を反映
+        saved_lang = self.config.get("language")
+        if saved_lang:
+            set_language(saved_lang)
         self.wind_sim = WindSimulator()
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self.last_time = time.monotonic()
@@ -1061,22 +1101,22 @@ def main():
 
     menu = QMenu()
     hotkey_label = "Cmd+Ctrl+Shift+W" if sys.platform == "darwin" else "Win+Ctrl+Shift+W"
-    toggle_action = QAction(f"表示切替 ({hotkey_label})")
+    toggle_action = QAction(f"{t('toggle')} ({hotkey_label})")
     toggle_action.triggered.connect(toggle_overlay)
     menu.addAction(toggle_action)
-    settings_action = QAction("設定")
+    settings_action = QAction(t("settings"))
     settings_action.triggered.connect(open_settings)
     menu.addAction(settings_action)
-    regen_action = QAction("再生成")
+    regen_action = QAction(t("regenerate"))
     regen_action.triggered.connect(lambda: manager.apply_config({"seed": random.randint(0, 999999)}))
     menu.addAction(regen_action)
     menu.addSeparator()
-    quit_action = QAction("終了")
+    quit_action = QAction(t("quit"))
     quit_action.triggered.connect(lambda: (hotkey.cleanup(), app.quit()))
     menu.addAction(quit_action)
 
     tray.setContextMenu(menu)
-    tray.setToolTip(f"1/f Yuragi ({hotkey_label} で表示切替)")
+    tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 
