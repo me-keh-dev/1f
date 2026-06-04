@@ -178,6 +178,15 @@ Grass will appear above the taskbar (Windows) / Dock (macOS) on launch.
 - Nigg et al. (2024) — *Systematic Review and Meta-Analysis: Do White/Pink Noise Help With Task Performance in Youth With ADHD?*
 - Rijmen et al. (2026) — *Pink Noise and a Pure Tone Both Reduce 1/f Neural Noise in Adults With Elevated ADHD Traits*
 
+### Code Signing Policy
+
+Windows executables are signed via [SignPath Foundation](https://signpath.org/) free code signing for OSS.
+
+- Signing is performed exclusively through GitHub Actions CI/CD
+- Only artifacts built from this repository's source code are signed
+- The signing team is identical to the development team
+- No functionality that compromises user privacy or security
+
 ### License
 
 [MIT License](LICENSE)
