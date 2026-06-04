@@ -20,9 +20,9 @@ from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
 if sys.platform == "win32":
-    from platform_win import init_dpi, set_click_through, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+    from platform_win import init_dpi, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
 elif sys.platform == "darwin":
-    from platform_mac import init_dpi, setup_mac_app, set_click_through, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+    from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
 else:
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
@@ -818,6 +818,8 @@ class ScreenOverlay(QWidget):
             full.x(), taskbar_top - self.grass_area_height,
             full.width(), self.grass_area_height,
         )
+        # 最前面を再設定（他アプリに奪われた場合の回復）
+        ensure_topmost(int(self.winId()))
 
     def _rebuild_grasses(self):
         width = self.width()

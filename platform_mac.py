@@ -49,6 +49,10 @@ def set_click_through(hwnd):
     except Exception:
         pass
 
+def ensure_topmost(hwnd):
+    """macOSではset_click_throughで設定済みのため追加処理不要"""
+    pass
+
 # --- カーソル位置 ---
 def get_cursor_pos():
     pos = QCursor.pos()

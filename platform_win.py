@@ -16,11 +16,28 @@ WS_EX_TRANSPARENT = 0x00000020
 WS_EX_LAYERED = 0x00080000
 WS_EX_TOOLWINDOW = 0x00000080
 
+HWND_TOPMOST = -1
+SWP_NOMOVE = 0x0002
+SWP_NOSIZE = 0x0001
+SWP_NOACTIVATE = 0x0010
+
 def set_click_through(hwnd):
     style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
     ctypes.windll.user32.SetWindowLongW(
         hwnd, GWL_EXSTYLE,
         style | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW
+    )
+    # Win32 APIで確実にTOPMOSTに設定
+    ctypes.windll.user32.SetWindowPos(
+        hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    )
+
+def ensure_topmost(hwnd):
+    """定期的に呼んで最前面を再設定する"""
+    ctypes.windll.user32.SetWindowPos(
+        hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     )
 
 # --- カーソル位置 ---
