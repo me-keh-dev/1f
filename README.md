@@ -1,4 +1,4 @@
-# 1/f Yuragi - ADHD Focus Support Overlay
+# 1/f Yuragi
 
 **タスクバー（Windows）/ Dock（macOS）の上にドット絵の草を生やし、1/fゆらぎの風で揺らすデスクトップオーバーレイ**
 
@@ -10,9 +10,12 @@
 
 ### これは何？
 
-ADHDなど多動傾向のある方の**集中支援**を目的としたデスクトップオーバーレイアプリです。
+タスクバーのすぐ上にファミコン風のドット絵の草が生え、1/fゆらぎで自然に揺れます。風が左から右に波のように伝播し、まるで高原の草原のような動きを作り出します。天気に連動して雨や雪が降り、時間帯で草の色が変わります。
 
-タスクバーのすぐ上にファミコン風のドット絵の草が生え、1/fゆらぎで自然に揺れます。風が左から右に波のように伝播し、まるで高原の草原のような動きを作り出します。
+**2つのモードで使えます：**
+
+- **フォーカスモード** — ADHDなど多動傾向のある方の集中支援。1/fゆらぎによる適度な視覚ノイズが、脳の覚醒レベルを最適化して過集中のスイッチを入れます。
+- **デコレーションモード** — 静かな草原の景色を楽しむデスクトップ装飾。風を穏やかにし、天気やライティングで季節感のある環境を作ります。
 
 ### 背景：なぜこのアプリが必要なのか
 
@@ -44,15 +47,18 @@ Nigg et al. (2024) による335名を対象としたメタ分析では、ホワ�
 
 ### 特徴
 
+- **2つのモード**: フォーカスモード（集中支援）/ デコレーションモード（デスクトップ装飾）
 - **1/fゆらぎ**: Voss-McCartney アルゴリズムによる自然な揺れ
 - **風の波**: 左から右にさささ〜っと伝播する風。突風もあり
+- **天気連動**: 実際の天気に基づいて雨や雪のドット絵エフェクト（3レイヤー奥行き付き）
+- **時間帯ライティング**: 朝焼け → 日中 → 夕暮れ → 夜（月明かり）で草の色が変化
 - **完全クリック透過**: マウス操作に一切干渉しない
 - **マウス近接透過**: マウスが近づくと草がフェードアウト
 - **プロシージャル生成**: 草の形状・配置を自動生成。気に入ったら保存
 - **3タイプの草**: しゅっとした細い草 / 葉付き草 / 花付き草
 - **8色パレット**: フォレスト、エメラルド、オータム、オーシャン、サクラ、ラベンダー、サンセット、モス
-- **詳細な設定UI**: 長さ、密集度、まばら具合、風の強さ、色、マウス透過をすべてスライダーで調整
-- **設定の分離保存**: 草プリセット（配置）と環境設定（風・マウス）を別々に保存/読み込み
+- **マルチモニター対応**: 接続された全画面に草を表示
+- **詳細な設定UI**: 2段タブで全パラメータをスライダー調整
 - **表示切替**: Win+Ctrl+Shift+W（Windows）/ Cmd+Ctrl+Shift+W（macOS）でON/OFF
 
 ### ダウンロード
@@ -131,9 +137,13 @@ python main.py
 
 ### What is this?
 
-A desktop overlay app for **ADHD focus support** on Windows and macOS.
+A desktop overlay app for **focus support and desktop decoration** on Windows and macOS.
 
-Pixel-art grass grows above the taskbar (Windows) or Dock (macOS) and sways with 1/f fluctuation. Wind waves propagate from left to right, creating a natural meadow-like animation.
+Pixel-art grass grows above the taskbar (Windows) or Dock (macOS) and sways with 1/f fluctuation. Wind waves propagate from left to right, creating a natural meadow-like animation. Rain and snow fall based on real weather, and colors change with the time of day.
+
+**Two modes:**
+- **Focus Mode** — ADHD focus support through moderate visual ambient noise based on 1/f fluctuation
+- **Decoration Mode** — Enjoy a quiet meadow scenery with gentle wind, weather effects, and time-based lighting
 
 ### Why does swaying grass help focus?
 

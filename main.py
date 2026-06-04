@@ -29,6 +29,8 @@ else:
 init_dpi()
 
 from i18n import t, set_language, get_language, detect_language
+from weather import WeatherMonitor
+from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
 
 def _app_dir():
     """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
@@ -78,10 +80,23 @@ PALETTE_PRESETS = [
     {"name": "モス",         "dark": (0x2a,0x40,0x1a), "mid": (0x4a,0x6a,0x2a), "bright": (0x7a,0x9a,0x4a), "tip": (0xb0,0xd0,0x70)},
 ]
 
-FLOWER_COLORS = [
-    (220, 50, 50), (255, 100, 80), (80, 80, 220), (100, 120, 255),
-    (255, 220, 50), (255, 180, 200), (200, 130, 255), (255, 255, 255),
+FLOWER_COLORS_ALL = [
+    {"rgb": (220, 50, 50),   "key": "fc_red"},
+    {"rgb": (255, 100, 80),  "key": "fc_vermilion"},
+    {"rgb": (80, 80, 220),   "key": "fc_blue"},
+    {"rgb": (100, 120, 255), "key": "fc_lightblue"},
+    {"rgb": (255, 220, 50),  "key": "fc_yellow"},
+    {"rgb": (255, 180, 200), "key": "fc_pink"},
+    {"rgb": (200, 130, 255), "key": "fc_purple"},
+    {"rgb": (255, 255, 255), "key": "fc_white"},
 ]
+# 有効な花色リスト（configから動的に生成）
+def get_active_flower_colors(config):
+    enabled = config.get("flower_colors_enabled", list(range(len(FLOWER_COLORS_ALL))))
+    return [FLOWER_COLORS_ALL[i]["rgb"] for i in enabled if i < len(FLOWER_COLORS_ALL)]
+
+# 後方互換: 古いコードが FLOWER_COLORS を参照する場合
+FLOWER_COLORS = [c["rgb"] for c in FLOWER_COLORS_ALL]
 
 PIXEL_SIZE = 4
 
@@ -210,7 +225,7 @@ def generate_flower_grass(height, rng):
             shade = 3 if (ly / height) > 0.6 else 2
             pixels.append((lx, ly, shade))
 
-    flower_color = rng.choice(FLOWER_COLORS)
+    flower_color = rng.choice(FLOWER_COLORS)  # デフォルト、configベースは generate_grass_data で上書き
     return pixels, flower_color
 
 
@@ -223,6 +238,7 @@ def generate_grass_data(config, screen_width):
     max_h = config.get("max_height", 20)
     wind = config.get("wind", 50)
     palette_indices = config.get("palette_indices", [0])
+    active_flowers = get_active_flower_colors(config) or FLOWER_COLORS
 
     slim_pct = config.get("slim_ratio", 40)
     flower_pct = config.get("flower_ratio", 15)
@@ -252,6 +268,7 @@ def generate_grass_data(config, screen_width):
             pixels, flower_color = generate_slim_grass(height, rng)
         elif roll < slim_pct + flower_pct:
             pixels, flower_color = generate_flower_grass(height, rng)
+            flower_color = rng.choice(active_flowers)  # 有効な花色から選択
         else:
             pixels, flower_color = generate_leafy_grass(height, rng)
         return {
@@ -477,18 +494,29 @@ class SettingsDialog(QDialog):
         self.on_save = on_save
         self.on_load = on_load
         self.setWindowTitle("1/f Yuragi - 設定")
-        self.setFixedWidth(480)
         self._build_ui()
 
     def _build_ui(self):
+        from PyQt5.QtWidgets import QSplitter
         layout = QVBoxLayout(self)
         title = QLabel(t("settings_title"))
         title.setFont(QFont("Meiryo", 12, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        # 左右レイアウト
+        hbox = QHBoxLayout()
+        layout.addLayout(hbox)
+
+        # 左: メイン設定タブ
         tabs = QTabWidget()
-        layout.addWidget(tabs)
+        tabs.setMinimumWidth(380)
+        hbox.addWidget(tabs, 1)
+
+        # 右: オプション・テストタブ
+        tabs2 = QTabWidget()
+        tabs2.setMinimumWidth(320)
+        hbox.addWidget(tabs2, 1)
 
         # === タブ1: 草 ===
         tab_grass = QWidget()
@@ -515,22 +543,26 @@ class SettingsDialog(QDialog):
         self._update_balance_label()
         tgl.addWidget(g_type)
 
-        g5 = QGroupBox(t("color_palette"))
-        g5l = QVBoxLayout(g5)
-        self.palette_checks = []
-        for i, p in enumerate(PALETTE_PRESETS):
+
+        # 花の色
+        g_fc = QGroupBox(t("flower_colors"))
+        g_fcl = QVBoxLayout(g_fc)
+        self.flower_color_checks = []
+        enabled_flowers = self.config.get("flower_colors_enabled", list(range(len(FLOWER_COLORS_ALL))))
+        for i, fc in enumerate(FLOWER_COLORS_ALL):
             row = QHBoxLayout()
-            btn = QPushButton()
-            btn.setFixedSize(20, 20)
-            btn.setStyleSheet(f"background-color: rgb{p['bright']}; border: 2px solid #333;")
-            btn.setCheckable(True)
-            btn.setChecked(i in self.config.get("palette_indices", [0]))
-            row.addWidget(btn)
-            row.addWidget(QLabel(p["name"]))
+            cb = QCheckBox(t(fc["key"]))
+            cb.setChecked(i in enabled_flowers)
+            color_icon = QLabel()
+            color_icon.setFixedSize(16, 16)
+            r, g, b = fc["rgb"]
+            color_icon.setStyleSheet(f"background-color: rgb({r},{g},{b}); border: 1px solid #999;")
+            row.addWidget(cb)
+            row.addWidget(color_icon)
             row.addStretch()
-            g5l.addLayout(row)
-            self.palette_checks.append(btn)
-        tgl.addWidget(g5)
+            g_fcl.addLayout(row)
+            self.flower_color_checks.append(cb)
+        tgl.addWidget(g_fc)
 
         tabs.addTab(tab_grass, t("tab_grass"))
 
@@ -563,6 +595,26 @@ class SettingsDialog(QDialog):
         # === タブ3: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
+
+        g_mode = QGroupBox(t("mode"))
+        g_ml = QVBoxLayout(g_mode)
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem(t("mode_focus"), "focus")
+        self.mode_combo.addItem(t("mode_deco"), "deco")
+        self.mode_combo.addItem(t("mode_custom"), "custom")
+        current_mode = self.config.get("app_mode", "focus")
+        for i in range(self.mode_combo.count()):
+            if self.mode_combo.itemData(i) == current_mode:
+                self.mode_combo.setCurrentIndex(i)
+                break
+        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        g_ml.addWidget(self.mode_combo)
+        self.mode_desc_label = QLabel()
+        self.mode_desc_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.mode_desc_label.setWordWrap(True)
+        self._update_mode_desc()
+        g_ml.addWidget(self.mode_desc_label)
+        tel.addWidget(g_mode)
 
         g4 = QGroupBox(t("wind_strength"))
         g4l = QVBoxLayout(g4)
@@ -638,11 +690,47 @@ class SettingsDialog(QDialog):
         lang_note.setStyleSheet("color: #888; font-size: 10px;")
         g_lang_l.addWidget(lang_note)
         g_lang.setLayout(g_lang_l)
+        # 天気エフェクト
+        g_weather = QGroupBox(t("weather"))
+        g_wl = QVBoxLayout(g_weather)
+        weather_desc = QLabel(t("weather_desc"))
+        weather_desc.setStyleSheet("color: #666; font-size: 11px;")
+        weather_desc.setWordWrap(True)
+        g_wl.addWidget(weather_desc)
+        self.weather_btn = QPushButton("ON" if self.config.get("weather_enabled", True) else "OFF")
+        self.weather_btn.setCheckable(True)
+        self.weather_btn.setChecked(self.config.get("weather_enabled", True))
+        self.weather_btn.toggled.connect(self._on_weather_toggled)
+        g_wl.addWidget(self.weather_btn)
+
+
+        # 風速連動
+        g_wsync = QGroupBox(t("wind_sync"))
+        g_wsl = QVBoxLayout(g_wsync)
+        wsync_desc = QLabel(t("wind_sync_desc"))
+        wsync_desc.setStyleSheet("color: #666; font-size: 11px;")
+        wsync_desc.setWordWrap(True)
+        g_wsl.addWidget(wsync_desc)
+        self.wind_sync_btn = QPushButton("ON" if self.config.get("wind_sync_enabled", False) else "OFF")
+        self.wind_sync_btn.setCheckable(True)
+        self.wind_sync_btn.setChecked(self.config.get("wind_sync_enabled", False))
+        self.wind_sync_btn.toggled.connect(self._on_wind_sync_toggled)
+        g_wsl.addWidget(self.wind_sync_btn)
+        limit_desc = QLabel(t("wind_limit_desc"))
+        limit_desc.setStyleSheet("color: #666; font-size: 10px;")
+        g_wsl.addWidget(limit_desc)
+        self.wind_limit_slider = self._add_slider(g_wsl, t("wind_limit"), 10, 30, self.config.get("wind_sync_limit", 15))
+        limit_note = QLabel("e.g. 15 = up to 1.5x your wind setting" if get_language() == "en" else "例: 15 = あなたの風設定の最大1.5倍まで")
+        limit_note.setStyleSheet("color: #888; font-size: 10px;")
+        g_wsl.addWidget(limit_note)
+
         tol.addWidget(g_light)
+        tol.addWidget(g_weather)
+        tol.addWidget(g_wsync)
         tol.addWidget(g_lang)
 
         tol.addStretch()
-        tabs.addTab(tab_opt, t("tab_option"))
+        tabs2.addTab(tab_opt, t("tab_option"))
 
         # === タブ5: 保存 ===
         tab_save = QWidget()
@@ -694,6 +782,100 @@ class SettingsDialog(QDialog):
         tsl.addStretch()
         tabs.addTab(tab_save, t("tab_save"))
 
+        # === 2段目: グラフィックテスト ===
+        tab_test = QWidget()
+        ttl = QVBoxLayout(tab_test)
+
+        # 天気テスト
+        g_wtest = QGroupBox(t("gfx_test_weather"))
+        g_wtl = QVBoxLayout(g_wtest)
+        self.weather_test_combo = QComboBox()
+        self.weather_test_combo.addItem("--", "auto")
+        self.weather_test_combo.addItem("Clear", "clear")
+        self.weather_test_combo.addItem("Drizzle", "drizzle")
+        self.weather_test_combo.addItem("Rain", "rain")
+        self.weather_test_combo.addItem("Rain + Wind", "rain_wind")
+        self.weather_test_combo.addItem("Heavy Rain", "heavy_rain")
+        self.weather_test_combo.addItem("Thunderstorm", "thunderstorm")
+        self.weather_test_combo.addItem("Snow", "snow")
+        self.weather_test_combo.addItem("Heavy Snow", "heavy_snow")
+        self.weather_test_combo.currentIndexChanged.connect(self._on_weather_test)
+        g_wtl.addWidget(self.weather_test_combo)
+        ttl.addWidget(g_wtest)
+
+        # ライティングテスト
+        g_ltest = QGroupBox(t("gfx_test_lighting"))
+        g_ltl = QVBoxLayout(g_ltest)
+        self.lighting_test_combo = QComboBox()
+        self.lighting_test_combo.addItem("--", "test_off")
+        self.lighting_test_combo.addItem(t("light_sunrise"), "sunrise")
+        self.lighting_test_combo.addItem(t("light_daytime"), "daytime")
+        self.lighting_test_combo.addItem(t("light_sunset"), "sunset")
+        self.lighting_test_combo.addItem(t("light_night"), "night")
+        self.lighting_test_combo.currentIndexChanged.connect(self._on_lighting_test)
+        g_ltl.addWidget(self.lighting_test_combo)
+        ttl.addWidget(g_ltest)
+
+        ttl.addStretch()
+        tabs2.addTab(tab_test, t("tab_gfx_test"))
+
+    def _update_mode_desc(self):
+        mode = self.mode_combo.currentData()
+        if mode == "focus":
+            self.mode_desc_label.setText(t("mode_focus_desc"))
+        elif mode == "deco":
+            self.mode_desc_label.setText(t("mode_deco_desc"))
+        else:
+            self.mode_desc_label.setText("")
+
+    def _on_mode_changed(self):
+        mode = self.mode_combo.currentData()
+        self._update_mode_desc()
+        if mode == "focus":
+            self.on_apply({
+                "app_mode": "focus",
+                "wind": 52,
+                "lighting_mode": "auto",
+                "weather_enabled": True,
+                "wind_sync_enabled": False,
+            })
+            self.wind_slider.setValue(52)
+            self.lighting_combo.setCurrentIndex(1)  # auto
+        elif mode == "deco":
+            self.on_apply({
+                "app_mode": "deco",
+                "wind": 10,
+                "lighting_mode": "auto",
+                "weather_enabled": True,
+                "wind_sync_enabled": False,
+            })
+            self.wind_slider.setValue(10)
+            self.lighting_combo.setCurrentIndex(1)  # auto
+        else:
+            self.on_apply({"app_mode": "custom"})
+
+    def _on_wind_sync_toggled(self, checked):
+        self.wind_sync_btn.setText("ON" if checked else "OFF")
+        self.on_apply({"wind_sync_enabled": checked})
+
+    def _on_weather_toggled(self, checked):
+        self.weather_btn.setText("ON" if checked else "OFF")
+        self.on_apply({"weather_enabled": checked})
+
+    def _on_weather_test(self):
+        state = self.weather_test_combo.currentData()
+        if state == "auto":
+            return
+        self.on_apply({"_weather_test": state})
+
+    def _on_lighting_test(self):
+        mode = self.lighting_test_combo.currentData()
+        if mode == "test_off":
+            # オプションの設定に戻す
+            self.on_apply({"_lighting_test": None})
+        else:
+            self.on_apply({"_lighting_test": mode})
+
     def _on_language_changed(self):
         lang = self.lang_combo.currentData()
         set_language(lang)
@@ -733,9 +915,7 @@ class SettingsDialog(QDialog):
         return slider
 
     def _gather_config(self):
-        indices = [i for i, btn in enumerate(self.palette_checks) if btn.isChecked()]
-        if not indices:
-            indices = [0]
+        indices = self.config.get("palette_indices", [0])
         return {
             "min_height": self.min_h_slider.value(),
             "max_height": max(self.max_h_slider.value(), self.min_h_slider.value() + 1),
@@ -749,11 +929,16 @@ class SettingsDialog(QDialog):
             "slim_ratio": self.slim_slider.value(),
             "flower_ratio": self.flower_slider.value(),
             "palette_indices": indices,
+            "flower_colors_enabled": [i for i, btn in enumerate(self.flower_color_checks) if btn.isChecked()],
             "mouse_fade_enabled": self.mouse_fade_btn.isChecked(),
             "mouse_fade_inner": self.fade_inner_slider.value(),
             "mouse_fade_range": self.fade_range_slider.value(),
             "mouse_fade_alpha": self.fade_alpha_slider.value(),
             "lighting_mode": self.lighting_combo.currentData(),
+            "app_mode": self.mode_combo.currentData(),
+            "weather_enabled": self.weather_btn.isChecked(),
+            "wind_sync_enabled": self.wind_sync_btn.isChecked(),
+            "wind_sync_limit": self.wind_limit_slider.value(),
             "language": self.lang_combo.currentData(),
         }
 
@@ -774,12 +959,13 @@ class SettingsDialog(QDialog):
     GRASS_KEYS = [
         "min_height", "max_height", "num_clusters", "cluster_count",
         "cluster_density", "sparseness", "scatter_count", "scatter_density",
-        "slim_ratio", "flower_ratio", "palette_indices", "seed",
+        "slim_ratio", "flower_ratio", "palette_indices", "flower_colors_enabled", "seed",
     ]
     # 環境設定のキー
     ENV_KEYS = [
         "wind", "mouse_fade_enabled", "mouse_fade_inner",
         "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
+        "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
     ]
 
     def _on_save_grass(self):
@@ -826,6 +1012,7 @@ class ScreenOverlay(QWidget):
         self.screen = screen
         self.config = config
         self.wind_sim = wind_sim
+        self.weather_fx = WeatherEffect()
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
@@ -856,6 +1043,7 @@ class ScreenOverlay(QWidget):
         )
         # 最前面を再設定（他アプリに奪われた場合の回復）
         ensure_topmost(int(self.winId()))
+        self.weather_fx.set_geometry(full.width(), self.grass_area_height)
 
     def _rebuild_grasses(self):
         width = self.width()
@@ -877,6 +1065,7 @@ class ScreenOverlay(QWidget):
         for g in self.grasses:
             wave = self.wind_sim.get_wave_at(g.base_x)
             g.update(wave)
+        self.weather_fx.update()
         self.update()
 
     def paintEvent(self, event):
@@ -911,6 +1100,9 @@ class ScreenOverlay(QWidget):
         else:
             for g in self.grasses:
                 g.draw(painter, self.ground_y, tint=tint)
+        # 天気エフェクト（雨・雪）
+        if self.config.get("weather_enabled", True):
+            self.weather_fx.draw(painter)
         painter.end()
 
 
@@ -942,6 +1134,12 @@ class OverlayManager:
         self.overlays = []
         self._create_overlays()
 
+        # 天気監視
+        self.weather_monitor = WeatherMonitor()
+        self.weather_monitor.signal.updated.connect(self._on_weather_update)
+        if self.config.get("weather_enabled", True):
+            self.weather_monitor.start()
+
         self.timer = QTimer()
         self.timer.timeout.connect(self._tick)
         self.timer.start(33)
@@ -949,6 +1147,23 @@ class OverlayManager:
         self.reposition_timer = QTimer()
         self.reposition_timer.timeout.connect(self._refresh_screens)
         self.reposition_timer.start(5000)
+
+    def _on_weather_update(self, state):
+        """天気更新時に全画面のエフェクトを更新"""
+        for o in self.overlays:
+            o.weather_fx.set_wind_speed(state.wind_speed or 0)
+            o.weather_fx.set_weather(state.weather_state)
+        # 風速連動
+        user_wind = self.config.get("wind", 50)
+        wind_sync = self.config.get("wind_sync_enabled", False)
+        if wind_sync and state.wind_speed and state.wind_speed > WIND_SPEED_CALM:
+            api_wind = min(100, int(state.wind_speed * 100 / WIND_SPEED_MAX))
+            # 上限: ユーザー設定の N 倍まで
+            limit_mult = self.config.get("wind_sync_limit", 15) / 10.0
+            max_wind = int(user_wind * limit_mult)
+            self.wind_sim.set_wind(min(api_wind, max_wind))
+        else:
+            self.wind_sim.set_wind(user_wind)
 
     def _create_overlays(self):
         for o in self.overlays:
@@ -984,6 +1199,32 @@ class OverlayManager:
             json.dump(self.config, f, ensure_ascii=False, indent=2)
 
     def apply_config(self, new_config):
+        # テストモード（他の処理をスキップ）
+        test_weather = new_config.get("_weather_test")
+        if test_weather:
+            if test_weather == "rain_wind":
+                for o in self.overlays:
+                    o.weather_fx.set_wind_speed(45)
+                    o.weather_fx.set_weather("rain")
+                self.wind_sim.set_wind(80)
+            else:
+                for o in self.overlays:
+                    o.weather_fx.set_wind_speed(5)
+                    o.weather_fx.set_weather(test_weather)
+            return
+
+        if "_lighting_test" in new_config:
+            self._lighting_test_mode = new_config["_lighting_test"]
+            # configのlighting_modeを一時上書き（テスト用）
+            if self._lighting_test_mode:
+                self.config["lighting_mode"] = self._lighting_test_mode
+            else:
+                # テスト解除 → オプション設定の値に戻す
+                pass  # configはそのまま
+            for o in self.overlays:
+                o.config = self.config
+            return
+
         self.config.update(new_config)
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self._save_config()
@@ -991,6 +1232,14 @@ class OverlayManager:
             o.config = self.config
             o._position_window()
             o._rebuild_grasses()
+        # 天気ON/OFF制御
+        if self.config.get("weather_enabled", True):
+            if not self.weather_monitor._running:
+                self.weather_monitor.start()
+        else:
+            self.weather_monitor.stop()
+            for o in self.overlays:
+                o.weather_fx.set_weather("clear")
 
     def save_preset(self, category, data):
         cat_dir = os.path.join(SAVE_DIR, category)

@@ -1,35 +1,57 @@
 # Changelog
 
+## v1.5.0 (2026-06-05)
+
+### Features
+- Weather effects: rain and snow based on real weather (3-layer depth, bounce splash)
+- Weather API: ip-api.com (location) + Open-Meteo (forecast), fully free, no registration
+- Smart polling: 30min normal, 5min when rain approaching
+- Rain pre-detection: 2-hour lookahead for precipitation
+- Time-based lighting: sunrise, daytime, sunset, moonlight (auto or manual)
+- Two usage modes: Focus Mode (ADHD support) / Decoration Mode (desktop scenery)
+- Side-by-side settings layout: main tabs (left) + options/test (right)
+- Graphics test tab: preview weather effects and lighting
+- Flower color selector: checkbox ON/OFF per color
+- Wind sync with weather: ON/OFF toggle + configurable limit multiplier
+- i18n: Japanese / English auto-detect + manual switch
+
+### Removed
+- Color palette selector (simplified, always uses Forest palette)
+
+## v1.4.0 (2026-06-04)
+
+### Features
+- i18n support (Japanese/English), auto-detect locale, language switcher
+
+## v1.3.1 (2026-06-04)
+
+### Fixes
+- Overlay going behind active windows: periodic topmost re-assertion
+
+## v1.3.0 (2026-06-04)
+
+### Features
+- Time-based lighting (sunrise, daytime, sunset, moonlight)
+- Instant option apply on change
+- Wider settings window
+- PC auto-startup fix
+
 ## v1.2.0 (2026-06-04)
 
 ### Features
-- Multi-monitor support: grass displayed on all connected screens
-- macOS fixes: click-through, all-spaces, Dock overlay, rounded tray icon
-- App icon for exe, system tray (Windows), menu bar (macOS)
-- macOS .icns icon support
-- Tabbed settings UI (Grass / Layout / Environment / Save)
-- Auto-startup setting (PC startup)
-- NoWheelSlider to prevent scroll accidents
-- Platform-adaptive hotkey label (Win vs Cmd)
+- Multi-monitor support
+- macOS fixes: click-through, all-spaces, Dock overlay
+- App icon, tabbed settings UI, auto-startup
 
 ## v1.1.0 (2026-06-03)
 
 ### Features
-- Global hotkey to toggle visibility (Win+Ctrl+Shift+W)
-- Portable exe: config.json and saves/ stored next to the executable
+- Global hotkey toggle (Win+Ctrl+Shift+W)
+- Portable exe with local config
 
 ## v1.0.0 (2026-06-03)
 
 ### Features
-- Procedural pixel-art grass generation on Windows taskbar
-- 1/f noise sway using Voss-McCartney algorithm
-- Wind wave propagation (left to right) with gust simulation
-- Full click-through overlay
-- Mouse proximity fade with configurable radius and gradient
-- 3 grass types: slim, leafy, flowering
-- 8 color palettes: Forest, Emerald, Autumn, Ocean, Sakura, Lavender, Sunset, Moss
-- Cluster-based layout with configurable density and sparseness
-- Scatter grass for natural distribution between clusters
-- Settings UI accessible from system tray
-- Separate save/load for grass presets and environment settings
-- Colorful flowers (8 colors) randomly assigned
+- Initial release: procedural pixel-art grass, 1/f noise sway, wind waves
+- Full click-through overlay, mouse proximity fade
+- 3 grass types, 8 color palettes, settings UI
