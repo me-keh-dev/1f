@@ -20,7 +20,7 @@ from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
 if sys.platform == "win32":
-    from platform_win import init_dpi, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
+    from platform_win import init_dpi, set_click_through, ensure_topmost, set_behind_windows, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
 elif sys.platform == "darwin":
     from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
     def is_fullscreen_active(): return False  # macOS: 未実装
@@ -334,6 +334,45 @@ class SettingsDialog(QDialog):
         self.tab_aquarium = tab_aq
         self.tab_aquarium_label = t("aq_settings")
         tabs.addTab(tab_aq, self.tab_aquarium_label)
+
+        # === タブ: 東海道 ===
+        tab_tk = QWidget()
+        tk_scroll = QScrollArea()
+        tk_scroll.setWidgetResizable(True)
+        tk_inner = QWidget()
+        tk_layout = QVBoxLayout(tk_inner)
+
+        g_tk_obj = QGroupBox(t("tk_objects"))
+        g_tol = QVBoxLayout(g_tk_obj)
+        self.tk_pine_slider = self._add_slider(g_tol, t("tk_pine"), 0, 10, self.config.get("tk_pine_count", 2))
+        self.tk_willow_slider = self._add_slider(g_tol, t("tk_willow_item"), 0, 10, self.config.get("tk_willow_count", 2))
+        self.tk_teahouse_slider = self._add_slider(g_tol, t("tk_teahouse"), 0, 5, self.config.get("tk_teahouse_count", 2))
+        self.tk_inn_slider = self._add_slider(g_tol, t("tk_inn"), 0, 5, self.config.get("tk_inn_count", 1))
+        self.tk_shop_slider = self._add_slider(g_tol, t("tk_shop"), 0, 5, self.config.get("tk_shop_count", 2))
+        self.tk_kura_slider = self._add_slider(g_tol, t("tk_kura"), 0, 5, self.config.get("tk_kura_count", 1))
+        self.tk_house_slider = self._add_slider(g_tol, t("tk_house"), 0, 10, self.config.get("tk_house_count", 3))
+        self.tk_torii_slider = self._add_slider(g_tol, t("tk_torii"), 0, 3, self.config.get("tk_torii_count", 0))
+        self.tk_hill_slider = self._add_slider(g_tol, t("tk_hill"), 0, 5, self.config.get("tk_hill_count", 2))
+        self.tk_grass_slider = self._add_slider(g_tol, t("tk_grass"), 0, 150, self.config.get("tk_grass_count", 60))
+        self.tk_traveler_slider = self._add_slider(g_tol, t("tk_traveler"), 0, 20, self.config.get("tk_traveler_count", 8))
+        tk_layout.addWidget(g_tk_obj)
+
+        g_tk_willow = QGroupBox(t("tk_willow"))
+        g_twl = QVBoxLayout(g_tk_willow)
+        self.tk_leaf_thickness_slider = self._add_slider(g_twl, t("tk_leaf_w"), 1, 6, self.config.get("tk_leaf_thickness", 4))
+        self.tk_willow_min_slider = self._add_slider(g_twl, t("min"), 15, 60, self.config.get("tk_willow_min_h", 45))
+        self.tk_willow_max_slider = self._add_slider(g_twl, t("max"), 30, 90, self.config.get("tk_willow_max_h", 68))
+        tk_layout.addWidget(g_tk_willow)
+
+        tk_layout.addStretch()
+        tk_scroll.setWidget(tk_inner)
+        tab_tk_l = QVBoxLayout(tab_tk)
+        tab_tk_l.setContentsMargins(0, 0, 0, 0)
+        tab_tk_l.addWidget(tk_scroll)
+
+        self.tab_tokaido = tab_tk
+        self.tab_tokaido_label = t("tk_settings")
+        tabs.addTab(tab_tk, self.tab_tokaido_label)
 
         # === タブ: 環境 ===
         tab_env = QWidget()
@@ -651,6 +690,20 @@ class SettingsDialog(QDialog):
             "aq_fish_speed_max": self.aq_speed_max_slider.value(),
             "aq_fish_y_top": self.aq_fish_y_top_slider.value(),
             "aq_fish_y_bottom": self.aq_fish_y_bottom_slider.value(),
+            "tk_pine_count": self.tk_pine_slider.value(),
+            "tk_willow_count": self.tk_willow_slider.value(),
+            "tk_teahouse_count": self.tk_teahouse_slider.value(),
+            "tk_inn_count": self.tk_inn_slider.value(),
+            "tk_shop_count": self.tk_shop_slider.value(),
+            "tk_kura_count": self.tk_kura_slider.value(),
+            "tk_house_count": self.tk_house_slider.value(),
+            "tk_torii_count": self.tk_torii_slider.value(),
+            "tk_hill_count": self.tk_hill_slider.value(),
+            "tk_grass_count": self.tk_grass_slider.value(),
+            "tk_traveler_count": self.tk_traveler_slider.value(),
+            "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
+            "tk_willow_min_h": self.tk_willow_min_slider.value(),
+            "tk_willow_max_h": self.tk_willow_max_slider.value(),
         }
 
     def _on_scene_changed(self):
@@ -662,7 +715,7 @@ class SettingsDialog(QDialog):
     def _update_tabs_for_scene(self, scene):
         """シーンに応じてタブを切り替え"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium]
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido]
         for i in range(tabs.count() - 1, -1, -1):
             if tabs.widget(i) in scene_tabs:
                 tabs.removeTab(i)
@@ -671,6 +724,8 @@ class SettingsDialog(QDialog):
             tabs.insertTab(1, self.tab_layout, self.tab_layout_label)
         elif scene == "aquarium":
             tabs.insertTab(0, self.tab_aquarium, self.tab_aquarium_label)
+        elif scene == "tokaido":
+            tabs.insertTab(0, self.tab_tokaido, self.tab_tokaido_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -699,7 +754,13 @@ class SettingsDialog(QDialog):
             "aq_fish_count", "aq_fish_speed_min", "aq_fish_speed_max",
             "aq_fish_y_top", "aq_fish_y_bottom", "seed",
         ],
-        "tokaido": ["seed"],
+        "tokaido": [
+            "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
+            "tk_inn_count", "tk_shop_count", "tk_kura_count",
+            "tk_house_count", "tk_torii_count", "tk_hill_count",
+            "tk_grass_count", "tk_traveler_count",
+            "tk_willow_min_h", "tk_willow_max_h", "seed",
+        ],
     }
     # 環境設定のキー
     ENV_KEYS = [
@@ -753,6 +814,53 @@ class SettingsDialog(QDialog):
 
 
 # --- 1画面分のオーバーレイ ---
+class BackgroundOverlay(QWidget):
+    """Separate window for background elements (Mt. Fuji) — behind other windows"""
+    def __init__(self, parent_overlay):
+        super().__init__()
+        self.parent_overlay = parent_overlay
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+    def setup(self):
+        set_click_through(int(self.winId()))
+        set_behind_windows(int(self.winId()))
+
+    def paintEvent(self, event):
+        po = self.parent_overlay
+        if not po.scene or not po.scene.has_background_layer():
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        lighting_mode = po.config.get("lighting_mode", "off")
+        if lighting_mode == "auto":
+            tint = _get_time_tint()
+        elif lighting_mode in LIGHTING_PRESETS:
+            tint = LIGHTING_PRESETS[lighting_mode]
+        else:
+            tint = None
+        get_alpha = None
+        if po.config.get("mouse_fade_enabled", True):
+            mx, my = get_cursor_pos()
+            inner_r = po.config.get("mouse_fade_inner", 30)
+            fade_r = po.config.get("mouse_fade_range", 120)
+            min_alpha = po.config.get("mouse_fade_alpha", 15)
+            gy = self.y() + po.ground_y // 2
+            widget_x = self.x()
+            def get_alpha(base_x):
+                gx = widget_x + base_x
+                dist = math.sqrt((mx - gx) ** 2 + (my - gy) ** 2)
+                if dist <= inner_r:
+                    return min_alpha
+                elif dist <= inner_r + fade_r:
+                    t_val = (dist - inner_r) / fade_r
+                    return int(min_alpha + (255 - min_alpha) * t_val)
+                return 255
+        po.scene.draw_background(painter, po.ground_y, tint, get_alpha)
+        painter.end()
+
+
 class ScreenOverlay(QWidget):
     def __init__(self, screen, config, wind_sim):
         super().__init__()
@@ -766,6 +874,7 @@ class ScreenOverlay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.scene = None
+        self.bg_overlay = None
         self._position_window()
         self._rebuild_scene()
         self.show()
@@ -786,24 +895,39 @@ class ScreenOverlay(QWidget):
         area_height = temp_scene.get_area_height(self.config)
         self.area_height = area_height
         self.ground_y = area_height
-        self.setGeometry(
-            full.x(), taskbar_top - area_height,
-            full.width(), area_height,
-        )
+        geo = (full.x(), taskbar_top - area_height, full.width(), area_height)
+        self.setGeometry(*geo)
         ensure_topmost(int(self.winId()))
         self.weather_fx.set_geometry(full.width(), area_height)
+        # Position background overlay at same geometry
+        if self.bg_overlay:
+            self.bg_overlay.setGeometry(*geo)
+            QTimer.singleShot(50, self.bg_overlay.setup)
 
     def _rebuild_scene(self):
         scene_cls = get_scene_class(self.config.get("scene_mode", "grass"))
         self.scene = scene_cls()
         screen_w = self.screen.geometry().width()
         self.scene.rebuild(self.config, screen_w, self.width())
+        # Create/destroy background overlay as needed
+        if self.scene.has_background_layer():
+            if not self.bg_overlay:
+                self.bg_overlay = BackgroundOverlay(self)
+                self.bg_overlay.setGeometry(self.geometry())
+                self.bg_overlay.show()
+                QTimer.singleShot(50, self.bg_overlay.setup)
+        else:
+            if self.bg_overlay:
+                self.bg_overlay.close()
+                self.bg_overlay = None
 
     def update_scene(self):
         if self.scene:
             self.scene.update(self.wind_sim)
         self.weather_fx.update()
         self.update()
+        if self.bg_overlay:
+            self.bg_overlay.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -879,7 +1003,7 @@ class OverlayManager:
 
         self.timer = QTimer()
         self.timer.timeout.connect(self._tick)
-        self.timer.start(33)
+        self.timer.start(11)  # ~90fps (3x faster)
 
         self.reposition_timer = QTimer()
         self.reposition_timer.timeout.connect(self._refresh_screens)
@@ -1010,20 +1134,32 @@ class OverlayManager:
         for o in self.overlays:
             o.show()
             QTimer.singleShot(100, o._set_click_through)
+            if o.bg_overlay:
+                o.bg_overlay.show()
+                QTimer.singleShot(150, o.bg_overlay.setup)
 
     def hide_all(self):
         for o in self.overlays:
             o.hide()
+            if o.bg_overlay:
+                o.bg_overlay.hide()
 
     def _check_fullscreen(self):
         if not self.user_visible:
             return
         is_fs = is_fullscreen_active()
-        if is_fs and not self._fullscreen_hidden:
+        if is_fs:
+            self._fs_confirm = getattr(self, '_fs_confirm', 0) + 1
+        else:
+            self._fs_confirm = 0
+        if self._fs_confirm == 1:
+            print(f"[FS] Fullscreen detected (confirming...)")
+        # Require 3 consecutive detections (3 seconds) to avoid false triggers on click
+        if self._fs_confirm >= 3 and not self._fullscreen_hidden:
             self._fullscreen_hidden = True
             for o in self.overlays:
                 o.hide()
-        elif not is_fs and self._fullscreen_hidden:
+        elif self._fs_confirm == 0 and self._fullscreen_hidden:
             self._fullscreen_hidden = False
             self.show_all()
 
@@ -1070,7 +1206,7 @@ def main():
             manager.user_visible = False
         else:
             manager.show_all()
-            manager.timer.start(33)
+            manager.timer.start(11)
             manager.user_visible = True
             manager._fullscreen_hidden = False
         overlay_visible[0] = not overlay_visible[0]

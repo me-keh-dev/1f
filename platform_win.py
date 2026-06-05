@@ -40,6 +40,15 @@ def ensure_topmost(hwnd):
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     )
 
+HWND_NOTOPMOST = -2
+
+def set_behind_windows(hwnd):
+    """ウィンドウを他のウィンドウの下に配置する（富士山用）"""
+    ctypes.windll.user32.SetWindowPos(
+        hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+    )
+
 # --- カーソル位置 ---
 class POINT(ctypes.Structure):
     _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
@@ -104,6 +113,14 @@ def is_fullscreen_active():
     """前面ウィンドウがモニター全体を覆っているか（全画面状態）を判定"""
     hwnd = ctypes.windll.user32.GetForegroundWindow()
     if not hwnd:
+        return False
+    # Exclude system windows (desktop, taskbar, start menu, etc.)
+    class_name = ctypes.create_unicode_buffer(256)
+    ctypes.windll.user32.GetClassNameW(hwnd, class_name, 256)
+    excluded = {'Progman', 'WorkerW', 'Shell_TrayWnd', 'Shell_SecondaryTrayWnd',
+                'Windows.UI.Core.CoreWindow', 'XamlExplorerHostIslandWindow',
+                'TopLevelWindowForOverflowXamlIsland', 'NotifyIconOverflowWindow'}
+    if class_name.value in excluded:
         return False
     rect = wintypes.RECT()
     ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))

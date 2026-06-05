@@ -1,0 +1,17 @@
+{
+  "tk_pine_count": 2,
+  "tk_willow_count": 2,
+  "tk_teahouse_count": 2,
+  "tk_inn_count": 1,
+  "tk_shop_count": 2,
+  "tk_kura_count": 1,
+  "tk_house_count": 3,
+  "tk_torii_count": 0,
+  "tk_hill_count": 2,
+  "tk_grass_count": 60,
+  "tk_traveler_count": 8,
+  "tk_leaf_thickness": 4,
+  "tk_willow_min_h": 45,
+  "tk_willow_max_h": 68,
+  "seed": 42
+}

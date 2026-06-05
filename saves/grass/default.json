@@ -1,0 +1,17 @@
+{
+  "min_height": 4,
+  "max_height": 20,
+  "grass_thickness": 4,
+  "num_clusters": 5,
+  "cluster_count": 90,
+  "cluster_density": 70,
+  "sparseness": 50,
+  "scatter_count": 20,
+  "scatter_density": 20,
+  "slim_ratio": 74,
+  "flower_ratio": 44,
+  "palette_indices": [
+    0
+  ],
+  "seed": 535401
+}

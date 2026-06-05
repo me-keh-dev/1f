@@ -1,0 +1,15 @@
+{
+  "aq_plant_min_height": 8,
+  "aq_plant_max_height": 30,
+  "aq_cluster_count": 3,
+  "aq_cluster_size": 8,
+  "aq_cluster_density": 70,
+  "aq_scatter_count": 15,
+  "aq_scatter_density": 30,
+  "aq_fish_count": 6,
+  "aq_fish_speed_min": 30,
+  "aq_fish_speed_max": 65,
+  "aq_fish_y_top": 10,
+  "aq_fish_y_bottom": 55,
+  "seed": 42
+}

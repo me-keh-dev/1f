@@ -56,3 +56,11 @@ class BaseScene:
         get_alpha(screen_x) -> int(0..255), or None for full opacity.
         """
         raise NotImplementedError
+
+    def has_background_layer(self):
+        """Whether this scene has a separate background layer (behind other windows)"""
+        return False
+
+    def draw_background(self, painter, ground_y, tint=None, get_alpha=None):
+        """Draw background elements (rendered behind other windows)"""
+        pass
