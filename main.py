@@ -20,9 +20,10 @@ from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
 if sys.platform == "win32":
-    from platform_win import init_dpi, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+    from platform_win import init_dpi, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
 elif sys.platform == "darwin":
     from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+    def is_fullscreen_active(): return False  # macOS: 未実装
 else:
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
@@ -31,6 +32,9 @@ init_dpi()
 from i18n import t, set_language, get_language, detect_language
 from weather import WeatherMonitor
 from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
+from scenes import get_scene_class, SCENE_MODES
+from scenes.base import PinkNoiseGenerator, PIXEL_SIZE
+from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
 
 def _app_dir():
     """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
@@ -49,283 +53,9 @@ SAVE_DIR = os.path.join(APP_DIR, "saves")
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 
 
-class PinkNoiseGenerator:
-    def __init__(self, num_octaves=8):
-        self.num_octaves = num_octaves
-        self.max_key = (1 << num_octaves) - 1
-        self.key = 0
-        self.white_values = [random.random() - 0.5 for _ in range(num_octaves)]
-
-    def next(self):
-        last_key = self.key
-        self.key = (self.key + 1) & self.max_key
-        diff = last_key ^ self.key
-        total = 0.0
-        for i in range(self.num_octaves):
-            if diff & (1 << i):
-                self.white_values[i] = random.random() - 0.5
-            total += self.white_values[i]
-        return total / (self.num_octaves * 0.5)
 
 
-# --- カラーパレット ---
-PALETTE_PRESETS = [
-    {"name": "フォレスト",   "dark": (0x21,0x61,0x21), "mid": (0x30,0x7e,0x30), "bright": (0x6b,0xb7,0x58), "tip": (0xe4,0xfb,0x91)},
-    {"name": "エメラルド",   "dark": (0x1a,0x55,0x3a), "mid": (0x28,0x80,0x5a), "bright": (0x50,0xc8,0x78), "tip": (0xa0,0xf0,0xb0)},
-    {"name": "オータム",     "dark": (0x5a,0x3e,0x1a), "mid": (0x8a,0x6e,0x2a), "bright": (0xc0,0xa0,0x40), "tip": (0xf0,0xd8,0x70)},
-    {"name": "オーシャン",   "dark": (0x1a,0x3a,0x5a), "mid": (0x28,0x60,0x80), "bright": (0x50,0x90,0xc0), "tip": (0x90,0xd0,0xf0)},
-    {"name": "サクラ",       "dark": (0x6a,0x2a,0x3a), "mid": (0x9a,0x4a,0x5a), "bright": (0xd0,0x80,0x90), "tip": (0xf8,0xc0,0xd0)},
-    {"name": "ラベンダー",   "dark": (0x3a,0x2a,0x5a), "mid": (0x5a,0x40,0x8a), "bright": (0x90,0x70,0xc0), "tip": (0xc8,0xb0,0xf0)},
-    {"name": "サンセット",   "dark": (0x6a,0x2a,0x1a), "mid": (0xa0,0x50,0x20), "bright": (0xe0,0x80,0x30), "tip": (0xff,0xc0,0x60)},
-    {"name": "モス",         "dark": (0x2a,0x40,0x1a), "mid": (0x4a,0x6a,0x2a), "bright": (0x7a,0x9a,0x4a), "tip": (0xb0,0xd0,0x70)},
-]
 
-FLOWER_COLORS_ALL = [
-    {"rgb": (220, 50, 50),   "key": "fc_red"},
-    {"rgb": (255, 100, 80),  "key": "fc_vermilion"},
-    {"rgb": (80, 80, 220),   "key": "fc_blue"},
-    {"rgb": (100, 120, 255), "key": "fc_lightblue"},
-    {"rgb": (255, 220, 50),  "key": "fc_yellow"},
-    {"rgb": (255, 180, 200), "key": "fc_pink"},
-    {"rgb": (200, 130, 255), "key": "fc_purple"},
-    {"rgb": (255, 255, 255), "key": "fc_white"},
-]
-# 有効な花色リスト（configから動的に生成）
-def get_active_flower_colors(config):
-    enabled = config.get("flower_colors_enabled", list(range(len(FLOWER_COLORS_ALL))))
-    return [FLOWER_COLORS_ALL[i]["rgb"] for i in enabled if i < len(FLOWER_COLORS_ALL)]
-
-# 後方互換: 古いコードが FLOWER_COLORS を参照する場合
-FLOWER_COLORS = [c["rgb"] for c in FLOWER_COLORS_ALL]
-
-PIXEL_SIZE = 4
-
-
-# =============================================
-# プロシージャル草生成（3タイプ）
-# =============================================
-
-def _shade_for_ratio(ratio):
-    if ratio < 0.3:
-        return 0
-    elif ratio < 0.55:
-        return 1
-    elif ratio < 0.8:
-        return 2
-    return 3
-
-
-def generate_slim_grass(height, rng):
-    """しゅっとした細い草: 茎のみ、枝なし、先端が細くスッと伸びる"""
-    pixels = []
-    # 根元は1px幅
-    pixels.append((0, 0, 0))
-    if height > 6:
-        pixels.append((0, 1, 0))
-
-    # 茎: 緩やかにカーブ
-    curve_dir = rng.choice([-1, 1])
-    curve_strength = rng.uniform(0.08, 0.25)  # 控えめなカーブ
-    cx = 0.0
-    start = 1 if height <= 6 else 2
-    for dy in range(start, height):
-        cx += curve_dir * curve_strength * (dy / height)
-        dx = round(cx)
-        pixels.append((dx, dy, _shade_for_ratio(dy / height)))
-
-    return pixels, None  # 花なし
-
-
-def generate_leafy_grass(height, rng):
-    """葉付きの草: 茎+横に伸びる葉、花なし"""
-    pixels = []
-    # 根元
-    root_w = 1 if height < 8 else 2
-    for rdx in range(-root_w // 2, root_w // 2 + 1):
-        pixels.append((rdx, 0, 0))
-        if height > 5:
-            pixels.append((rdx, 1, 0))
-
-    # 茎
-    curve_dir = rng.choice([-1, 1])
-    curve_strength = rng.uniform(0.12, 0.35)
-    cx = 0.0
-    start = 1 if height <= 5 else 2
-    for dy in range(start, height):
-        cx += curve_dir * curve_strength * (dy / height)
-        if rng.random() < 0.06:
-            curve_dir *= -1
-        dx = round(cx)
-        pixels.append((dx, dy, _shade_for_ratio(dy / height)))
-
-    # 葉を1〜3枚追加
-    num_leaves = rng.randint(1, min(3, max(1, height // 4)))
-    used_dy = set()
-    for _ in range(num_leaves):
-        leaf_dy = rng.randint(max(2, height // 3), height - 1)
-        if leaf_dy in used_dy:
-            continue
-        used_dy.add(leaf_dy)
-        leaf_dir = rng.choice([-1, 1])
-        stem_dx = 0
-        for pdx, pdy, _ in pixels:
-            if pdy == leaf_dy:
-                stem_dx = pdx
-                break
-        leaf_len = rng.randint(2, max(2, height // 3))
-        lx = stem_dx
-        for li in range(1, leaf_len + 1):
-            lx += leaf_dir
-            ly = leaf_dy + (rng.choice([0, 1]) if li < leaf_len else 1)
-            shade = 3 if (ly / height) > 0.6 else 2
-            pixels.append((lx, ly, shade))
-
-    return pixels, None  # 花なし
-
-
-def generate_flower_grass(height, rng):
-    """花付きの草: 茎+葉+先端に花"""
-    pixels = []
-    root_w = 1 if height < 8 else 2
-    for rdx in range(-root_w // 2, root_w // 2 + 1):
-        pixels.append((rdx, 0, 0))
-        if height > 5:
-            pixels.append((rdx, 1, 0))
-
-    curve_dir = rng.choice([-1, 1])
-    curve_strength = rng.uniform(0.1, 0.3)
-    cx = 0.0
-    start = 1 if height <= 5 else 2
-    for dy in range(start, height):
-        cx += curve_dir * curve_strength * (dy / height)
-        if rng.random() < 0.06:
-            curve_dir *= -1
-        dx = round(cx)
-        pixels.append((dx, dy, _shade_for_ratio(dy / height)))
-
-    # 葉を0〜2枚
-    num_leaves = rng.randint(0, min(2, max(0, height // 5)))
-    used_dy = set()
-    for _ in range(num_leaves):
-        leaf_dy = rng.randint(max(2, height // 3), height - 2)
-        if leaf_dy in used_dy:
-            continue
-        used_dy.add(leaf_dy)
-        leaf_dir = rng.choice([-1, 1])
-        stem_dx = 0
-        for pdx, pdy, _ in pixels:
-            if pdy == leaf_dy:
-                stem_dx = pdx
-                break
-        leaf_len = rng.randint(1, max(1, height // 4))
-        lx = stem_dx
-        for li in range(1, leaf_len + 1):
-            lx += leaf_dir
-            ly = leaf_dy + (0 if li < leaf_len else 1)
-            shade = 3 if (ly / height) > 0.6 else 2
-            pixels.append((lx, ly, shade))
-
-    flower_color = rng.choice(FLOWER_COLORS)  # デフォルト、configベースは generate_grass_data で上書き
-    return pixels, flower_color
-
-
-# --- 配置生成 ---
-def generate_grass_data(config, screen_width):
-    seed = config.get("seed", random.randint(0, 999999))
-    rng = random.Random(seed)
-
-    min_h = config.get("min_height", 4)
-    max_h = config.get("max_height", 20)
-    wind = config.get("wind", 50)
-    palette_indices = config.get("palette_indices", [0])
-    active_flowers = get_active_flower_colors(config) or FLOWER_COLORS
-
-    slim_pct = config.get("slim_ratio", 40)
-    flower_pct = config.get("flower_ratio", 15)
-    total = slim_pct + flower_pct
-    if total > 100:
-        slim_pct = int(slim_pct / total * 100)
-        flower_pct = 100 - slim_pct
-
-    # === 密集エリアの設定 ===
-    cluster_density = config.get("cluster_density", 70) / 100.0
-    cluster_count = config.get("cluster_count", 40)        # 塊に使う総本数
-    num_clusters = config.get("num_clusters", 5)            # 塊の数
-    # === 散在エリアの設定 ===
-    scatter_density = config.get("scatter_density", 20) / 100.0
-    scatter_count = config.get("scatter_count", 20)
-    # === まばら具合 (塊と塊の間隔) ===
-    sparseness = config.get("sparseness", 50) / 100.0
-
-    positions = []
-
-    def make_one(cx):
-        height = rng.randint(min_h, max_h)
-        pal_idx = rng.choice(palette_indices)
-        sway_base = rng.uniform(0.8, 3.0) * (wind / 50)
-        roll = rng.randint(0, 99)
-        if roll < slim_pct:
-            pixels, flower_color = generate_slim_grass(height, rng)
-        elif roll < slim_pct + flower_pct:
-            pixels, flower_color = generate_flower_grass(height, rng)
-            flower_color = rng.choice(active_flowers)  # 有効な花色から選択
-        else:
-            pixels, flower_color = generate_leafy_grass(height, rng)
-        return {
-            "x": cx, "pixels": pixels, "palette_idx": pal_idx,
-            "flower_color": flower_color, "sway_base": sway_base,
-            "max_dy": max((p[1] for p in pixels), default=1),
-        }
-
-    # --- ステップ1: クラスターの開始位置を決める ---
-    num_clusters = max(0, num_clusters)
-    if num_clusters > 0 and cluster_count > 0:
-        # 画面を等分して、そこからランダムにずらして配置
-        per_cluster = max(1, cluster_count // num_clusters)
-        remainder = cluster_count - per_cluster * num_clusters
-        # 間隔のゆとり
-        margin = int(sparseness * 150)
-        segment = max(1, (screen_width - margin) // num_clusters)
-
-        cd = cluster_density
-        cluster_placed = 0
-        for ci in range(num_clusters):
-            if cluster_placed >= cluster_count:
-                break
-            # このクラスターの開始位置
-            base_x = ci * segment + rng.randint(0, max(1, segment // 3))
-            # クラスターごとにファジーな密集度 (±25%)
-            local_cd = max(0.05, min(1.0, cd + rng.uniform(-0.25, 0.25)))
-            local_inner_min = max(3, int(15 * (1 - local_cd * 0.8)))
-            local_inner_max = max(local_inner_min + 3, int(30 * (1 - local_cd * 0.7)))
-            # このクラスターに割り当てる本数もばらつかせる
-            this_count = per_cluster + (1 if ci < remainder else 0)
-            this_count = max(1, this_count + rng.randint(-2, 2))
-
-            cx = base_x
-            for _ in range(this_count):
-                if cluster_placed >= cluster_count or cx >= screen_width:
-                    break
-                positions.append(make_one(cx))
-                cluster_placed += 1
-                cx += rng.randint(local_inner_min, local_inner_max)
-
-    # --- ステップ2: 散在する草を画面全体に配置 ---
-    sd = scatter_density
-    scatter_gap_min = max(10, int(40 * (1 - sd * 0.7)))
-    scatter_gap_max = max(scatter_gap_min + 10, int(100 * (1 - sd * 0.5)))
-
-    scatter_placed = 0
-    sx = rng.randint(5, 40)
-    while sx < screen_width and scatter_placed < scatter_count:
-        # 既存のクラスター位置と被ってもOK（自然に混ざる）
-        positions.append(make_one(sx))
-        scatter_placed += 1
-        sx += rng.randint(scatter_gap_min, scatter_gap_max)
-
-    # x座標でソート（描画順のため）
-    positions.sort(key=lambda p: p["x"])
-    return positions, seed
 
 
 # --- 時間帯ライティング ---
@@ -376,64 +106,8 @@ LIGHTING_PRESETS = {
     "night":   (0.30, 0.32, 0.55),   # 夜（月明かり）
 }
 
-def _apply_tint(color, tint):
-    """QColorにtint (r,g,b)の掛け算を適用して新しいQColorを返す"""
-    if tint is None:
-        return QColor(color)
-    r, g, b = tint
-    return QColor(
-        min(255, int(color.red() * r)),
-        min(255, int(color.green() * g)),
-        min(255, int(color.blue() * b)),
-    )
 
 
-class GrassBlade:
-    def __init__(self, data, palettes):
-        self.base_x = data["x"]
-        self.pixels = data["pixels"]
-        pal = palettes[data["palette_idx"] % len(palettes)]
-        self.colors = [
-            QColor(*pal["dark"]), QColor(*pal["mid"]),
-            QColor(*pal["bright"]), QColor(*pal["tip"]),
-        ]
-        fc = data["flower_color"]
-        self.flower_color = QColor(*fc) if fc else None
-        self.noise_gen = PinkNoiseGenerator()
-        self.sway = 0.0
-        self.sway_base = data["sway_base"]
-        self.max_dy = data["max_dy"]
-
-        if self.flower_color:
-            top_pixel = max(self.pixels, key=lambda p: p[1])
-            tdx, tdy = top_pixel[0], top_pixel[1]
-            self.flower_pixels = [(tdx, tdy+1), (tdx-1, tdy+1), (tdx+1, tdy+1), (tdx, tdy+2)]
-            self.max_dy = tdy + 2
-        else:
-            self.flower_pixels = []
-
-    def update(self, wind_wave):
-        local = self.noise_gen.next()
-        self.sway = (wind_wave * 0.7 + local * 0.3) * self.sway_base
-
-    def draw(self, painter, ground_y, alpha=255, tint=None):
-        ps = PIXEL_SIZE
-        md = max(self.max_dy, 1)
-        for dx, dy, shade in self.pixels:
-            sf = dy / md
-            draw_x = int(self.base_x + (dx + self.sway * sf) * ps)
-            draw_y = int(ground_y - (dy + 1) * ps)
-            c = _apply_tint(self.colors[shade], tint)
-            c.setAlpha(alpha)
-            painter.fillRect(draw_x, draw_y, ps, ps, c)
-        if self.flower_color:
-            for fx, fy in self.flower_pixels:
-                sf = fy / md
-                draw_x = int(self.base_x + (fx + self.sway * sf) * ps)
-                draw_y = int(ground_y - (fy + 1) * ps)
-                c = _apply_tint(self.flower_color, tint)
-                c.setAlpha(alpha)
-                painter.fillRect(draw_x, draw_y, ps, ps, c)
 
 
 class WindSimulator:
@@ -504,12 +178,31 @@ class SettingsDialog(QDialog):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        # シーンモード選択
+        scene_row = QHBoxLayout()
+        scene_label = QLabel(t("scene_mode"))
+        scene_label.setFont(QFont("Meiryo", 10, QFont.Bold))
+        self.scene_combo = QComboBox()
+        for mode_key, label_key in SCENE_MODES:
+            self.scene_combo.addItem(t(label_key), mode_key)
+        current_scene = self.config.get("scene_mode", "grass")
+        for i in range(self.scene_combo.count()):
+            if self.scene_combo.itemData(i) == current_scene:
+                self.scene_combo.setCurrentIndex(i)
+                break
+        self.scene_combo.currentIndexChanged.connect(self._on_scene_changed)
+        scene_row.addWidget(scene_label)
+        scene_row.addWidget(self.scene_combo, 1)
+        layout.addLayout(scene_row)
+
+        self._initial_scene = current_scene
+
         # 左右レイアウト
         hbox = QHBoxLayout()
         layout.addLayout(hbox)
 
         # 左: メイン設定タブ
-        tabs = QTabWidget()
+        self.tabs = tabs = QTabWidget()
         tabs.setMinimumWidth(380)
         hbox.addWidget(tabs, 1)
 
@@ -526,6 +219,7 @@ class SettingsDialog(QDialog):
         g1l = QVBoxLayout(g1)
         self.min_h_slider = self._add_slider(g1l, t("min"), 2, 15, self.config.get("min_height", 4))
         self.max_h_slider = self._add_slider(g1l, t("max"), 5, 30, self.config.get("max_height", 20))
+        self.thickness_slider = self._add_slider(g1l, t("thickness"), 1, 12, self.config.get("grass_thickness", 4))
         tgl.addWidget(g1)
 
         g_type = QGroupBox(t("grass_type"))
@@ -564,7 +258,9 @@ class SettingsDialog(QDialog):
             self.flower_color_checks.append(cb)
         tgl.addWidget(g_fc)
 
-        tabs.addTab(tab_grass, t("tab_grass"))
+        self.tab_grass = tab_grass
+        self.tab_grass_label = t("tab_grass")
+        tabs.addTab(tab_grass, self.tab_grass_label)
 
         # === タブ2: 配置 ===
         tab_layout = QWidget()
@@ -590,35 +286,63 @@ class SettingsDialog(QDialog):
         gsl.addWidget(sd_desc)
         tll.addWidget(gs)
 
-        tabs.addTab(tab_layout, t("tab_layout"))
+        self.tab_layout = tab_layout
+        self.tab_layout_label = t("tab_layout")
+        tabs.addTab(tab_layout, self.tab_layout_label)
 
-        # === タブ3: 環境 ===
+        # === タブ: アクアリウム ===
+        tab_aq = QWidget()
+        aq_scroll = QScrollArea()
+        aq_scroll.setWidgetResizable(True)
+        aq_inner = QWidget()
+        aq_layout = QVBoxLayout(aq_inner)
+
+        g_aq_plant = QGroupBox(t("aq_plant_length"))
+        g_apl = QVBoxLayout(g_aq_plant)
+        self.aq_min_h_slider = self._add_slider(g_apl, t("min"), 2, 20, self.config.get("aq_plant_min_height", 8))
+        self.aq_max_h_slider = self._add_slider(g_apl, t("max"), 5, 40, self.config.get("aq_plant_max_height", 30))
+        aq_layout.addWidget(g_aq_plant)
+
+        g_aq_cluster = QGroupBox(t("aq_cluster"))
+        g_acl = QVBoxLayout(g_aq_cluster)
+        self.aq_cluster_count_slider = self._add_slider(g_acl, t("num_clusters"), 0, 10, self.config.get("aq_cluster_count", 3))
+        self.aq_cluster_size_slider = self._add_slider(g_acl, t("total_count"), 1, 20, self.config.get("aq_cluster_size", 8))
+        self.aq_cluster_density_slider = self._add_slider(g_acl, t("density"), 0, 100, self.config.get("aq_cluster_density", 70))
+        aq_layout.addWidget(g_aq_cluster)
+
+        g_aq_scatter = QGroupBox(t("aq_scatter"))
+        g_asl = QVBoxLayout(g_aq_scatter)
+        self.aq_scatter_count_slider = self._add_slider(g_asl, t("count"), 0, 50, self.config.get("aq_scatter_count", 15))
+        self.aq_scatter_density_slider = self._add_slider(g_asl, t("scatter_density"), 0, 100, self.config.get("aq_scatter_density", 30))
+        aq_layout.addWidget(g_aq_scatter)
+
+        g_aq_fish = QGroupBox(t("aq_fish_settings"))
+        g_afl = QVBoxLayout(g_aq_fish)
+        self.aq_fish_count_slider = self._add_slider(g_afl, t("aq_fish_count"), 1, 20, self.config.get("aq_fish_count", 6))
+        self.aq_speed_min_slider = self._add_slider(g_afl, t("aq_speed_min"), 5, 100, self.config.get("aq_fish_speed_min", 30))
+        self.aq_speed_max_slider = self._add_slider(g_afl, t("aq_speed_max"), 5, 100, self.config.get("aq_fish_speed_max", 65))
+        self.aq_fish_y_top_slider = self._add_slider(g_afl, t("aq_y_top"), 0, 80, self.config.get("aq_fish_y_top", 10))
+        self.aq_fish_y_bottom_slider = self._add_slider(g_afl, t("aq_y_bottom"), 20, 90, self.config.get("aq_fish_y_bottom", 55))
+        aq_layout.addWidget(g_aq_fish)
+
+        aq_layout.addStretch()
+        aq_scroll.setWidget(aq_inner)
+        tab_aq_layout = QVBoxLayout(tab_aq)
+        tab_aq_layout.setContentsMargins(0, 0, 0, 0)
+        tab_aq_layout.addWidget(aq_scroll)
+
+        self.tab_aquarium = tab_aq
+        self.tab_aquarium_label = t("aq_settings")
+        tabs.addTab(tab_aq, self.tab_aquarium_label)
+
+        # === タブ: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
-
-        g_mode = QGroupBox(t("mode"))
-        g_ml = QVBoxLayout(g_mode)
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItem(t("mode_focus"), "focus")
-        self.mode_combo.addItem(t("mode_deco"), "deco")
-        self.mode_combo.addItem(t("mode_custom"), "custom")
-        current_mode = self.config.get("app_mode", "focus")
-        for i in range(self.mode_combo.count()):
-            if self.mode_combo.itemData(i) == current_mode:
-                self.mode_combo.setCurrentIndex(i)
-                break
-        self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        g_ml.addWidget(self.mode_combo)
-        self.mode_desc_label = QLabel()
-        self.mode_desc_label.setStyleSheet("color: #666; font-size: 11px;")
-        self.mode_desc_label.setWordWrap(True)
-        self._update_mode_desc()
-        g_ml.addWidget(self.mode_desc_label)
-        tel.addWidget(g_mode)
 
         g4 = QGroupBox(t("wind_strength"))
         g4l = QVBoxLayout(g4)
         self.wind_slider = self._add_slider(g4l, t("wind"), 0, 100, self.config.get("wind", 50))
+        self.sway_speed_slider = self._add_slider(g4l, t("sway_speed"), 5, 100, self.config.get("sway_speed", 50))
         tel.addWidget(g4)
 
         gm = QGroupBox(t("mouse_fade"))
@@ -745,22 +469,22 @@ class SettingsDialog(QDialog):
         btn_row.addWidget(apply_btn)
         tsl.addLayout(btn_row)
 
-        g_save_grass = QGroupBox(t("grass_preset"))
-        g_sg_l = QVBoxLayout(g_save_grass)
-        sg_row1 = QHBoxLayout()
-        save_grass_btn = QPushButton(t("save_grass"))
-        save_grass_btn.clicked.connect(self._on_save_grass)
-        sg_row1.addWidget(save_grass_btn)
-        g_sg_l.addLayout(sg_row1)
-        sg_row2 = QHBoxLayout()
-        self.grass_combo = QComboBox()
-        self._refresh_grass_saves()
-        load_grass_btn = QPushButton(t("load"))
-        load_grass_btn.clicked.connect(self._on_load_grass)
-        sg_row2.addWidget(self.grass_combo, 1)
-        sg_row2.addWidget(load_grass_btn)
-        g_sg_l.addLayout(sg_row2)
-        tsl.addWidget(g_save_grass)
+        self.scene_preset_group = QGroupBox(t("scene_preset"))
+        g_sp_l = QVBoxLayout(self.scene_preset_group)
+        sp_row1 = QHBoxLayout()
+        save_scene_btn = QPushButton(t("save_scene"))
+        save_scene_btn.clicked.connect(self._on_save_scene)
+        sp_row1.addWidget(save_scene_btn)
+        g_sp_l.addLayout(sp_row1)
+        sp_row2 = QHBoxLayout()
+        self.scene_preset_combo = QComboBox()
+        self._refresh_scene_saves()
+        load_scene_btn = QPushButton(t("load"))
+        load_scene_btn.clicked.connect(self._on_load_scene)
+        sp_row2.addWidget(self.scene_preset_combo, 1)
+        sp_row2.addWidget(load_scene_btn)
+        g_sp_l.addLayout(sp_row2)
+        tsl.addWidget(self.scene_preset_group)
 
         g_save_env = QGroupBox(t("env_preset"))
         g_se_l = QVBoxLayout(g_save_env)
@@ -819,40 +543,8 @@ class SettingsDialog(QDialog):
         ttl.addStretch()
         tabs2.addTab(tab_test, t("tab_gfx_test"))
 
-    def _update_mode_desc(self):
-        mode = self.mode_combo.currentData()
-        if mode == "focus":
-            self.mode_desc_label.setText(t("mode_focus_desc"))
-        elif mode == "deco":
-            self.mode_desc_label.setText(t("mode_deco_desc"))
-        else:
-            self.mode_desc_label.setText("")
-
-    def _on_mode_changed(self):
-        mode = self.mode_combo.currentData()
-        self._update_mode_desc()
-        if mode == "focus":
-            self.on_apply({
-                "app_mode": "focus",
-                "wind": 52,
-                "lighting_mode": "auto",
-                "weather_enabled": True,
-                "wind_sync_enabled": False,
-            })
-            self.wind_slider.setValue(52)
-            self.lighting_combo.setCurrentIndex(1)  # auto
-        elif mode == "deco":
-            self.on_apply({
-                "app_mode": "deco",
-                "wind": 10,
-                "lighting_mode": "auto",
-                "weather_enabled": True,
-                "wind_sync_enabled": False,
-            })
-            self.wind_slider.setValue(10)
-            self.lighting_combo.setCurrentIndex(1)  # auto
-        else:
-            self.on_apply({"app_mode": "custom"})
+        # 初期シーンに応じてタブ表示を調整
+        self._update_tabs_for_scene(self._initial_scene)
 
     def _on_wind_sync_toggled(self, checked):
         self.wind_sync_btn.setText("ON" if checked else "OFF")
@@ -908,17 +600,23 @@ class SettingsDialog(QDialog):
         val_lbl = QLabel(str(current))
         val_lbl.setFixedWidth(35)
         slider.valueChanged.connect(lambda v: val_lbl.setText(str(v)))
+        slider.valueChanged.connect(self._on_slider_changed)
         row.addWidget(lbl)
         row.addWidget(slider, 1)
         row.addWidget(val_lbl)
         layout.addLayout(row)
         return slider
 
+    def _on_slider_changed(self):
+        cfg = self._gather_config()
+        self.on_apply(cfg)
+
     def _gather_config(self):
         indices = self.config.get("palette_indices", [0])
         return {
             "min_height": self.min_h_slider.value(),
             "max_height": max(self.max_h_slider.value(), self.min_h_slider.value() + 1),
+            "grass_thickness": self.thickness_slider.value(),
             "num_clusters": self.num_clusters_slider.value(),
             "cluster_count": self.cluster_count_slider.value(),
             "cluster_density": self.cluster_density_slider.value(),
@@ -935,12 +633,44 @@ class SettingsDialog(QDialog):
             "mouse_fade_range": self.fade_range_slider.value(),
             "mouse_fade_alpha": self.fade_alpha_slider.value(),
             "lighting_mode": self.lighting_combo.currentData(),
-            "app_mode": self.mode_combo.currentData(),
             "weather_enabled": self.weather_btn.isChecked(),
             "wind_sync_enabled": self.wind_sync_btn.isChecked(),
             "wind_sync_limit": self.wind_limit_slider.value(),
             "language": self.lang_combo.currentData(),
+            "scene_mode": self.scene_combo.currentData(),
+            "sway_speed": self.sway_speed_slider.value(),
+            "aq_plant_min_height": self.aq_min_h_slider.value(),
+            "aq_plant_max_height": self.aq_max_h_slider.value(),
+            "aq_cluster_count": self.aq_cluster_count_slider.value(),
+            "aq_cluster_size": self.aq_cluster_size_slider.value(),
+            "aq_cluster_density": self.aq_cluster_density_slider.value(),
+            "aq_scatter_count": self.aq_scatter_count_slider.value(),
+            "aq_scatter_density": self.aq_scatter_density_slider.value(),
+            "aq_fish_count": self.aq_fish_count_slider.value(),
+            "aq_fish_speed_min": self.aq_speed_min_slider.value(),
+            "aq_fish_speed_max": self.aq_speed_max_slider.value(),
+            "aq_fish_y_top": self.aq_fish_y_top_slider.value(),
+            "aq_fish_y_bottom": self.aq_fish_y_bottom_slider.value(),
         }
+
+    def _on_scene_changed(self):
+        scene = self.scene_combo.currentData()
+        self._update_tabs_for_scene(scene)
+        self._refresh_scene_saves()
+        self.on_apply({"scene_mode": scene})
+
+    def _update_tabs_for_scene(self, scene):
+        """シーンに応じてタブを切り替え"""
+        tabs = self.tabs
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium]
+        for i in range(tabs.count() - 1, -1, -1):
+            if tabs.widget(i) in scene_tabs:
+                tabs.removeTab(i)
+        if scene == "grass":
+            tabs.insertTab(0, self.tab_grass, self.tab_grass_label)
+            tabs.insertTab(1, self.tab_layout, self.tab_layout_label)
+        elif scene == "aquarium":
+            tabs.insertTab(0, self.tab_aquarium, self.tab_aquarium_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -955,28 +685,41 @@ class SettingsDialog(QDialog):
         cfg = self._gather_config()
         self.on_apply(cfg)
 
-    # 草プリセットのキー
-    GRASS_KEYS = [
-        "min_height", "max_height", "num_clusters", "cluster_count",
-        "cluster_density", "sparseness", "scatter_count", "scatter_density",
-        "slim_ratio", "flower_ratio", "palette_indices", "flower_colors_enabled", "seed",
-    ]
+    # シーン別プリセットキー
+    SCENE_KEYS = {
+        "grass": [
+            "min_height", "max_height", "grass_thickness", "num_clusters", "cluster_count",
+            "cluster_density", "sparseness", "scatter_count", "scatter_density",
+            "slim_ratio", "flower_ratio", "palette_indices", "flower_colors_enabled", "seed",
+        ],
+        "aquarium": [
+            "aq_plant_min_height", "aq_plant_max_height",
+            "aq_cluster_count", "aq_cluster_size", "aq_cluster_density",
+            "aq_scatter_count", "aq_scatter_density",
+            "aq_fish_count", "aq_fish_speed_min", "aq_fish_speed_max",
+            "aq_fish_y_top", "aq_fish_y_bottom", "seed",
+        ],
+        "tokaido": ["seed"],
+    }
     # 環境設定のキー
     ENV_KEYS = [
-        "wind", "mouse_fade_enabled", "mouse_fade_inner",
+        "wind", "sway_speed", "mouse_fade_enabled", "mouse_fade_inner",
         "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
         "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
     ]
 
-    def _on_save_grass(self):
+    def _on_save_scene(self):
+        scene = self.scene_combo.currentData()
+        keys = self.SCENE_KEYS.get(scene, [])
         cfg = self._gather_config()
-        self.on_save("grass", {k: cfg[k] for k in self.GRASS_KEYS if k in cfg})
-        self._refresh_grass_saves()
+        self.on_save(scene, {k: cfg[k] for k in keys if k in cfg})
+        self._refresh_scene_saves()
 
-    def _on_load_grass(self):
-        name = self.grass_combo.currentText()
+    def _on_load_scene(self):
+        name = self.scene_preset_combo.currentText()
+        scene = self.scene_combo.currentData()
         if name:
-            self.on_load("grass", name)
+            self.on_load(scene, name)
 
     def _on_save_env(self):
         cfg = self._gather_config()
@@ -988,13 +731,17 @@ class SettingsDialog(QDialog):
         if name:
             self.on_load("env", name)
 
-    def _refresh_grass_saves(self):
-        self.grass_combo.clear()
-        grass_dir = os.path.join(SAVE_DIR, "grass")
-        if os.path.exists(grass_dir):
-            for f in sorted(os.listdir(grass_dir)):
+    def _refresh_scene_saves(self):
+        self.scene_preset_combo.clear()
+        scene = self.scene_combo.currentData()
+        scene_dir = os.path.join(SAVE_DIR, scene)
+        if os.path.exists(scene_dir):
+            for f in sorted(os.listdir(scene_dir)):
                 if f.endswith(".json"):
-                    self.grass_combo.addItem(f[:-5])
+                    self.scene_preset_combo.addItem(f[:-5])
+        # Update group title
+        label_map = {"grass": t("grass_preset"), "aquarium": t("aq_preset"), "tokaido": t("tokaido_preset")}
+        self.scene_preset_group.setTitle(label_map.get(scene, t("scene_preset")))
 
     def _refresh_env_saves(self):
         self.env_combo.clear()
@@ -1018,9 +765,9 @@ class ScreenOverlay(QWidget):
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.grasses = []
+        self.scene = None
         self._position_window()
-        self._rebuild_grasses()
+        self._rebuild_scene()
         self.show()
         QTimer.singleShot(100, self._set_click_through)
 
@@ -1034,44 +781,33 @@ class ScreenOverlay(QWidget):
         taskbar_top = avail.y() + avail.height()
         if taskbar_h < 10:
             taskbar_top = full.y() + full.height() - 48
-        max_h = self.config.get("max_height", 20)
-        self.grass_area_height = max(80, max_h * PIXEL_SIZE + 30)
-        self.ground_y = self.grass_area_height
+        scene_cls = get_scene_class(self.config.get("scene_mode", "grass"))
+        temp_scene = scene_cls()
+        area_height = temp_scene.get_area_height(self.config)
+        self.area_height = area_height
+        self.ground_y = area_height
         self.setGeometry(
-            full.x(), taskbar_top - self.grass_area_height,
-            full.width(), self.grass_area_height,
+            full.x(), taskbar_top - area_height,
+            full.width(), area_height,
         )
-        # 最前面を再設定（他アプリに奪われた場合の回復）
         ensure_topmost(int(self.winId()))
-        self.weather_fx.set_geometry(full.width(), self.grass_area_height)
+        self.weather_fx.set_geometry(full.width(), area_height)
 
-    def _rebuild_grasses(self):
-        width = self.width()
-        palette_indices = self.config.get("palette_indices", [0])
-        palettes = [PALETTE_PRESETS[i] for i in palette_indices if i < len(PALETTE_PRESETS)]
-        if not palettes:
-            palettes = [PALETTE_PRESETS[0]]
-        # 画面幅に応じてスケーリングしたconfigで生成
+    def _rebuild_scene(self):
+        scene_cls = get_scene_class(self.config.get("scene_mode", "grass"))
+        self.scene = scene_cls()
         screen_w = self.screen.geometry().width()
-        ratio = screen_w / 2400
-        scaled_config = self.config.copy()
-        for key in ["cluster_count", "scatter_count", "num_clusters"]:
-            if key in scaled_config:
-                scaled_config[key] = max(1, round(scaled_config[key] * ratio))
-        data_list, _ = generate_grass_data(scaled_config, width)
-        self.grasses = [GrassBlade(d, palettes) for d in data_list]
+        self.scene.rebuild(self.config, screen_w, self.width())
 
-    def update_grasses(self):
-        for g in self.grasses:
-            wave = self.wind_sim.get_wave_at(g.base_x)
-            g.update(wave)
+    def update_scene(self):
+        if self.scene:
+            self.scene.update(self.wind_sim)
         self.weather_fx.update()
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
-        # 時間帯ライティング
         lighting_mode = self.config.get("lighting_mode", "off")
         if lighting_mode == "auto":
             tint = _get_time_tint()
@@ -1079,6 +815,7 @@ class ScreenOverlay(QWidget):
             tint = LIGHTING_PRESETS[lighting_mode]
         else:
             tint = None
+        get_alpha = None
         fade_enabled = self.config.get("mouse_fade_enabled", True)
         if fade_enabled:
             mx, my = get_cursor_pos()
@@ -1086,21 +823,18 @@ class ScreenOverlay(QWidget):
             fade_r = self.config.get("mouse_fade_range", 120)
             min_alpha = self.config.get("mouse_fade_alpha", 15)
             gy = self.y() + self.ground_y // 2
-            for g in self.grasses:
-                gx = self.x() + g.base_x
+            widget_x = self.x()
+            def get_alpha(base_x):
+                gx = widget_x + base_x
                 dist = math.sqrt((mx - gx) ** 2 + (my - gy) ** 2)
                 if dist <= inner_r:
-                    alpha = min_alpha
+                    return min_alpha
                 elif dist <= inner_r + fade_r:
-                    t = (dist - inner_r) / fade_r
-                    alpha = int(min_alpha + (255 - min_alpha) * t)
-                else:
-                    alpha = 255
-                g.draw(painter, self.ground_y, alpha, tint)
-        else:
-            for g in self.grasses:
-                g.draw(painter, self.ground_y, tint=tint)
-        # 天気エフェクト（雨・雪）
+                    t_val = (dist - inner_r) / fade_r
+                    return int(min_alpha + (255 - min_alpha) * t_val)
+                return 255
+        if self.scene:
+            self.scene.draw(painter, self.ground_y, tint, get_alpha)
         if self.config.get("weather_enabled", True):
             self.weather_fx.draw(painter)
         painter.end()
@@ -1140,6 +874,9 @@ class OverlayManager:
         if self.config.get("weather_enabled", True):
             self.weather_monitor.start()
 
+        self.user_visible = True
+        self._fullscreen_hidden = False
+
         self.timer = QTimer()
         self.timer.timeout.connect(self._tick)
         self.timer.start(33)
@@ -1147,6 +884,10 @@ class OverlayManager:
         self.reposition_timer = QTimer()
         self.reposition_timer.timeout.connect(self._refresh_screens)
         self.reposition_timer.start(5000)
+
+        self.fullscreen_timer = QTimer()
+        self.fullscreen_timer.timeout.connect(self._check_fullscreen)
+        self.fullscreen_timer.start(1000)
 
     def _on_weather_update(self, state):
         """天気更新時に全画面のエフェクトを更新"""
@@ -1231,7 +972,7 @@ class OverlayManager:
         for o in self.overlays:
             o.config = self.config
             o._position_window()
-            o._rebuild_grasses()
+            o._rebuild_scene()
         # 天気ON/OFF制御
         if self.config.get("weather_enabled", True):
             if not self.weather_monitor._running:
@@ -1260,11 +1001,10 @@ class OverlayManager:
             self.config.update(data)
             self.wind_sim.set_wind(self.config.get("wind", 50))
             self._save_config()
-            if category == "grass":
-                for o in self.overlays:
-                    o.config = self.config
-                    o._position_window()
-                    o._rebuild_grasses()
+            for o in self.overlays:
+                o.config = self.config
+                o._position_window()
+                o._rebuild_scene()
 
     def show_all(self):
         for o in self.overlays:
@@ -1275,13 +1015,26 @@ class OverlayManager:
         for o in self.overlays:
             o.hide()
 
+    def _check_fullscreen(self):
+        if not self.user_visible:
+            return
+        is_fs = is_fullscreen_active()
+        if is_fs and not self._fullscreen_hidden:
+            self._fullscreen_hidden = True
+            for o in self.overlays:
+                o.hide()
+        elif not is_fs and self._fullscreen_hidden:
+            self._fullscreen_hidden = False
+            self.show_all()
+
     def _tick(self):
         now = time.monotonic()
         dt = now - self.last_time
         self.last_time = now
-        self.wind_sim.update(dt)
+        sway_speed = self.config.get("sway_speed", 50) / 50.0
+        self.wind_sim.update(dt * sway_speed)
         for o in self.overlays:
-            o.update_grasses()
+            o.update_scene()
 
 
 def _make_rounded_pixmap(icon_path, size=44, radius_ratio=0.22):
@@ -1314,9 +1067,12 @@ def main():
         if overlay_visible[0]:
             manager.hide_all()
             manager.timer.stop()
+            manager.user_visible = False
         else:
             manager.show_all()
             manager.timer.start(33)
+            manager.user_visible = True
+            manager._fullscreen_hidden = False
         overlay_visible[0] = not overlay_visible[0]
 
     hotkey = HotkeyListener(toggle_overlay)

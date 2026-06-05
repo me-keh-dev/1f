@@ -91,6 +91,31 @@ class HotkeyListener:
         if tid:
             ctypes.windll.user32.PostThreadMessageW(tid, 0x0000, 0, 0)
 
+# --- 全画面検出 ---
+class MONITORINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    ]
+
+def is_fullscreen_active():
+    """前面ウィンドウがモニター全体を覆っているか（全画面状態）を判定"""
+    hwnd = ctypes.windll.user32.GetForegroundWindow()
+    if not hwnd:
+        return False
+    rect = wintypes.RECT()
+    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+    MONITOR_DEFAULTTONEAREST = 2
+    hmon = ctypes.windll.user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+    mi = MONITORINFO()
+    mi.cbSize = ctypes.sizeof(MONITORINFO)
+    ctypes.windll.user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
+    mon = mi.rcMonitor
+    return (rect.left <= mon.left and rect.top <= mon.top and
+            rect.right >= mon.right and rect.bottom >= mon.bottom)
+
 # --- スタートアップ ---
 def _startup_shortcut_path():
     startup = os.path.join(os.environ["APPDATA"],
