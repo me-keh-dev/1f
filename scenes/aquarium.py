@@ -423,7 +423,7 @@ class AquariumScene(BaseScene):
         if len(self.bubbles) > 50:
             self.bubbles = self.bubbles[-50:]
 
-    def update(self, wind_sim):
+    def update(self, wind_sim, mouse_pos=None):
         for p in self.plants:
             wave = wind_sim.get_wave_at(p.base_x)
             p.update(wave)

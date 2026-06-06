@@ -1,5 +1,5 @@
 """
-1/f Yuragi - ADHDの集中支援デスクトップオーバーレイ
+1/f - ADHDの集中支援デスクトップオーバーレイ
 タスクバーの上にプロシージャル生成のドット絵草を表示し、1/fゆらぎで揺らす
 風が左から右に波のように伝播し、高原の草原のようになびく
 """
@@ -167,7 +167,7 @@ class SettingsDialog(QDialog):
         self.on_apply = on_apply
         self.on_save = on_save
         self.on_load = on_load
-        self.setWindowTitle("1/f Yuragi - 設定")
+        self.setWindowTitle("1/f - 設定")
         self._build_ui()
 
     def _build_ui(self):
@@ -379,6 +379,53 @@ class SettingsDialog(QDialog):
         self.tab_tokaido = tab_tk
         self.tab_tokaido_label = t("tk_settings")
         tabs.addTab(tab_tk, self.tab_tokaido_label)
+
+        # === Tab: Pooh ===
+        tab_pooh = QWidget()
+        pooh_layout = QVBoxLayout(tab_pooh)
+        self.pooh_scale_slider = self._add_slider(pooh_layout, t("display_scale"), 25, 200, self.config.get("pooh_scale", 100))
+        # Character ON/OFF
+        char_group = QGroupBox(t("pooh_characters"))
+        char_layout = QVBoxLayout(char_group)
+        self.pooh_pooh_check = QCheckBox("Winnie-the-Pooh")
+        self.pooh_pooh_check.setChecked(self.config.get("pooh_show_pooh", True))
+        self.pooh_pooh_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_pooh_check)
+        self.pooh_tigger_check = QCheckBox("Tigger")
+        self.pooh_tigger_check.setChecked(self.config.get("pooh_show_tigger", True))
+        self.pooh_tigger_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_tigger_check)
+        self.pooh_eeyore_check = QCheckBox("Eeyore")
+        self.pooh_eeyore_check.setChecked(self.config.get("pooh_show_eeyore", True))
+        self.pooh_eeyore_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_eeyore_check)
+        self.pooh_piglet_check = QCheckBox("Piglet")
+        self.pooh_piglet_check.setChecked(self.config.get("pooh_show_piglet", True))
+        self.pooh_piglet_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_piglet_check)
+        self.pooh_rabbit_check = QCheckBox("Rabbit")
+        self.pooh_rabbit_check.setChecked(self.config.get("pooh_show_rabbit", True))
+        self.pooh_rabbit_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_rabbit_check)
+        self.pooh_owl_check = QCheckBox("Owl")
+        self.pooh_owl_check.setChecked(self.config.get("pooh_show_owl", True))
+        self.pooh_owl_check.toggled.connect(self._on_slider_changed)
+        char_layout.addWidget(self.pooh_owl_check)
+        pooh_layout.addWidget(char_group)
+
+        self.pooh_balloon_slider = self._add_slider(pooh_layout, t("pooh_balloon_count"), 0, 400, self.config.get("pooh_balloon_count", 8))
+        self.pooh_balloon_size_slider = self._add_slider(pooh_layout, t("pooh_balloon_size"), 1, 30, self.config.get("pooh_balloon_size", 30))
+        self.pooh_bird_slider = self._add_slider(pooh_layout, t("pooh_bird_count"), 0, 10, self.config.get("pooh_bird_count", 3))
+
+        # Credit notice
+        credit = QLabel(t("pooh_credit"))
+        credit.setWordWrap(True)
+        credit.setStyleSheet("color: #888; font-size: 9px; margin-top: 8px;")
+        pooh_layout.addWidget(credit)
+        pooh_layout.addStretch()
+        self.tab_pooh = tab_pooh
+        self.tab_pooh_label = t("pooh_settings")
+        tabs.addTab(tab_pooh, self.tab_pooh_label)
 
         # === タブ: 環境 ===
         tab_env = QWidget()
@@ -710,6 +757,16 @@ class SettingsDialog(QDialog):
             "tk_grass_count": self.tk_grass_slider.value(),
             "tk_traveler_count": self.tk_traveler_slider.value(),
             "tk_scale": self.tk_scale_slider.value(),
+            "pooh_scale": self.pooh_scale_slider.value(),
+            "pooh_show_pooh": self.pooh_pooh_check.isChecked(),
+            "pooh_show_tigger": self.pooh_tigger_check.isChecked(),
+            "pooh_show_eeyore": self.pooh_eeyore_check.isChecked(),
+            "pooh_show_piglet": self.pooh_piglet_check.isChecked(),
+            "pooh_show_rabbit": self.pooh_rabbit_check.isChecked(),
+            "pooh_show_owl": self.pooh_owl_check.isChecked(),
+            "pooh_balloon_count": self.pooh_balloon_slider.value(),
+            "pooh_balloon_size": self.pooh_balloon_size_slider.value(),
+            "pooh_bird_count": self.pooh_bird_slider.value(),
             "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
             "tk_willow_min_h": self.tk_willow_min_slider.value(),
             "tk_willow_max_h": self.tk_willow_max_slider.value(),
@@ -724,7 +781,7 @@ class SettingsDialog(QDialog):
     def _update_tabs_for_scene(self, scene):
         """シーンに応じてタブを切り替え"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido]
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh]
         for i in range(tabs.count() - 1, -1, -1):
             if tabs.widget(i) in scene_tabs:
                 tabs.removeTab(i)
@@ -735,6 +792,8 @@ class SettingsDialog(QDialog):
             tabs.insertTab(0, self.tab_aquarium, self.tab_aquarium_label)
         elif scene == "tokaido":
             tabs.insertTab(0, self.tab_tokaido, self.tab_tokaido_label)
+        elif scene == "pooh":
+            tabs.insertTab(0, self.tab_pooh, self.tab_pooh_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -763,6 +822,7 @@ class SettingsDialog(QDialog):
             "aq_fish_count", "aq_fish_speed_min", "aq_fish_speed_max",
             "aq_fish_y_top", "aq_fish_y_bottom", "seed",
         ],
+        "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
@@ -932,7 +992,12 @@ class ScreenOverlay(QWidget):
 
     def update_scene(self):
         if self.scene:
-            self.scene.update(self.wind_sim)
+            # Pass mouse position for interactive physics
+            mx, my = get_cursor_pos()
+            wx, wy = self.x(), self.y()
+            local_mx = mx - wx
+            local_my = my - wy
+            self.scene.update(self.wind_sim, mouse_pos=(local_mx, local_my))
         self.weather_fx.update()
         self.update()
         if self.bg_overlay:

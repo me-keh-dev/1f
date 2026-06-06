@@ -47,7 +47,7 @@ class BaseScene:
         """Generate / regenerate scene elements"""
         raise NotImplementedError
 
-    def update(self, wind_sim):
+    def update(self, wind_sim, mouse_pos=None):
         """Per-frame animation update"""
         raise NotImplementedError
 

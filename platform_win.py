@@ -137,7 +137,7 @@ def is_fullscreen_active():
 def _startup_shortcut_path():
     startup = os.path.join(os.environ["APPDATA"],
                            "Microsoft", "Windows", "Start Menu",
-                           "Programs", "Startup", "1f Yuragi.lnk")
+                           "Programs", "Startup", "1f.lnk")
     return startup
 
 def _get_exe_path():

@@ -8,9 +8,9 @@ TEXTS = {
         "settings": "設定",
         "regenerate": "再生成",
         "quit": "終了",
-        "tooltip": "1/f Yuragi ({hotkey} で表示切替)",
+        "tooltip": "1/f ({hotkey} で表示切替)",
         # 設定ダイアログ
-        "settings_title": "1/f Yuragi 設定",
+        "settings_title": "1/f 設定",
         # タブ
         "tab_grass": "草",
         "tab_layout": "配置",
@@ -70,8 +70,8 @@ TEXTS = {
         "settings": "Settings",
         "regenerate": "Regenerate",
         "quit": "Quit",
-        "tooltip": "1/f Yuragi ({hotkey} to toggle)",
-        "settings_title": "1/f Yuragi Settings",
+        "tooltip": "1/f ({hotkey} to toggle)",
+        "settings_title": "1/f Settings",
         "tab_grass": "Grass",
         "tab_layout": "Layout",
         "tab_env": "Environment",

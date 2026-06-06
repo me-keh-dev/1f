@@ -1,4 +1,4 @@
-"""Grass scene - the original 1/f Yuragi grassland"""
+"""Grass scene - the original 1/f grassland"""
 import random
 from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
 from PyQt5.QtGui import QColor
@@ -303,7 +303,7 @@ class GrassScene(BaseScene):
         data_list, _ = generate_grass_data(scaled_config, widget_width)
         self.grasses = [GrassBlade(d, palettes) for d in data_list]
 
-    def update(self, wind_sim):
+    def update(self, wind_sim, mouse_pos=None):
         for g in self.grasses:
             wave = wind_sim.get_wave_at(g.base_x)
             g.update(wave)

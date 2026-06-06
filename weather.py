@@ -207,7 +207,7 @@ class WeatherMonitor:
 
         try:
             req = urllib.request.Request(LOCATION_API_URL)
-            req.add_header("User-Agent", "1f-Yuragi/1.0")
+            req.add_header("User-Agent", "1f/2.0")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
             if data.get("status") == "success":
@@ -234,7 +234,7 @@ class WeatherMonitor:
 
         try:
             req = urllib.request.Request(url)
-            req.add_header("User-Agent", "1f-Yuragi/1.0")
+            req.add_header("User-Agent", "1f/2.0")
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode())
 

@@ -1089,7 +1089,7 @@ class TokaidoScene(BaseScene):
             self.travelers.append(
                 Traveler(x, road_y, t_type, direction, speed))
 
-    def update(self, wind_sim):
+    def update(self, wind_sim, mouse_pos=None):
         for tree in self.back_trees + self.front_trees:
             tree.update(0)
         for willow in self.back_willows + self.front_willows:

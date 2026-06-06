@@ -104,7 +104,7 @@ import sys
 import plistlib
 
 def _launch_agent_path():
-    return os.path.expanduser("~/Library/LaunchAgents/com.1f-yuragi.plist")
+    return os.path.expanduser("~/Library/LaunchAgents/com.1f.plist")
 
 def _get_exe_path():
     if getattr(sys, 'frozen', False):
@@ -119,7 +119,7 @@ def set_startup_enabled(enabled):
     if enabled:
         target = _get_exe_path()
         plist = {
-            "Label": "com.1f-yuragi",
+            "Label": "com.1f",
             "ProgramArguments": [target],
             "RunAtLoad": True,
             "WorkingDirectory": os.path.dirname(target),
