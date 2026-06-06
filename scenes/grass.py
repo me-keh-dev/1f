@@ -252,9 +252,10 @@ class GrassBlade:
         local = self.noise_gen.next()
         self.sway = (wind_wave * 0.7 + local * 0.3) * self.sway_base
 
-    def draw(self, painter, ground_y, alpha=255, tint=None, pixel_size=None):
-        pw = pixel_size or PIXEL_SIZE  # width (thickness)
-        ph = PIXEL_SIZE                # height & spacing (fixed)
+    def draw(self, painter, ground_y, alpha=255, tint=None, pixel_size=None, scale=None):
+        s = scale or 1.0
+        pw = pixel_size or PIXEL_SIZE
+        ph = int(PIXEL_SIZE * s)       # height & spacing scaled
         md = max(self.max_dy, 1)
         for dx, dy, shade in self.pixels:
             sf = dy / md
@@ -280,12 +281,15 @@ class GrassScene(BaseScene):
     def __init__(self):
         self.grasses = []
         self.pixel_size = PIXEL_SIZE
+        self.scale = 1.0
 
     def get_area_height(self, config):
         max_h = config.get("max_height", 20)
-        return max(80, max_h * PIXEL_SIZE + 30)
+        s = config.get("grass_scale", 100) / 100.0
+        return max(80, int(max_h * PIXEL_SIZE * s + 30))
 
     def rebuild(self, config, screen_width, widget_width):
+        self.scale = config.get("grass_scale", 100) / 100.0
         self.pixel_size = config.get("grass_thickness", 4)
         palette_indices = config.get("palette_indices", [0])
         palettes = [PALETTE_PRESETS[i] for i in palette_indices if i < len(PALETTE_PRESETS)]
@@ -305,6 +309,7 @@ class GrassScene(BaseScene):
             g.update(wave)
 
     def draw(self, painter, ground_y, tint=None, get_alpha=None):
+        s = self.scale
         for g in self.grasses:
             alpha = get_alpha(g.base_x) if get_alpha else 255
-            g.draw(painter, ground_y, alpha, tint, self.pixel_size)
+            g.draw(painter, ground_y, alpha, tint, int(self.pixel_size * s), s)

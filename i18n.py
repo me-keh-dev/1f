@@ -117,6 +117,7 @@ TEXTS = {
         "aq_speed_max": "速度 最高",
         "aq_y_top": "上限位置",
         "aq_y_bottom": "下限位置",
+        "display_scale": "表示倍率%",
         "sway_speed": "揺れ速度",
         # 保存タブ
         "apply": "適用",
@@ -235,6 +236,7 @@ TEXTS = {
         "aq_speed_max": "Speed Max",
         "aq_y_top": "Top Pos",
         "aq_y_bottom": "Bottom Pos",
+        "display_scale": "Scale %",
         "sway_speed": "Sway Speed",
         "apply": "Apply",
         "scene_preset": "Scene Preset",

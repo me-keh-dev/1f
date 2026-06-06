@@ -222,6 +222,8 @@ class SettingsDialog(QDialog):
         self.thickness_slider = self._add_slider(g1l, t("thickness"), 1, 12, self.config.get("grass_thickness", 4))
         tgl.addWidget(g1)
 
+        self.grass_scale_slider = self._add_slider(g1l, t("display_scale"), 25, 200, self.config.get("grass_scale", 100))
+
         g_type = QGroupBox(t("grass_type"))
         g_type_l = QVBoxLayout(g_type)
         desc = QLabel(t("type_desc"))
@@ -297,6 +299,8 @@ class SettingsDialog(QDialog):
         aq_inner = QWidget()
         aq_layout = QVBoxLayout(aq_inner)
 
+        self.aq_scale_slider = self._add_slider(aq_layout, t("display_scale"), 25, 200, self.config.get("aq_scale", 100))
+
         g_aq_plant = QGroupBox(t("aq_plant_length"))
         g_apl = QVBoxLayout(g_aq_plant)
         self.aq_min_h_slider = self._add_slider(g_apl, t("min"), 2, 20, self.config.get("aq_plant_min_height", 8))
@@ -341,6 +345,8 @@ class SettingsDialog(QDialog):
         tk_scroll.setWidgetResizable(True)
         tk_inner = QWidget()
         tk_layout = QVBoxLayout(tk_inner)
+
+        self.tk_scale_slider = self._add_slider(tk_layout, t("display_scale"), 25, 200, self.config.get("tk_scale", 100))
 
         g_tk_obj = QGroupBox(t("tk_objects"))
         g_tol = QVBoxLayout(g_tk_obj)
@@ -656,6 +662,7 @@ class SettingsDialog(QDialog):
             "min_height": self.min_h_slider.value(),
             "max_height": max(self.max_h_slider.value(), self.min_h_slider.value() + 1),
             "grass_thickness": self.thickness_slider.value(),
+            "grass_scale": self.grass_scale_slider.value(),
             "num_clusters": self.num_clusters_slider.value(),
             "cluster_count": self.cluster_count_slider.value(),
             "cluster_density": self.cluster_density_slider.value(),
@@ -688,6 +695,7 @@ class SettingsDialog(QDialog):
             "aq_fish_count": self.aq_fish_count_slider.value(),
             "aq_fish_speed_min": self.aq_speed_min_slider.value(),
             "aq_fish_speed_max": self.aq_speed_max_slider.value(),
+            "aq_scale": self.aq_scale_slider.value(),
             "aq_fish_y_top": self.aq_fish_y_top_slider.value(),
             "aq_fish_y_bottom": self.aq_fish_y_bottom_slider.value(),
             "tk_pine_count": self.tk_pine_slider.value(),
@@ -701,6 +709,7 @@ class SettingsDialog(QDialog):
             "tk_hill_count": self.tk_hill_slider.value(),
             "tk_grass_count": self.tk_grass_slider.value(),
             "tk_traveler_count": self.tk_traveler_slider.value(),
+            "tk_scale": self.tk_scale_slider.value(),
             "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
             "tk_willow_min_h": self.tk_willow_min_slider.value(),
             "tk_willow_max_h": self.tk_willow_max_slider.value(),

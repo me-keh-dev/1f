@@ -167,8 +167,8 @@ class PineTree:
     def update(self, wind_wave):
         pass  # Pine trees don't sway
 
-    def draw(self, painter, ground_y, alpha=255, tint=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, ground_y, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
         for dx, dy, part in self.pixels:
             if part in ('trunk', 'trunk_dark'):
                 c = self.trunk_qcolors.get(part, self.trunk_qcolors['trunk'])
@@ -222,9 +222,9 @@ class WillowTree:
             target_offset = group_vals[g] * self.sway_base * 1.5
             self.branch_offsets[i] += (target_offset - self.branch_offsets[i]) * 0.03
 
-    def draw(self, painter, ground_y, alpha=255, tint=None, get_alpha=None):
-        ps = PIXEL_SIZE
-        lw = self.leaf_thickness
+    def draw(self, painter, ground_y, alpha=255, tint=None, get_alpha=None, ps=None):
+        ps = ps or PIXEL_SIZE
+        lw = max(1, int(self.leaf_thickness * ps / PIXEL_SIZE))
         # Single alpha for whole tree (not per-pixel)
         ta = get_alpha(int(self.base_x)) if get_alpha else alpha
         if ta <= 0:
@@ -409,8 +409,8 @@ class Hill:
         self.color = QColor(160, 195, 130, 100)
         self.color_dark = QColor(130, 170, 105, 80)
 
-    def draw(self, painter, ground_y, tint=None, get_alpha=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, ground_y, tint=None, get_alpha=None, ps=None):
+        ps = ps or PIXEL_SIZE
         cx = self.base_x
         for dx in range(-self.width, self.width + 1):
             ratio = 1.0 - (dx / self.width) ** 2
@@ -523,13 +523,13 @@ class MtFuji:
         self.snow_color = QColor(220, 228, 240, 160)
         self.snow_threshold = 0.72  # above this ratio = snow
 
-    def draw(self, painter, ground_y, tint=None, get_alpha=None):
+    def draw(self, painter, ground_y, tint=None, get_alpha=None, ps=None):
         from PyQt5.QtGui import QPainter
+        ps = ps or PIXEL_SIZE
         cx = self.base_x
-        screen_hw = self.half_width * PIXEL_SIZE
-        screen_h = self.max_height * PIXEL_SIZE
-        road_h = 3 * PIXEL_SIZE
-        base_y = ground_y - road_h
+        screen_hw = self.half_width * ps
+        screen_h = self.max_height * ps
+        base_y = ground_y  # extend to bottom (taskbar)
 
         # Build smooth ridgeline path
         body_path = QPainterPath()
@@ -609,8 +609,8 @@ class StaticBuilding:
             local = self.noise_gen.next()
             self.noren_sway = (wind_wave * 0.15 + local * 0.1)
 
-    def draw(self, painter, ground_y, alpha=255, tint=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, ground_y, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
         for dx, dy, part in self.pixels:
             sway = 0
             if self.has_noren and part in ('noren', 'noren_light'):
@@ -649,8 +649,8 @@ class Traveler:
         elif self.x < -margin:
             self.x = screen_width + margin
 
-    def draw(self, painter, alpha=255, tint=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
         shape = self.frames[self.frame]
         for dx, dy, part in shape:
             actual_dx = dx * self.direction
@@ -866,12 +866,16 @@ class TokaidoScene(BaseScene):
         self.travelers = []
         self.widget_width = 0
         self.area_height = 200
+        self.scale = 1.0
 
     def get_area_height(self, config):
         willow_max = config.get("tk_willow_max_h", 45)
-        return max(200, int(willow_max * PIXEL_SIZE * 0.7) + 50)
+        s = config.get("tk_scale", 100) / 100.0
+        return max(200, int((willow_max * PIXEL_SIZE * 0.7 + 50) * s))
 
     def rebuild(self, config, screen_width, widget_width):
+        self.scale = config.get("tk_scale", 100) / 100.0
+        self.ps = max(1, int(PIXEL_SIZE * self.scale))
         self.widget_width = widget_width
         self.area_height = self.get_area_height(config)
         seed = config.get("seed", random.randint(0, 999999))
@@ -1105,7 +1109,7 @@ class TokaidoScene(BaseScene):
 
     def draw_background(self, painter, ground_y, tint=None, get_alpha=None):
         if self.fuji:
-            self.fuji.draw(painter, ground_y, tint, get_alpha)
+            self.fuji.draw(painter, ground_y, tint, get_alpha, self.ps)
 
     def draw(self, painter, ground_y, tint=None, get_alpha=None):
         # Sky gradient
@@ -1117,48 +1121,50 @@ class TokaidoScene(BaseScene):
 
         # Mt. Fuji is drawn in background layer (behind other windows)
 
+        ps = self.ps
+
         # Background hills
         for hill in self.hills:
-            hill.draw(painter, ground_y, tint, get_alpha)
+            hill.draw(painter, ground_y, tint, get_alpha, ps)
 
-        # Road surface (with mouse fade, coarse stepping for performance)
-        road_h = 3 * PIXEL_SIZE
-        step = PIXEL_SIZE * 2
+        # Road surface
+        road_h = 3 * ps
+        step = ps * 2
         for rx in range(0, self.widget_width, step):
             a = get_alpha(rx) if get_alpha else 255
             rc = QColor(185, 165, 120, int(160 * a / 255))
             painter.fillRect(rx, ground_y - road_h, step, road_h, rc)
             ec = QColor(140, 120, 80, int(120 * a / 255))
-            painter.fillRect(rx, ground_y - road_h, step, PIXEL_SIZE // 2, ec)
+            painter.fillRect(rx, ground_y - road_h, step, ps // 2, ec)
 
-        # Back trees (behind buildings, grow from road top line)
+        # Back trees
         road_top_y = ground_y - road_h
         for tree in self.back_trees:
             alpha = get_alpha(tree.base_x) if get_alpha else 255
-            tree.draw(painter, road_top_y, alpha, tint)
+            tree.draw(painter, road_top_y, alpha, tint, ps)
         for willow in self.back_willows:
-            willow.draw(painter, road_top_y, 255, tint, get_alpha)
+            willow.draw(painter, road_top_y, 255, tint, get_alpha, ps)
 
         # Buildings
         for bld in self.buildings:
             alpha = get_alpha(bld.base_x) if get_alpha else 255
-            bld.draw(painter, ground_y, alpha, tint)
+            bld.draw(painter, ground_y, alpha, tint, ps)
 
-        # Roadside grass (on top of road, behind travelers)
+        # Roadside grass
         road_top_y = ground_y - road_h
-        grass_ps = 2  # thin pixel size for grass
+        grass_ps = max(1, ps // 2)
         for g in self.roadside_grass:
             alpha = get_alpha(g.base_x) if get_alpha else 255
-            g.draw(painter, road_top_y, alpha, tint, grass_ps)
+            g.draw(painter, road_top_y, alpha, tint, grass_ps, self.scale)
 
-        # Travelers (behind front trees)
+        # Travelers
         for trav in self.travelers:
             alpha = get_alpha(int(trav.x)) if get_alpha else 255
-            trav.draw(painter, alpha, tint)
+            trav.draw(painter, alpha, tint, ps)
 
-        # Front trees (in front of travelers and buildings)
+        # Front trees
         for tree in self.front_trees:
             alpha = get_alpha(tree.base_x) if get_alpha else 255
-            tree.draw(painter, ground_y, alpha, tint)
+            tree.draw(painter, ground_y, alpha, tint, ps)
         for willow in self.front_willows:
-            willow.draw(painter, ground_y, 255, tint, get_alpha)
+            willow.draw(painter, ground_y, 255, tint, get_alpha, ps)

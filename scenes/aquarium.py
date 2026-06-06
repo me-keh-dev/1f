@@ -74,8 +74,8 @@ class WaterPlant:
         self.sway_vel *= 0.92  # water drag
         self.sway += self.sway_vel
 
-    def draw(self, painter, ground_y, alpha=255, tint=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, ground_y, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
         md = self.max_dy
         for dx, dy, shade in self.pixels:
             sf = dy / md
@@ -176,8 +176,8 @@ class Fish:
         self.tail_vel *= 0.85  # tail drag
         self.tail_sway += self.tail_vel
 
-    def draw(self, painter, alpha=255, tint=None):
-        ps = PIXEL_SIZE
+    def draw(self, painter, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
         flutter = self.tail_sway * 0.35 * (-self.direction)
         # Layer 1: static tail (fills base, no gaps)
         for dx, dy, part in self.shape:
@@ -330,11 +330,15 @@ class AquariumScene(BaseScene):
         self.bubble_timer = 0
         self.widget_width = 0
         self.area_height = 200
+        self.scale = 1.0
 
     def get_area_height(self, config):
-        return 200
+        s = config.get("aq_scale", 100) / 100.0
+        return int(200 * s)
 
     def rebuild(self, config, screen_width, widget_width):
+        self.scale = config.get("aq_scale", 100) / 100.0
+        self.ps = max(1, int(PIXEL_SIZE * self.scale))
         self.widget_width = widget_width
         self.area_height = self.get_area_height(config)
         seed = config.get("seed", random.randint(0, 999999))
@@ -433,13 +437,14 @@ class AquariumScene(BaseScene):
         gradient.setColorAt(0.5, QColor(15, 50, 100, 25))
         gradient.setColorAt(1.0, QColor(10, 35, 70, 50))
         painter.fillRect(0, 0, self.widget_width, ground_y, gradient)
+        ps = self.ps
         sand = QColor(194, 178, 128, 140)
-        painter.fillRect(0, ground_y - 2 * PIXEL_SIZE, self.widget_width, 2 * PIXEL_SIZE, sand)
+        painter.fillRect(0, ground_y - 2 * ps, self.widget_width, 2 * ps, sand)
         for p in self.plants:
             alpha = get_alpha(p.base_x) if get_alpha else 255
-            p.draw(painter, ground_y, alpha, tint)
+            p.draw(painter, ground_y, alpha, tint, ps)
         for f in self.fish_list:
             alpha = get_alpha(int(f.x)) if get_alpha else 255
-            f.draw(painter, alpha, tint)
+            f.draw(painter, alpha, tint, ps)
         for b in self.bubbles:
             b.draw(painter)
