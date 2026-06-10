@@ -21,7 +21,7 @@ a = Analysis(
     binaries=[],
     datas=[('icon.png', '.')] + APP_CODE,
     # pyobjc is used by the swappable platform_mac.py, so freeze it explicitly
-    hiddenimports=['objc', 'AppKit', 'Quartz'],
+    hiddenimports=['objc', 'AppKit', 'Quartz', 'plistlib'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
