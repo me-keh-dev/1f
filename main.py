@@ -22,8 +22,7 @@ from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 if sys.platform == "win32":
     from platform_win import init_dpi, set_click_through, ensure_topmost, set_behind_windows, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
 elif sys.platform == "darwin":
-    from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
-    def is_fullscreen_active(): return False  # macOS: 未実装
+    from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, set_behind_windows, is_fullscreen_active, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
 else:
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 

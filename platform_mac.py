@@ -49,6 +49,50 @@ def set_click_through(hwnd):
     except Exception:
         pass
 
+def set_behind_windows(hwnd):
+    """ウィンドウを通常ウィンドウの後ろに配置する（東海道・富士山モード用）"""
+    try:
+        import objc
+        from AppKit import NSNormalWindowLevel
+        ns_view = objc.objc_object(c_void_p=int(hwnd))
+        ns_window = ns_view.window()
+        if ns_window is not None:
+            # NSNormalWindowLevel(0) より下げてデスクトップ寄りにする
+            ns_window.setLevel_(NSNormalWindowLevel - 1)
+            ns_window.setCollectionBehavior_(1 | 16)
+            try:
+                ns_window.setHidesOnDeactivate_(False)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def is_fullscreen_active():
+    """最前面アプリが全画面かを判定する"""
+    try:
+        from AppKit import NSWorkspace
+        app = NSWorkspace.sharedWorkspace().frontmostApplication()
+        if app is None:
+            return False
+        # アクティブなアプリのウィンドウ情報からフルスクリーンを検出
+        import Quartz
+        windows = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly | Quartz.kCGWindowListExcludeDesktopElements,
+            Quartz.kCGNullWindowID
+        )
+        pid = app.processIdentifier()
+        screen = __import__('PyQt5.QtWidgets', fromlist=['QApplication']).QApplication.primaryScreen().geometry()
+        sw, sh = screen.width(), screen.height()
+        for w in windows:
+            if w.get('kCGWindowOwnerPID') != pid:
+                continue
+            bounds = w.get('kCGWindowBounds', {})
+            if (bounds.get('Width', 0) >= sw and bounds.get('Height', 0) >= sh):
+                return True
+        return False
+    except Exception:
+        return False
+
 def ensure_topmost(hwnd):
     """macOSではset_click_throughで設定済みのため追加処理不要"""
     pass
