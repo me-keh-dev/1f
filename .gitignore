@@ -5,6 +5,8 @@ __pycache__/
 dist/
 build/
 *.spec
+!1f.spec
+!1f_mac.spec
 *.exe
 config.json
 saves/

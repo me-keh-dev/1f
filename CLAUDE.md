@@ -30,4 +30,5 @@
 | 吊っているのは若干揺れるように | 張り綱に揺れを追加: 2周波の正弦合成による横揺れ（中央ほど大きく端は固定）＋わずかな縦の弾み。 |
 | 窓モードは削除＆廃棄でOK | `pending/window/` を完全削除し、CLAUDE.md のペンディング機能セクションも撤去。（必要なら直前のコミット a84d1d2 の履歴から復元可能） |
 | GitHubで最新版をダウンロードできるように（Windows版のみ） | コミットをpush、PyInstallerで1f.exeをビルド・起動確認し、GitHub Release v2.3.0 を作成して添付。 |
+| mac用 spec ファイルを作ってリポジトリに | `1f_mac.spec` を新規作成（.app バンドル化: BUNDLE セクション、icon.icns、LSUIElement=True のメニューバーアプリ、bundle_identifier=com.1f、pyobjc系 hiddenimports）。requirements.txt に `pyobjc; sys_platform == "darwin"` を追加。Mac側では `pyinstaller 1f_mac.spec` を実行するだけ。 |
 | 1f_mac_fix(1).zip はマージされているか／mac用更新ファイル | 未マージだった。zip（6/6時点）から mac 実装2関数（set_behind_windows / is_fullscreen_active）を platform_mac.py に移植し、main.py の darwin import を更新（スタブ削除）。zip の main.py 本体は焚火以前の旧版のため不使用。LaunchAgentラベルは新しい com.1f を維持。 |
