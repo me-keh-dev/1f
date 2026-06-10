@@ -30,7 +30,7 @@ PHASES = {
     "day":       {"ambient": 0.95, "campers": True,  "fire": True},
     "evening":   {"ambient": 0.55, "campers": True,  "fire": True},
     "night":     {"ambient": 0.30, "campers": True,  "fire": True},
-    "deepnight": {"ambient": 0.25, "campers": False, "fire": True},
+    "deepnight": {"ambient": 0.25, "campers": False, "fire": False},
     "dawn":      {"ambient": 0.55, "campers": False, "fire": False},
 }
 
@@ -230,7 +230,6 @@ class Campfire:
     GRID_W = 15   # heat grid width in cells (odd)
     GRID_H = 22   # heat grid height in cells
     FLAME_H = 16  # typical visual flame height (for glow / smoke placement)
-    SIM_EVERY = 3  # run the heat sim every N frames (~30Hz at 90fps)
 
     def __init__(self, x, rng, ps, area_height, depth=0.0, camper_specs=None,
                  tent_side=None, tent_kind=None):
@@ -263,6 +262,20 @@ class Campfire:
         self.garland_style = rng.choice(["tent", "poles"])
         self.fire_on = True
         self.ambient = 0.30  # base brightness for campers/tent (set by scene)
+        # Flame speed (0.1..1.0): scales sim rate, yuragi smoothing and flicker
+        self.speed = 0.3
+        self.t = self.phase  # flicker clock, advances by `speed` per frame
+        # Deep night (2-4am): some sites stay up with a small fire ("night
+        # owls", fewer campers), the rest are out cold with the fire dead
+        self.night_owl = rng.random() < 0.5
+        self.deep_count = min(len(self.camper_specs), rng.choice([1, 1, 2]))
+        self.burn = 1.0          # heat injection scale (small fire late at night)
+        self.show_campers = True
+        self.camper_limit = None  # None = everyone, or how many stayed up
+        # Stay schedule (set by the scene): the party is only on site
+        # between arrive and depart o'clock
+        self.present = True
+        self.arrive, self.depart, self.wraps = 0.0, 24.0, False
         # Heat grid: heat[y][x], y=0 at the base
         self.heat = [[0.0] * self.GRID_W for _ in range(self.GRID_H)]
         # Per-column 1/f noise modulating the heat injection
@@ -294,8 +307,8 @@ class Campfire:
         for x in range(W):
             d = abs(x - half) / half  # 0 center .. 1 edge
             env = max(0.0, 1.0 - d * d * 2.2)  # narrower than the grid
-            self.col_inj[x] += (self.col_noise[x].next() - self.col_inj[x]) * 0.3
-            inj = env * flicker * (0.95 + 0.25 * self.col_inj[x]) if self.fire_on else 0.0
+            self.col_inj[x] += (self.col_noise[x].next() - self.col_inj[x]) * 0.3 * self.speed
+            inj = env * flicker * self.burn * (0.95 + 0.25 * self.col_inj[x]) if self.fire_on else 0.0
             self.heat[0][x] = max(0.0, min(1.0, inj))
 
         # Wind bias: probability of taking heat from the upwind cell
@@ -322,9 +335,12 @@ class Campfire:
 
     def update(self, wind, spark_amount, smoke_on):
         self.frame += 1
-        # 1/f flicker, smoothed
-        self.level += (self.noise.next() - self.level) * 0.15
-        if self.frame % self.SIM_EVERY == 0:
+        self.t += self.speed  # flicker clock scaled by flame speed
+        # 1/f flicker, smoothed (small factor = slow, relaxed yuragi)
+        self.level += (self.noise.next() - self.level) * 0.15 * self.speed
+        # Heat sim rate scales with speed (speed 1.0 -> every 3 frames)
+        sim_every = max(2, min(12, round(3 / self.speed)))
+        if self.frame % sim_every == 0:
             self._step_heat(wind)
         # Spawn sparks from flame area
         if self.fire_on and spark_amount > 0 and self.rng.random() < spark_amount / 100.0 * 0.35:
@@ -360,7 +376,7 @@ class Campfire:
         # Firelight flicker on the body (follows the fire's 1/f level)
         if self.fire_on:
             flick = max(0.0, min(1.0, 0.78 + 0.22 * self.level
-                                 + 0.08 * math.sin(self.frame * 0.27 + self.phase + mirror)))
+                                 + 0.08 * math.sin(self.t * 0.27 + self.phase + mirror)))
         else:
             flick = 0.0
         for dx, dy, part in variant["cells"]:
@@ -402,7 +418,7 @@ class Campfire:
             H, HW = self.TENT_H, self.TENT_HALF_W
         if self.fire_on:
             flick = max(0.0, min(1.0, 0.75 + 0.25 * self.level
-                                 + 0.06 * math.sin(self.frame * 0.23 + self.phase)))
+                                 + 0.06 * math.sin(self.t * 0.23 + self.phase)))
         else:
             flick = 0.0
         for j in range(H):
@@ -450,10 +466,11 @@ class Campfire:
         ROOF_H = 6
         if self.fire_on:
             flick = max(0.0, min(1.0, 0.75 + 0.25 * self.level
-                                 + 0.06 * math.sin(self.frame * 0.23 + self.phase)))
+                                 + 0.06 * math.sin(self.t * 0.23 + self.phase)))
         else:
             flick = 0.0
-        window_lit = self.ambient <= 0.55
+        # Window glows in the dark, but goes out once everyone is asleep
+        window_lit = self.ambient <= 0.55 and self.show_campers
 
         def paint(base, dxc, py, full_bright=False):
             toward_fire = dxc * -side
@@ -552,11 +569,11 @@ class Campfire:
         ps = self.ps
         self.set_base_y(ground_y)
         base_y = self._base_y
-        flicker = 0.85 + 0.25 * self.level + 0.05 * math.sin(self.frame * 0.21 + self.phase)
+        flicker = 0.85 + 0.25 * self.level + 0.05 * math.sin(self.t * 0.21 + self.phase)
 
         # --- Glow (behind everything) ---
         if glow_on and self.fire_on:
-            radius = (self.FLAME_H + 8) * ps * (0.9 + 0.15 * self.level)
+            radius = (self.FLAME_H + 8) * ps * (0.9 + 0.15 * self.level) * (0.45 + 0.55 * self.burn)
             grad = QRadialGradient(self.x, base_y - 4 * ps, radius)
             gc = self._tinted(QColor(255, 140, 40), tint)
             gc.setAlpha(int(38 * flicker * fade))
@@ -580,8 +597,11 @@ class Campfire:
                 self._draw_garland(painter, ground_y, tint, fade)
 
         # --- Campers (beside the fire) ---
-        if campers_on:
-            for spec, mirror, seat_offset in self.camper_specs:
+        if campers_on and self.show_campers:
+            specs = self.camper_specs
+            if self.camper_limit is not None:
+                specs = specs[:self.camper_limit]  # late night: only a few left
+            for spec, mirror, seat_offset in specs:
                 self._draw_camper(painter, ground_y, spec, mirror, seat_offset, tint, fade)
 
         # --- Stones ring ---
@@ -653,6 +673,7 @@ class TakibiScene(BaseScene):
         self.scale = 1.0
         self.ps = PIXEL_SIZE
         self.spark_amount = 25
+        self.speed = 0.3
         self.smoke_on = True
         self.glow_on = True
         self.campers_on = True
@@ -679,11 +700,39 @@ class TakibiScene(BaseScene):
         return {"sunrise": "dawn", "daytime": "day",
                 "sunset": "evening", "night": "night"}.get(mode, "night")
 
+    def _current_hour(self):
+        """Clock driving arrivals/departures. Real time in auto mode,
+        otherwise a representative hour of the preset phase."""
+        mode = self._config.get("lighting_mode", "off") if self._config else "off"
+        if mode == "auto":
+            now = datetime.datetime.now()
+            return now.hour + now.minute / 60.0
+        return {"dawn": 5.0, "day": 12.0, "evening": 18.0,
+                "night": 22.0, "deepnight": 3.0}[self.phase]
+
+    def _update_presence(self):
+        h = self._current_hour()
+        for f in self.fires:
+            if f.wraps:
+                f.present = h >= f.arrive or h < f.depart
+            else:
+                f.present = f.arrive <= h < f.depart
+
     def _apply_phase(self, phase):
         self.phase = phase
         p = PHASES[phase]
         for f in self.fires:
-            f.fire_on = p["fire"]
+            if phase == "deepnight" and f.night_owl:
+                # Night owls: a few campers stay up around a small fire
+                f.fire_on = True
+                f.burn = 0.5
+                f.show_campers = True
+                f.camper_limit = f.deep_count
+            else:
+                f.fire_on = p["fire"]
+                f.burn = 1.0
+                f.show_campers = p["campers"]
+                f.camper_limit = None
             f.ambient = p["ambient"]
 
     def get_area_height(self, config):
@@ -700,9 +749,13 @@ class TakibiScene(BaseScene):
         self.glow_on = config.get("takibi_glow", True)
         self.campers_on = config.get("takibi_campers", True)
         self.tents_on = config.get("takibi_tents", True)
+        self.speed = max(0.1, min(1.0, config.get("takibi_speed", 30) / 100.0))
         self._config = config  # live reference; lighting_mode may change in place
+        self._screen_width = screen_width
         seed = config.get("seed", random.randint(0, 999999))
-        rng = random.Random(seed)
+        # Mix the date into the seed: the campsite is laid out anew every day
+        self._day = datetime.date.today().toordinal()
+        rng = random.Random(f"{seed}:{self._day}")
 
         count = max(1, config.get("takibi_count", 1))
         # Every camper in the whole campsite is a different person:
@@ -744,23 +797,48 @@ class TakibiScene(BaseScene):
                 pose, pal = combos[combo_i % len(combos)]
                 combo_i += 1
                 specs.append((make_camper_spec(pose, pal), mirror, seat_offset))
-            self.fires.append(Campfire(x, random.Random(rng.randint(0, 999999)),
-                                       f_ps, self.area_height, depth, specs,
-                                       tent_side, tent_kind))
+            fire = Campfire(x, random.Random(rng.randint(0, 999999)),
+                            f_ps, self.area_height, depth, specs,
+                            tent_side, tent_kind)
+            fire.speed = self.speed
+            # Stay schedule: when this party arrives and packs up.
+            # Site 0 is a long-stay camper so the meadow is never empty.
+            r = rng.random()
+            if i == 0 or r < 0.20:
+                fire.arrive, fire.depart, fire.wraps = 0.0, 24.0, False  # long stay
+            elif r < 0.65:
+                # Overnight: arrives midday-evening, packs up in the morning
+                fire.arrive = rng.uniform(10.0, 21.0)
+                fire.depart = rng.uniform(7.0, 10.0)
+                fire.wraps = True
+            else:
+                # Day trip: arrives in the morning, packs up by evening
+                fire.arrive = rng.uniform(8.0, 12.0)
+                fire.depart = rng.uniform(15.0, 19.0)
+                fire.wraps = False
+            self.fires.append(fire)
         # Draw back to front
         self.fires.sort(key=lambda f: -f.depth)
 
         self._apply_phase(self._resolve_phase())
+        self._update_presence()
 
     def update(self, wind_sim, mouse_pos=None):
         # Re-check the time-of-day phase about once a second
         self._phase_tick += 1
         if self._phase_tick >= 90:
             self._phase_tick = 0
+            # A new day: the campsite is laid out afresh
+            if datetime.date.today().toordinal() != self._day:
+                self.rebuild(self._config, self._screen_width, self.widget_width)
+                return
             phase = self._resolve_phase()
             if phase != self.phase:
                 self._apply_phase(phase)
+            self._update_presence()
         for f in self.fires:
+            if not f.present:
+                continue
             wind = wind_sim.get_wave_at(f.x)
             f.update(wind, self.spark_amount, self.smoke_on)
 
@@ -768,8 +846,10 @@ class TakibiScene(BaseScene):
         # The campfire is its own light source: ignore the global tint and
         # let the phase (PHASES) drive the mood instead.
         ph = PHASES[self.phase]
-        campers_on = self.campers_on and ph["campers"]
+        campers_on = self.campers_on  # per-fire show_campers handles the phase
         for f in self.fires:
+            if not f.present:
+                continue  # this party hasn't arrived yet / already packed up
             alpha = get_alpha(f.x) if get_alpha else 255
             if alpha <= 0:
                 continue

@@ -31,4 +31,10 @@
 | 窓モードは削除＆廃棄でOK | `pending/window/` を完全削除し、CLAUDE.md のペンディング機能セクションも撤去。（必要なら直前のコミット a84d1d2 の履歴から復元可能） |
 | GitHubで最新版をダウンロードできるように（Windows版のみ） | コミットをpush、PyInstallerで1f.exeをビルド・起動確認し、GitHub Release v2.3.0 を作成して添付。 |
 | mac用 spec ファイルを作ってリポジトリに | `1f_mac.spec` を新規作成（.app バンドル化: BUNDLE セクション、icon.icns、LSUIElement=True のメニューバーアプリ、bundle_identifier=com.1f、pyobjc系 hiddenimports）。requirements.txt に `pyobjc; sys_platform == "darwin"` を追加。Mac側では `pyinstaller 1f_mac.spec` を実行するだけ。 |
+| 炎が速い、もっとゆったり／めらめらの速さを調整できるように | 設定スライダー「めらめらの速さ」（takibi_speed 10〜100%、デフォルト30%）を追加。速度は熱シミュ間隔（speed 1.0で3フレーム毎〜最大12フレーム毎）・1/fレベルのスムージング・基部熱注入のゆらぎ・火明かり明滅クロック（self.t）すべてに連動。1/fゆらぎの性質は維持し時間スケールのみ低周波側へ。 |
+| 深夜2時〜は焚火が小さく人も少なく。複数焚火では「点いてる（少人数）」と「消えて無人」をランダムに | 焚火ごとに night_owl（50%）と残留人数（1〜2人）をシードで決定。深夜フェーズで夜更かしサイトは burn=0.5 の小さな焚火＋少人数（グローも縮小）、それ以外は消火・無人（熾火のみ）。 |
+| 深夜人がいなくなったらコテージの明かりも消える | コテージの窓明かりを「暗い時間帯かつ人が起きている」条件に変更。寝静まったサイトと明け方は消灯、夜更かしサイトは点灯のまま。 |
+| 設定が同じでも毎日設営場所が変わる。朝撤収・昼到着・夜にテント増、朝残った組は夕方撤収など | シードに日付（toordinal）を混ぜて毎日レイアウトを再生成（日付変更を毎秒チェックし自動rebuild）。サイトごとに滞在スケジュールをシード決定: 長期滞在（常駐、サイト0は必ずこれで空き地化を防止）／泊まり（10〜21時到着→翌朝7〜10時撤収）／日帰り（8〜12時到着→15〜19時撤収）。毎秒presenceを再判定し、不在サイトは描画・更新ともスキップ。プリセット照明時は代表時刻（dawn=5時等）で判定。 |
+| 言語を変えた瞬間に全部書き換わってほしい | SettingsDialog に on_language_change コールバックを追加。言語変更時にトレイメニュー文言を更新し、設定画面を同じ位置・同じタブのまま新言語で開き直す。「開き直すと反映」の注記を削除。 |
+| macで毎回ビルドせず、骨格＋ファイル差し替えで更新したい | bootstrap.py（凍結される唯一のエントリ）を新設。アプリコード（main.py/scenes/i18n/weather/weather_fx/platform_*）は datas の素の .py として同梱し excludes でPYZから除外。起動時に外部コードdir（Win: %APPDATA%/1f/code、mac: ~/Library/Application Support/1f/code）に main.py があれば sys.path 先頭に挿入して優先読み込み（=ファイル差し替えだけで更新、削除でバンドル版に戻る）。両spec を bootstrap エントリに変更。Windows exe で「バンドル版起動」「外部コード優先」の両方を実機検証済み。注意: 新しい外部ライブラリを使う変更は骨格の再ビルドが必要。 |
 | 1f_mac_fix(1).zip はマージされているか／mac用更新ファイル | 未マージだった。zip（6/6時点）から mac 実装2関数（set_behind_windows / is_fullscreen_active）を platform_mac.py に移植し、main.py の darwin import を更新（スタブ削除）。zip の main.py 本体は焚火以前の旧版のため不使用。LaunchAgentラベルは新しい com.1f を維持。 |

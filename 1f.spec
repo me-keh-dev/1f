@@ -1,16 +1,23 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 
+# App code ships as plain .py data files (swappable without rebuilding);
+# only bootstrap.py + dependencies (Python, PyQt5, stdlib) are frozen.
+APP_CODE = [
+    ('main.py', '.'), ('i18n.py', '.'), ('weather.py', '.'),
+    ('weather_fx.py', '.'), ('platform_win.py', '.'), ('scenes', 'scenes'),
+]
+
 a = Analysis(
-    ['main.py'],
+    ['bootstrap.py'],
     pathex=[],
     binaries=[],
-    datas=[('icon.png', '.'), ('i18n.py', '.'), ('weather.py', '.'), ('weather_fx.py', '.'), ('scenes', 'scenes')],
-    hiddenimports=['scenes', 'scenes.base', 'scenes.grass', 'scenes.aquarium', 'scenes.tokaido', 'scenes.pooh', 'scenes.takibi'],
+    datas=[('icon.png', '.')] + APP_CODE,
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['main', 'i18n', 'weather', 'weather_fx', 'platform_win', 'platform_mac', 'scenes'],
     noarchive=False,
     optimize=0,
 )

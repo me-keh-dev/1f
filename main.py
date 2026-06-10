@@ -160,10 +160,11 @@ class NoWheelSlider(QSlider):
 from PyQt5.QtWidgets import QTabWidget, QCheckBox, QScrollArea
 
 class SettingsDialog(QDialog):
-    def __init__(self, config, on_apply, on_save, on_load, parent=None):
+    def __init__(self, config, on_apply, on_save, on_load, on_language_change=None, parent=None):
         super().__init__(parent)
         self.config = config.copy()
         self.on_apply = on_apply
+        self.on_language_change = on_language_change
         self.on_save = on_save
         self.on_load = on_load
         self.setWindowTitle("1/f - 設定")
@@ -432,6 +433,7 @@ class SettingsDialog(QDialog):
         self.takibi_scale_slider = self._add_slider(takibi_layout, t("display_scale"), 25, 200, self.config.get("takibi_scale", 100))
         self.takibi_count_slider = self._add_slider(takibi_layout, t("takibi_count"), 1, 5, self.config.get("takibi_count", 1))
         self.takibi_sparks_slider = self._add_slider(takibi_layout, t("takibi_sparks"), 0, 100, self.config.get("takibi_sparks", 25))
+        self.takibi_speed_slider = self._add_slider(takibi_layout, t("takibi_speed"), 10, 100, self.config.get("takibi_speed", 30))
         self.takibi_campers_check = QCheckBox(t("takibi_campers"))
         self.takibi_campers_check.setChecked(self.config.get("takibi_campers", True))
         self.takibi_campers_check.toggled.connect(self._on_slider_changed)
@@ -528,9 +530,6 @@ class SettingsDialog(QDialog):
                 break
         self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
         g_lang_l.addWidget(self.lang_combo)
-        lang_note = QLabel("* Restart settings to apply" if get_language() == "en" else "* 設定画面を開き直すと反映されます")
-        lang_note.setStyleSheet("color: #888; font-size: 10px;")
-        g_lang_l.addWidget(lang_note)
         g_lang.setLayout(g_lang_l)
         # 天気エフェクト
         g_weather = QGroupBox(t("weather"))
@@ -690,6 +689,9 @@ class SettingsDialog(QDialog):
         lang = self.lang_combo.currentData()
         set_language(lang)
         self.on_apply({"language": lang})
+        # 言語を即時反映: ダイアログとトレイメニューを作り直す
+        if self.on_language_change:
+            self.on_language_change()
 
     def _update_balance_label(self):
         s = self.slim_slider.value()
@@ -799,6 +801,7 @@ class SettingsDialog(QDialog):
             "takibi_scale": self.takibi_scale_slider.value(),
             "takibi_count": self.takibi_count_slider.value(),
             "takibi_sparks": self.takibi_sparks_slider.value(),
+            "takibi_speed": self.takibi_speed_slider.value(),
             "takibi_campers": self.takibi_campers_check.isChecked(),
             "takibi_tents": self.takibi_tents_check.isChecked(),
             "takibi_smoke": self.takibi_smoke_check.isChecked(),
@@ -858,7 +861,7 @@ class SettingsDialog(QDialog):
             "aq_fish_y_top", "aq_fish_y_bottom", "seed",
         ],
         "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
-        "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
+        "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_speed", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
@@ -1344,11 +1347,29 @@ def main():
             on_apply=manager.apply_config,
             on_save=manager.save_preset,
             on_load=manager.load_preset,
+            on_language_change=refresh_language,
         )
         settings_dialog.show()
         # macOS: ダイアログ表示でオーバーレイが隠れることがあるため再表示
         if sys.platform == "darwin" and overlay_visible[0]:
             manager.show_all()
+
+    def refresh_language():
+        """言語変更を即時反映: トレイメニューの文言を更新し、設定画面を同じ位置・タブで開き直す"""
+        nonlocal settings_dialog
+        toggle_action.setText(f"{t('toggle')} ({hotkey_label})")
+        settings_action.setText(t("settings"))
+        regen_action.setText(t("regenerate"))
+        quit_action.setText(t("quit"))
+        tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
+        if settings_dialog and settings_dialog.isVisible():
+            pos = settings_dialog.pos()
+            tab_i = settings_dialog.tabs.currentIndex()
+            settings_dialog.close()
+            settings_dialog = None
+            open_settings()
+            settings_dialog.move(pos)
+            settings_dialog.tabs.setCurrentIndex(tab_i)
 
     menu = QMenu()
     hotkey_label = "Cmd+Ctrl+Shift+W" if sys.platform == "darwin" else "Win+Ctrl+Shift+W"
