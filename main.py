@@ -36,8 +36,16 @@ from scenes.base import PinkNoiseGenerator, PIXEL_SIZE
 from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
 
 def _app_dir():
-    """exeの場合はexeのあるフォルダ、スクリプトの場合はスクリプトのフォルダを返す"""
+    """設定・セーブの保存先。
+    Windows exe: exeのあるフォルダ（ポータブル運用）
+    mac .app: ~/Library/Application Support/1f
+      （.appバンドル内は App Translocation で読み取り専用＆毎回パスが変わるため）
+    スクリプト実行: スクリプトのフォルダ"""
     if getattr(sys, 'frozen', False):
+        if sys.platform == "darwin":
+            d = os.path.expanduser("~/Library/Application Support/1f")
+            os.makedirs(d, exist_ok=True)
+            return d
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
