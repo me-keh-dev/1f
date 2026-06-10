@@ -1,0 +1,777 @@
+diff --git a/1f.spec b/1f.spec
+index cf5b2a8..a34075f 100644
+--- a/1f.spec
++++ b/1f.spec
+@@ -6,7 +6,7 @@ a = Analysis(
+     pathex=[],
+     binaries=[],
+     datas=[('icon.png', '.'), ('i18n.py', '.'), ('weather.py', '.'), ('weather_fx.py', '.'), ('scenes', 'scenes')],
+-    hiddenimports=['scenes', 'scenes.base', 'scenes.grass', 'scenes.aquarium', 'scenes.tokaido'],
++    hiddenimports=['scenes', 'scenes.base', 'scenes.grass', 'scenes.aquarium', 'scenes.tokaido', 'scenes.pooh', 'scenes.window', 'PyQt5.QtWebEngineWidgets'],
+     hookspath=[],
+     hooksconfig={},
+     runtime_hooks=[],
+diff --git a/i18n.py b/i18n.py
+index f08e1a8..84d63f4 100644
+--- a/i18n.py
++++ b/i18n.py
+@@ -99,6 +99,24 @@ TEXTS = {
+         "pooh_balloon_size": "風船サイズ",
+         "pooh_cloud_count": "雲の数",
+         "pooh_bird_count": "鳥の数",
++        "scene_window": "窓（都市の定点カメラ）",
++        "win_settings": "窓モード設定",
++        "win_layout": "窓の配置",
++        "win_columns": "横の数",
++        "win_rows": "段数",
++        "win_wall_thickness": "壁の厚さ",
++        "win_camera": "カメラ",
++        "win_camera_url": "YouTube URL",
++        "win_camera_desc": "YouTube定点カメラのURLを貼り付けてください",
++        "win_curtains": "カーテン",
++        "win_plants": "窓辺の植物",
++        "win_custom_url": "カスタムURL",
++        "win_apply_url": "URL適用",
++        "win_clip": "映像の切り抜き位置",
++        "win_clip_desc": "窓から見える映像の位置を調整します",
++        "win_clip_x": "左右",
++        "win_clip_y": "上下",
++        "win_clip_zoom": "ズーム%",
+         "tk_settings": "東海道設定",
+         "tk_objects": "オブジェクト配置",
+         "tk_pine": "松の木",
+@@ -226,6 +244,24 @@ TEXTS = {
+         "pooh_balloon_size": "Balloon Size",
+         "pooh_cloud_count": "Clouds",
+         "pooh_bird_count": "Birds",
++        "scene_window": "Window (City Fixed Camera)",
++        "win_settings": "Window Settings",
++        "win_layout": "Window Layout",
++        "win_columns": "Columns",
++        "win_rows": "Rows",
++        "win_wall_thickness": "Wall Thickness",
++        "win_camera": "Camera",
++        "win_camera_url": "YouTube URL",
++        "win_camera_desc": "Paste a YouTube fixed camera URL",
++        "win_curtains": "Curtains",
++        "win_plants": "Windowsill Plants",
++        "win_custom_url": "Custom URL",
++        "win_apply_url": "Apply URL",
++        "win_clip": "Video Clip Position",
++        "win_clip_desc": "Adjust which part of the video is visible through the windows",
++        "win_clip_x": "Horizontal",
++        "win_clip_y": "Vertical",
++        "win_clip_zoom": "Zoom %",
+         "tk_settings": "Tokaido Settings",
+         "tk_objects": "Object Placement",
+         "tk_pine": "Pine Tree",
+diff --git a/main.py b/main.py
+index 3872650..ccabfdf 100644
+--- a/main.py
++++ b/main.py
+@@ -10,6 +10,14 @@ import math
+ import random
+ import time
+ 
++# QWebEngineWidgets must be imported BEFORE QApplication is created
++try:
++    from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineSettings
++    from PyQt5.QtCore import QUrl
++    _webengine_early_import = True
++except ImportError:
++    _webengine_early_import = False
++
+ from PyQt5.QtWidgets import (
+     QApplication, QWidget, QSystemTrayIcon, QMenu, QAction,
+     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QPushButton,
+@@ -20,7 +28,7 @@ from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
+ 
+ # プラットフォーム固有モジュールの読み込み
+ if sys.platform == "win32":
+-    from platform_win import init_dpi, set_click_through, ensure_topmost, set_behind_windows, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
++    from platform_win import init_dpi, set_click_through, ensure_topmost, set_behind_windows, set_not_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active, register_appbar, unregister_appbar
+ elif sys.platform == "darwin":
+     from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+     def is_fullscreen_active(): return False  # macOS: 未実装
+@@ -158,7 +166,7 @@ class NoWheelSlider(QSlider):
+         event.ignore()
+ 
+ # --- 設定ダイアログ ---
+-from PyQt5.QtWidgets import QTabWidget, QCheckBox, QScrollArea
++from PyQt5.QtWidgets import QTabWidget, QCheckBox, QScrollArea, QLineEdit
+ 
+ class SettingsDialog(QDialog):
+     def __init__(self, config, on_apply, on_save, on_load, parent=None):
+@@ -427,6 +435,86 @@ class SettingsDialog(QDialog):
+         self.tab_pooh_label = t("pooh_settings")
+         tabs.addTab(tab_pooh, self.tab_pooh_label)
+ 
++        # === Tab: Window ===
++        tab_win = QWidget()
++        win_scroll = QScrollArea()
++        win_scroll.setWidgetResizable(True)
++        win_inner = QWidget()
++        win_layout = QVBoxLayout(win_inner)
++
++        self.win_scale_slider = self._add_slider(win_layout, t("display_scale"), 25, 200, self.config.get("win_scale", 100))
++
++        g_win_frame = QGroupBox(t("win_layout"))
++        g_wfl = QVBoxLayout(g_win_frame)
++        self.win_cols_slider = self._add_slider(g_wfl, t("win_columns"), 1, 10, self.config.get("win_columns", 3))
++        self.win_rows_slider = self._add_slider(g_wfl, t("win_rows"), 1, 4, self.config.get("win_rows", 1))
++        self.win_wall_slider = self._add_slider(g_wfl, t("win_wall_thickness"), 8, 50, self.config.get("win_wall_thickness", 22))
++        win_layout.addWidget(g_win_frame)
++
++        # Camera selection
++        g_win_cam = QGroupBox(t("win_camera"))
++        g_wcl = QVBoxLayout(g_win_cam)
++        self.win_camera_combo = QComboBox()
++        from scenes.window import DEFAULT_CAMERAS
++        for i, cam in enumerate(DEFAULT_CAMERAS):
++            self.win_camera_combo.addItem(cam["name"], i)
++        cam_idx = self.config.get("win_camera_idx", 0)
++        if cam_idx < self.win_camera_combo.count():
++            self.win_camera_combo.setCurrentIndex(cam_idx)
++        self.win_camera_combo.currentIndexChanged.connect(self._on_slider_changed)
++        g_wcl.addWidget(self.win_camera_combo)
++
++        # Custom URL
++        cam_desc = QLabel(t("win_camera_desc"))
++        cam_desc.setStyleSheet("color: #666; font-size: 10px;")
++        cam_desc.setWordWrap(True)
++        g_wcl.addWidget(cam_desc)
++        url_row = QHBoxLayout()
++        self.win_url_edit = QLineEdit()
++        self.win_url_edit.setPlaceholderText("https://www.youtube.com/watch?v=...")
++        self.win_url_edit.setText(self.config.get("win_custom_url", ""))
++        url_apply = QPushButton(t("win_apply_url"))
++        url_apply.clicked.connect(self._on_win_url_apply)
++        url_row.addWidget(self.win_url_edit, 1)
++        url_row.addWidget(url_apply)
++        g_wcl.addLayout(url_row)
++        win_layout.addWidget(g_win_cam)
++
++        # Video clip position
++        g_win_clip = QGroupBox(t("win_clip"))
++        g_wcpl = QVBoxLayout(g_win_clip)
++        clip_desc = QLabel(t("win_clip_desc"))
++        clip_desc.setStyleSheet("color: #666; font-size: 10px;")
++        clip_desc.setWordWrap(True)
++        g_wcpl.addWidget(clip_desc)
++        self.win_clip_x_slider = self._add_slider(g_wcpl, t("win_clip_x"), 0, 100, self.config.get("win_clip_x", 50))
++        self.win_clip_y_slider = self._add_slider(g_wcpl, t("win_clip_y"), 0, 100, self.config.get("win_clip_y", 50))
++        self.win_clip_zoom_slider = self._add_slider(g_wcpl, t("win_clip_zoom"), 100, 400, self.config.get("win_clip_zoom", 150))
++        win_layout.addWidget(g_win_clip)
++
++        # Foreground elements
++        g_win_fg = QGroupBox("Foreground")
++        g_wfgl = QVBoxLayout(g_win_fg)
++        self.win_curtain_check = QCheckBox(t("win_curtains"))
++        self.win_curtain_check.setChecked(self.config.get("win_curtains", True))
++        self.win_curtain_check.toggled.connect(self._on_slider_changed)
++        g_wfgl.addWidget(self.win_curtain_check)
++        self.win_plants_check = QCheckBox(t("win_plants"))
++        self.win_plants_check.setChecked(self.config.get("win_plants", True))
++        self.win_plants_check.toggled.connect(self._on_slider_changed)
++        g_wfgl.addWidget(self.win_plants_check)
++        win_layout.addWidget(g_win_fg)
++
++        win_layout.addStretch()
++        win_scroll.setWidget(win_inner)
++        tab_win_l = QVBoxLayout(tab_win)
++        tab_win_l.setContentsMargins(0, 0, 0, 0)
++        tab_win_l.addWidget(win_scroll)
++
++        self.tab_window = tab_win
++        self.tab_window_label = t("win_settings")
++        tabs.addTab(tab_win, self.tab_window_label)
++
+         # === タブ: 環境 ===
+         tab_env = QWidget()
+         tel = QVBoxLayout(tab_env)
+@@ -638,6 +726,10 @@ class SettingsDialog(QDialog):
+         # 初期シーンに応じてタブ表示を調整
+         self._update_tabs_for_scene(self._initial_scene)
+ 
++    def _on_win_url_apply(self):
++        url = self.win_url_edit.text().strip()
++        self.on_apply({"win_custom_url": url})
++
+     def _on_wind_sync_toggled(self, checked):
+         self.wind_sync_btn.setText("ON" if checked else "OFF")
+         self.on_apply({"wind_sync_enabled": checked})
+@@ -770,6 +862,17 @@ class SettingsDialog(QDialog):
+             "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
+             "tk_willow_min_h": self.tk_willow_min_slider.value(),
+             "tk_willow_max_h": self.tk_willow_max_slider.value(),
++            "win_scale": self.win_scale_slider.value(),
++            "win_columns": self.win_cols_slider.value(),
++            "win_rows": self.win_rows_slider.value(),
++            "win_wall_thickness": self.win_wall_slider.value(),
++            "win_camera_idx": self.win_camera_combo.currentData(),
++            "win_custom_url": self.win_url_edit.text().strip(),
++            "win_clip_x": self.win_clip_x_slider.value(),
++            "win_clip_y": self.win_clip_y_slider.value(),
++            "win_clip_zoom": self.win_clip_zoom_slider.value(),
++            "win_curtains": self.win_curtain_check.isChecked(),
++            "win_plants": self.win_plants_check.isChecked(),
+         }
+ 
+     def _on_scene_changed(self):
+@@ -781,7 +884,7 @@ class SettingsDialog(QDialog):
+     def _update_tabs_for_scene(self, scene):
+         """シーンに応じてタブを切り替え"""
+         tabs = self.tabs
+-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh]
++        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_window]
+         for i in range(tabs.count() - 1, -1, -1):
+             if tabs.widget(i) in scene_tabs:
+                 tabs.removeTab(i)
+@@ -794,6 +897,8 @@ class SettingsDialog(QDialog):
+             tabs.insertTab(0, self.tab_tokaido, self.tab_tokaido_label)
+         elif scene == "pooh":
+             tabs.insertTab(0, self.tab_pooh, self.tab_pooh_label)
++        elif scene == "window":
++            tabs.insertTab(0, self.tab_window, self.tab_window_label)
+ 
+     def _on_lighting_changed(self):
+         mode = self.lighting_combo.currentData()
+@@ -830,6 +935,12 @@ class SettingsDialog(QDialog):
+             "tk_grass_count", "tk_traveler_count",
+             "tk_willow_min_h", "tk_willow_max_h", "seed",
+         ],
++        "window": [
++            "win_scale", "win_columns", "win_rows", "win_wall_thickness",
++            "win_camera_idx", "win_custom_url",
++            "win_clip_x", "win_clip_y", "win_clip_zoom",
++            "win_curtains", "win_plants", "seed",
++        ],
+     }
+     # 環境設定のキー
+     ENV_KEYS = [
+@@ -882,6 +993,305 @@ class SettingsDialog(QDialog):
+                     self.env_combo.addItem(f[:-5])
+ 
+ 
++# --- Window Mode Overlay (YouTube + pixel-art curtains) ---
++_webengine_available = _webengine_early_import
++
++
++class WallPainterWidget(QWidget):
++    """Transparent overlay that draws wall pieces + curtains + plants on top of QWebEngineView."""
++    def __init__(self, parent, config, wind_sim):
++        super().__init__(parent)
++        self.config = config
++        self.wind_sim = wind_sim
++        self.scene = None
++        self.wall_rects = []
++        self.frame_rects = []
++        self.setAttribute(Qt.WA_TranslucentBackground)
++        self.setAttribute(Qt.WA_TransparentForMouseEvents)
++
++    def rebuild(self, config, screen_width, widget_width, area_height):
++        self.config = config
++        from scenes.window import WindowScene, _compute_window_grid
++        self.scene = WindowScene()
++        self.scene.rebuild(config, screen_width, widget_width)
++
++        # Compute wall pieces for QPainter rendering
++        cols = config.get("win_columns", 3)
++        rows = config.get("win_rows", 1)
++        wall_t = config.get("win_wall_thickness", 22)
++        frame_w = 3
++
++        windows, win_w, win_h = _compute_window_grid(
++            widget_width, area_height, cols, rows, wall_t, wall_t, frame_w
++        )
++
++        # Build wall rects (same logic as HTML version)
++        self.wall_rects = []
++        # Top bar
++        self.wall_rects.append((0, 0, widget_width, wall_t))
++        # Bottom bar
++        if windows:
++            last_bottom = max(wy + wh for (wx, wy, ww, wh) in windows)
++            self.wall_rects.append((0, last_bottom, widget_width, area_height - last_bottom))
++        # Horizontal bars between rows
++        for r in range(1, rows):
++            bar_y = wall_t + r * (win_h + wall_t) - wall_t
++            self.wall_rects.append((0, bar_y, widget_width, wall_t))
++        # Vertical pillars
++        for r in range(rows):
++            row_y = wall_t + r * (win_h + wall_t)
++            self.wall_rects.append((0, row_y, wall_t, win_h))
++            for c in range(1, cols):
++                px = wall_t + c * (win_w + wall_t) - wall_t
++                self.wall_rects.append((px, row_y, wall_t, win_h))
++            right_x = wall_t + cols * (win_w + wall_t) - wall_t
++            self.wall_rects.append((right_x, row_y, widget_width - right_x, win_h))
++
++        # Frame rects
++        self.frame_rects = [(wx, wy, ww, wh) for (wx, wy, ww, wh) in windows]
++
++    def update_scene(self):
++        if self.scene:
++            mx, my = get_cursor_pos()
++            p = self.parent()
++            if p:
++                self.scene.update(self.wind_sim, mouse_pos=(mx - p.x(), my - p.y()))
++        self.update()
++
++    def paintEvent(self, event):
++        painter = QPainter(self)
++        painter.setRenderHint(QPainter.Antialiasing, False)
++
++        # Draw wall pieces (opaque concrete look)
++        wall_color = QColor(0x1e, 0x1e, 0x2e)
++        wall_light = QColor(0x2a, 0x2a, 0x3e)
++        wall_dark = QColor(0x14, 0x14, 0x20)
++        for (rx, ry, rw, rh) in self.wall_rects:
++            # Vertical gradient: lighter at top, darker at bottom
++            for y in range(rh):
++                ratio = y / max(1, rh - 1)
++                r = int(wall_light.red() + (wall_dark.red() - wall_light.red()) * ratio)
++                g = int(wall_light.green() + (wall_dark.green() - wall_light.green()) * ratio)
++                b = int(wall_light.blue() + (wall_dark.blue() - wall_light.blue()) * ratio)
++                painter.fillRect(rx, ry + y, rw, 1, QColor(r, g, b))
++            # Subtle mortar lines
++            for y in range(0, rh, 10):
++                painter.fillRect(rx, ry + y, rw, 1, QColor(255, 255, 255, 4))
++
++        # Draw window frames
++        frame_color = QColor(0x3a, 0x3a, 0x4e)
++        frame_hi = QColor(0x4a, 0x4a, 0x5e)
++        frame_lo = QColor(0x30, 0x30, 0x40)
++        fw = 3
++        for (wx, wy, ww, wh) in self.frame_rects:
++            # Top frame
++            painter.fillRect(wx - fw, wy - fw, ww + fw * 2, fw, frame_hi)
++            # Bottom frame
++            painter.fillRect(wx - fw, wy + wh, ww + fw * 2, fw, frame_lo)
++            # Left frame
++            painter.fillRect(wx - fw, wy, fw, wh, frame_color)
++            # Right frame
++            painter.fillRect(wx + ww, wy, fw, wh, frame_color)
++            # Inner shadow (subtle darkening around edges)
++            shadow = QColor(0, 0, 0, 40)
++            painter.fillRect(wx, wy, ww, 3, shadow)
++            painter.fillRect(wx, wy, 3, wh, shadow)
++            painter.fillRect(wx, wy + wh - 3, ww, 3, shadow)
++            painter.fillRect(wx + ww - 3, wy, 3, wh, shadow)
++
++        # Draw curtains and plants (1/f yuragi foreground)
++        lighting_mode = self.config.get("lighting_mode", "off")
++        if lighting_mode == "auto":
++            tint = _get_time_tint()
++        elif lighting_mode in LIGHTING_PRESETS:
++            tint = LIGHTING_PRESETS[lighting_mode]
++        else:
++            tint = None
++
++        get_alpha = None
++        if self.config.get("mouse_fade_enabled", True):
++            mx, my = get_cursor_pos()
++            inner_r = self.config.get("mouse_fade_inner", 30)
++            fade_r = self.config.get("mouse_fade_range", 120)
++            min_alpha = self.config.get("mouse_fade_alpha", 15)
++            p = self.parent()
++            gy = (p.y() if p else 0) + self.height() // 2
++            widget_x = p.x() if p else 0
++            def get_alpha(base_x):
++                gx = widget_x + base_x
++                dist = math.sqrt((mx - gx) ** 2 + (my - gy) ** 2)
++                if dist <= inner_r:
++                    return min_alpha
++                elif dist <= inner_r + fade_r:
++                    t_val = (dist - inner_r) / fade_r
++                    return int(min_alpha + (255 - min_alpha) * t_val)
++                return 255
++
++        if self.scene:
++            self.scene.draw(painter, self.height(), tint, get_alpha)
++        painter.end()
++
++
++class WindowOverlay(QWidget):
++    """Window mode overlay: QWebEngineView (YouTube) + WallPainterWidget (walls/curtains).
++    Loads the actual YouTube watch page (no embedding restrictions).
++    Registers as AppBar to reserve screen space.
++    """
++    def __init__(self, screen, config, wind_sim):
++        super().__init__()
++        self.screen = screen
++        self.config = config
++        self.wind_sim = wind_sim
++        self.scene = None
++        self.web_view = None
++        self._appbar_registered = False
++
++        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool)
++        self.setStyleSheet("background: #0a0a14;")
++
++        self._position_window()
++        self._create_web_view()
++        self.show()
++        QTimer.singleShot(100, self._setup_window)
++
++    def _setup_window(self):
++        if sys.platform == "win32":
++            hwnd = int(self.winId())
++            set_not_topmost(hwnd)
++        self._register_appbar()
++
++    def _register_appbar(self):
++        if sys.platform != "win32":
++            return
++        hwnd = int(self.winId())
++        geo = self.geometry()
++        self._appbar_registered = register_appbar(
++            hwnd, geo.x(), geo.y(), geo.x() + geo.width(), geo.y() + geo.height()
++        )
++
++    def _unregister_appbar(self):
++        if self._appbar_registered and sys.platform == "win32":
++            unregister_appbar(int(self.winId()))
++            self._appbar_registered = False
++
++    def _position_window(self):
++        # Only calculate position once (before AppBar registration changes availableGeometry)
++        if not hasattr(self, '_fixed_geometry'):
++            full = self.screen.geometry()
++            avail = self.screen.availableGeometry()
++            taskbar_h = full.height() - avail.height()
++            taskbar_top = avail.y() + avail.height()
++            if taskbar_h < 10:
++                taskbar_top = full.y() + full.height() - 48
++
++            scene_cls = get_scene_class("window")
++            temp_scene = scene_cls()
++            area_height = temp_scene.get_area_height(self.config)
++            self.area_height = area_height
++            self.ground_y = area_height
++            self._fixed_geometry = (full.x(), taskbar_top - area_height, full.width(), area_height)
++
++        self.setGeometry(*self._fixed_geometry)
++
++    def _rebuild_scene(self):
++        # Walls are rendered in HTML inside QWebEngineView, so rebuild = recreate web view
++        self._create_web_view()
++
++    def _create_web_view(self):
++        if not _webengine_available:
++            return
++        if self.web_view:
++            try:
++                self.web_view.setUrl(QUrl("about:blank"))
++                self.web_view.deleteLater()
++            except RuntimeError:
++                pass
++            self.web_view = None
++
++        from scenes.window import DEFAULT_CAMERAS, generate_window_html
++
++        # Get video URL
++        camera_idx = self.config.get("win_camera_idx", 0)
++        custom_url = self.config.get("win_custom_url", "")
++        if custom_url:
++            raw_url = custom_url
++        elif camera_idx < len(DEFAULT_CAMERAS):
++            raw_url = DEFAULT_CAMERAS[camera_idx]["url"]
++        else:
++            raw_url = ""
++
++        # Extract direct stream URL via yt-dlp (avoids YouTube JS which crashes QtWebEngine 5.15)
++        stream_url = self._get_stream_url(raw_url) if raw_url else ""
++
++        # Clip position
++        clip_x = self.config.get("win_clip_x", 50)
++        clip_y = self.config.get("win_clip_y", 50)
++        clip_zoom = self.config.get("win_clip_zoom", 150)
++
++        # Generate HTML with video + CSS walls in one page
++        cols = self.config.get("win_columns", 3)
++        rows = self.config.get("win_rows", 1)
++        wall_thickness = self.config.get("win_wall_thickness", 22)
++
++        html = generate_window_html(
++            stream_url, self.width(), self.height(),
++            cols=cols, rows=rows, wall_thickness=wall_thickness,
++            clip_x=clip_x, clip_y=clip_y, clip_zoom=clip_zoom,
++            use_video_tag=True,
++        )
++
++        self.web_view = QWebEngineView(self)
++        self.web_view.setGeometry(0, 0, self.width(), self.height())
++        settings = self.web_view.settings()
++        settings.setAttribute(QWebEngineSettings.PlaybackRequiresUserGesture, False)
++        self.web_view.setHtml(html)
++        self.web_view.show()
++
++    def _create_wall_overlay(self):
++        pass  # Walls are now rendered in HTML inside QWebEngineView
++
++    @staticmethod
++    def _get_stream_url(url):
++        """Extract direct video stream URL using yt-dlp. Returns None on failure."""
++        try:
++            import yt_dlp
++            ydl_opts = {
++                'format': 'best[height<=480]',
++                'quiet': True,
++                'no_warnings': True,
++            }
++            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
++                info = ydl.extract_info(url, download=False)
++                return info.get('url')
++        except Exception as e:
++            print(f"[WARN] yt-dlp failed: {e}")
++            return None
++
++    def _create_wall_overlay(self):
++        self.wall_widget = WallPainterWidget(self, self.config, self.wind_sim)
++        self.wall_widget.setGeometry(0, 0, self.width(), self.height())
++        self.wall_widget.rebuild(
++            self.config, self.screen.geometry().width(),
++            self.width(), self.area_height
++        )
++        self.wall_widget.raise_()  # On top of web_view
++        self.wall_widget.show()
++
++    def update_scene(self):
++        pass  # Video plays in QWebEngineView, no per-frame update needed
++
++    def paintEvent(self, event):
++        pass  # Wall painting handled by WallPainterWidget
++
++    def closeEvent(self, event):
++        self._unregister_appbar()
++        if self.web_view:
++            self.web_view.setUrl(QUrl("about:blank"))
++            self.web_view.deleteLater()
++            self.web_view = None
++        super().closeEvent(event)
++
++
+ # --- 1画面分のオーバーレイ ---
+ class BackgroundOverlay(QWidget):
+     """Separate window for background elements (Mt. Fuji) — behind other windows"""
+@@ -1090,8 +1500,9 @@ class OverlayManager:
+     def _on_weather_update(self, state):
+         """天気更新時に全画面のエフェクトを更新"""
+         for o in self.overlays:
+-            o.weather_fx.set_wind_speed(state.wind_speed or 0)
+-            o.weather_fx.set_weather(state.weather_state)
++            if hasattr(o, 'weather_fx'):
++                o.weather_fx.set_wind_speed(state.wind_speed or 0)
++                o.weather_fx.set_weather(state.weather_state)
+         # 風速連動
+         user_wind = self.config.get("wind", 50)
+         wind_sync = self.config.get("wind_sync_enabled", False)
+@@ -1108,8 +1519,12 @@ class OverlayManager:
+         for o in self.overlays:
+             o.close()
+         self.overlays = []
++        is_window_mode = self.config.get("scene_mode") == "window"
+         for screen in QApplication.screens():
+-            overlay = ScreenOverlay(screen, self.config, self.wind_sim)
++            if is_window_mode and _webengine_available:
++                overlay = WindowOverlay(screen, self.config, self.wind_sim)
++            else:
++                overlay = ScreenOverlay(screen, self.config, self.wind_sim)
+             self.overlays.append(overlay)
+ 
+     def _refresh_screens(self):
+@@ -1119,7 +1534,9 @@ class OverlayManager:
+             self._create_overlays()
+         else:
+             for o in self.overlays:
+-                o._position_window()
++                # WindowOverlay manages its own position via AppBar — skip periodic reposition
++                if not isinstance(o, WindowOverlay):
++                    o._position_window()
+ 
+     def _load_config(self):
+         if os.path.exists(CONFIG_FILE):
+@@ -1143,13 +1560,15 @@ class OverlayManager:
+         if test_weather:
+             if test_weather == "rain_wind":
+                 for o in self.overlays:
+-                    o.weather_fx.set_wind_speed(45)
+-                    o.weather_fx.set_weather("rain")
++                    if hasattr(o, 'weather_fx'):
++                        o.weather_fx.set_wind_speed(45)
++                        o.weather_fx.set_weather("rain")
+                 self.wind_sim.set_wind(80)
+             else:
+                 for o in self.overlays:
+-                    o.weather_fx.set_wind_speed(5)
+-                    o.weather_fx.set_weather(test_weather)
++                    if hasattr(o, 'weather_fx'):
++                        o.weather_fx.set_wind_speed(5)
++                        o.weather_fx.set_weather(test_weather)
+             return
+ 
+         if "_lighting_test" in new_config:
+@@ -1164,13 +1583,31 @@ class OverlayManager:
+                 o.config = self.config
+             return
+ 
++        # シーンモード変更時はオーバーレイ種別が変わるため再作成
++        old_scene = self.config.get("scene_mode", "grass")
++        # Check layout change BEFORE updating config (use defaults to avoid None mismatch)
++        _win_layout_defaults = {"win_scale": 100, "win_columns": 3, "win_rows": 1, "win_wall_thickness": 22}
++        _win_layout_changed = any(
++            k in new_config and new_config[k] != self.config.get(k, _win_layout_defaults[k])
++            for k in _win_layout_defaults
++        )
+         self.config.update(new_config)
++        new_scene = self.config.get("scene_mode", "grass")
+         self.wind_sim.set_wind(self.config.get("wind", 50))
+         self._save_config()
+-        for o in self.overlays:
+-            o.config = self.config
+-            o._position_window()
+-            o._rebuild_scene()
++
++        switching_window = (old_scene == "window") != (new_scene == "window")
++        if switching_window:
++            self._create_overlays()
++        else:
++            for o in self.overlays:
++                o.config = self.config
++                if isinstance(o, WindowOverlay):
++                    # Never reposition — just recreate web view with new settings
++                    o._create_web_view()
++                else:
++                    o._position_window()
++                    o._rebuild_scene()
+         # 天気ON/OFF制御
+         if self.config.get("weather_enabled", True):
+             if not self.weather_monitor._running:
+@@ -1178,7 +1615,8 @@ class OverlayManager:
+         else:
+             self.weather_monitor.stop()
+             for o in self.overlays:
+-                o.weather_fx.set_weather("clear")
++                if hasattr(o, 'weather_fx'):
++                    o.weather_fx.set_weather("clear")
+ 
+     def save_preset(self, category, data):
+         cat_dir = os.path.join(SAVE_DIR, category)
+@@ -1207,15 +1645,18 @@ class OverlayManager:
+     def show_all(self):
+         for o in self.overlays:
+             o.show()
+-            QTimer.singleShot(100, o._set_click_through)
+-            if o.bg_overlay:
+-                o.bg_overlay.show()
+-                QTimer.singleShot(150, o.bg_overlay.setup)
++            if isinstance(o, WindowOverlay):
++                QTimer.singleShot(100, o._setup_window)
++            else:
++                QTimer.singleShot(100, o._set_click_through)
++                if o.bg_overlay:
++                    o.bg_overlay.show()
++                    QTimer.singleShot(150, o.bg_overlay.setup)
+ 
+     def hide_all(self):
+         for o in self.overlays:
+             o.hide()
+-            if o.bg_overlay:
++            if hasattr(o, 'bg_overlay') and o.bg_overlay:
+                 o.bg_overlay.hide()
+ 
+     def _check_fullscreen(self):
+diff --git a/platform_win.py b/platform_win.py
+index 29d85f3..05dcd50 100644
+--- a/platform_win.py
++++ b/platform_win.py
+@@ -42,6 +42,13 @@ def ensure_topmost(hwnd):
+ 
+ HWND_NOTOPMOST = -2
+ 
++def set_not_topmost(hwnd):
++    """TOPMOSTを解除して通常のZ-orderに戻す"""
++    ctypes.windll.user32.SetWindowPos(
++        hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
++        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
++    )
++
+ def set_behind_windows(hwnd):
+     """ウィンドウを他のウィンドウの下に配置する（富士山用）"""
+     ctypes.windll.user32.SetWindowPos(
+@@ -100,6 +107,54 @@ class HotkeyListener:
+         if tid:
+             ctypes.windll.user32.PostThreadMessageW(tid, 0x0000, 0, 0)
+ 
++# --- AppBar API (画面領域予約) ---
++WM_USER = 0x0400
++APPBAR_CALLBACK = WM_USER + 100
++ABM_NEW = 0x00000000
++ABM_REMOVE = 0x00000001
++ABM_QUERYPOS = 0x00000002
++ABM_SETPOS = 0x00000003
++ABE_BOTTOM = 3
++
++class APPBARDATA(ctypes.Structure):
++    _fields_ = [
++        ("cbSize", wintypes.DWORD),
++        ("hWnd", wintypes.HWND),
++        ("uCallbackMessage", ctypes.c_uint),
++        ("uEdge", ctypes.c_uint),
++        ("rc", wintypes.RECT),
++        ("lParam", ctypes.c_int),
++    ]
++
++def register_appbar(hwnd, left, top, right, bottom):
++    """AppBarとして登録し、画面の作業領域を予約する。
++    最大化されたウィンドウはこの領域を避ける。"""
++    abd = APPBARDATA()
++    abd.cbSize = ctypes.sizeof(APPBARDATA)
++    abd.hWnd = hwnd
++    abd.uCallbackMessage = APPBAR_CALLBACK
++    result = ctypes.windll.shell32.SHAppBarMessage(ABM_NEW, ctypes.byref(abd))
++    if not result:
++        print("[WARN] AppBar registration failed")
++        return False
++
++    abd.uEdge = ABE_BOTTOM
++    abd.rc.left = left
++    abd.rc.top = top
++    abd.rc.right = right
++    abd.rc.bottom = bottom
++    ctypes.windll.shell32.SHAppBarMessage(ABM_QUERYPOS, ctypes.byref(abd))
++    abd.rc.top = abd.rc.bottom - (bottom - top)
++    ctypes.windll.shell32.SHAppBarMessage(ABM_SETPOS, ctypes.byref(abd))
++    return True
++
++def unregister_appbar(hwnd):
++    """AppBar登録を解除し、予約した画面領域を解放する。"""
++    abd = APPBARDATA()
++    abd.cbSize = ctypes.sizeof(APPBARDATA)
++    abd.hWnd = hwnd
++    ctypes.windll.shell32.SHAppBarMessage(ABM_REMOVE, ctypes.byref(abd))
++
+ # --- 全画面検出 ---
+ class MONITORINFO(ctypes.Structure):
+     _fields_ = [
+diff --git a/scenes/__init__.py b/scenes/__init__.py
+index 3eabc67..63de696 100644
+--- a/scenes/__init__.py
++++ b/scenes/__init__.py
+@@ -11,6 +11,9 @@ def get_scene_class(scene_mode):
+     elif scene_mode == "pooh":
+         from scenes.pooh import PoohScene
+         return PoohScene
++    elif scene_mode == "window":
++        from scenes.window import WindowScene
++        return WindowScene
+     else:
+         from scenes.grass import GrassScene
+         return GrassScene
+@@ -21,4 +24,5 @@ SCENE_MODES = [
+     ("aquarium", "scene_aquarium"),
+     ("tokaido", "scene_tokaido"),
+     ("pooh", "scene_pooh"),
++    ("window", "scene_window"),
+ ]

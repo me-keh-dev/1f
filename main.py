@@ -427,6 +427,33 @@ class SettingsDialog(QDialog):
         self.tab_pooh_label = t("pooh_settings")
         tabs.addTab(tab_pooh, self.tab_pooh_label)
 
+        # === Tab: Takibi (campfire) ===
+        tab_takibi = QWidget()
+        takibi_layout = QVBoxLayout(tab_takibi)
+        self.takibi_scale_slider = self._add_slider(takibi_layout, t("display_scale"), 25, 200, self.config.get("takibi_scale", 100))
+        self.takibi_count_slider = self._add_slider(takibi_layout, t("takibi_count"), 1, 5, self.config.get("takibi_count", 1))
+        self.takibi_sparks_slider = self._add_slider(takibi_layout, t("takibi_sparks"), 0, 100, self.config.get("takibi_sparks", 25))
+        self.takibi_campers_check = QCheckBox(t("takibi_campers"))
+        self.takibi_campers_check.setChecked(self.config.get("takibi_campers", True))
+        self.takibi_campers_check.toggled.connect(self._on_slider_changed)
+        takibi_layout.addWidget(self.takibi_campers_check)
+        self.takibi_tents_check = QCheckBox(t("takibi_tents"))
+        self.takibi_tents_check.setChecked(self.config.get("takibi_tents", True))
+        self.takibi_tents_check.toggled.connect(self._on_slider_changed)
+        takibi_layout.addWidget(self.takibi_tents_check)
+        self.takibi_smoke_check = QCheckBox(t("takibi_smoke"))
+        self.takibi_smoke_check.setChecked(self.config.get("takibi_smoke", True))
+        self.takibi_smoke_check.toggled.connect(self._on_slider_changed)
+        takibi_layout.addWidget(self.takibi_smoke_check)
+        self.takibi_glow_check = QCheckBox(t("takibi_glow"))
+        self.takibi_glow_check.setChecked(self.config.get("takibi_glow", True))
+        self.takibi_glow_check.toggled.connect(self._on_slider_changed)
+        takibi_layout.addWidget(self.takibi_glow_check)
+        takibi_layout.addStretch()
+        self.tab_takibi = tab_takibi
+        self.tab_takibi_label = t("takibi_settings")
+        tabs.addTab(tab_takibi, self.tab_takibi_label)
+
         # === タブ: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
@@ -770,6 +797,13 @@ class SettingsDialog(QDialog):
             "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
             "tk_willow_min_h": self.tk_willow_min_slider.value(),
             "tk_willow_max_h": self.tk_willow_max_slider.value(),
+            "takibi_scale": self.takibi_scale_slider.value(),
+            "takibi_count": self.takibi_count_slider.value(),
+            "takibi_sparks": self.takibi_sparks_slider.value(),
+            "takibi_campers": self.takibi_campers_check.isChecked(),
+            "takibi_tents": self.takibi_tents_check.isChecked(),
+            "takibi_smoke": self.takibi_smoke_check.isChecked(),
+            "takibi_glow": self.takibi_glow_check.isChecked(),
         }
 
     def _on_scene_changed(self):
@@ -781,7 +815,7 @@ class SettingsDialog(QDialog):
     def _update_tabs_for_scene(self, scene):
         """シーンに応じてタブを切り替え"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh]
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi]
         for i in range(tabs.count() - 1, -1, -1):
             if tabs.widget(i) in scene_tabs:
                 tabs.removeTab(i)
@@ -794,6 +828,8 @@ class SettingsDialog(QDialog):
             tabs.insertTab(0, self.tab_tokaido, self.tab_tokaido_label)
         elif scene == "pooh":
             tabs.insertTab(0, self.tab_pooh, self.tab_pooh_label)
+        elif scene == "takibi":
+            tabs.insertTab(0, self.tab_takibi, self.tab_takibi_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -823,6 +859,7 @@ class SettingsDialog(QDialog):
             "aq_fish_y_top", "aq_fish_y_bottom", "seed",
         ],
         "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
+        "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
