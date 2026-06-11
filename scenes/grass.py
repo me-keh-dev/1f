@@ -82,8 +82,11 @@ def generate_leafy_grass(height, rng):
         pixels.append((dx, dy, _shade_for_ratio(dy / height)))
     num_leaves = rng.randint(1, min(3, max(1, height // 4)))
     used_dy = set()
+    leaf_lo = max(2, height // 3)
     for _ in range(num_leaves):
-        leaf_dy = rng.randint(max(2, height // 3), height - 1)
+        if leaf_lo > height - 1:
+            break  # 葉を付けられないほど低い草（height<=2）
+        leaf_dy = rng.randint(leaf_lo, height - 1)
         if leaf_dy in used_dy:
             continue
         used_dy.add(leaf_dy)
@@ -122,8 +125,11 @@ def generate_flower_grass(height, rng):
         pixels.append((dx, dy, _shade_for_ratio(dy / height)))
     num_leaves = rng.randint(0, min(2, max(0, height // 5)))
     used_dy = set()
+    leaf_lo = max(2, height // 3)
     for _ in range(num_leaves):
-        leaf_dy = rng.randint(max(2, height // 3), height - 2)
+        if leaf_lo > height - 2:
+            break  # 葉を付けられないほど低い草
+        leaf_dy = rng.randint(leaf_lo, height - 2)
         if leaf_dy in used_dy:
             continue
         used_dy.add(leaf_dy)
