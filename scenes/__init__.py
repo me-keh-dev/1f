@@ -14,6 +14,9 @@ def get_scene_class(scene_mode):
     elif scene_mode == "takibi":
         from scenes.takibi import TakibiScene
         return TakibiScene
+    elif scene_mode == "skating":
+        from scenes.skating import SkatingScene
+        return SkatingScene
     else:
         from scenes.grass import GrassScene
         return GrassScene
@@ -25,4 +28,5 @@ SCENE_MODES = [
     ("tokaido", "scene_tokaido"),
     ("pooh", "scene_pooh"),
     ("takibi", "scene_takibi"),
+    ("skating", "scene_skating"),
 ]

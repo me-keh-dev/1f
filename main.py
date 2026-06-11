@@ -468,6 +468,21 @@ class SettingsDialog(QDialog):
         self.tab_takibi_label = t("takibi_settings")
         tabs.addTab(tab_takibi, self.tab_takibi_label)
 
+        # === Tab: Skating (figure skating) ===
+        tab_skating = QWidget()
+        sk_layout = QVBoxLayout(tab_skating)
+        self.skate_scale_slider = self._add_slider(sk_layout, t("display_scale"), 25, 200, self.config.get("skate_scale", 100))
+        self.skate_count_slider = self._add_slider(sk_layout, t("skate_count"), 1, 5, self.config.get("skate_count", 2))
+        self.skate_snow_slider = self._add_slider(sk_layout, t("skate_snow"), 0, 100, self.config.get("skate_snow", 40))
+        self.skate_trail_check = QCheckBox(t("skate_trail"))
+        self.skate_trail_check.setChecked(self.config.get("skate_trail", True))
+        self.skate_trail_check.toggled.connect(self._on_slider_changed)
+        sk_layout.addWidget(self.skate_trail_check)
+        sk_layout.addStretch()
+        self.tab_skating = tab_skating
+        self.tab_skating_label = t("skating_settings")
+        tabs.addTab(tab_skating, self.tab_skating_label)
+
         # === タブ: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
@@ -841,6 +856,10 @@ class SettingsDialog(QDialog):
             "takibi_tents": self.takibi_tents_check.isChecked(),
             "takibi_smoke": self.takibi_smoke_check.isChecked(),
             "takibi_glow": self.takibi_glow_check.isChecked(),
+            "skate_scale": self.skate_scale_slider.value(),
+            "skate_count": self.skate_count_slider.value(),
+            "skate_snow": self.skate_snow_slider.value(),
+            "skate_trail": self.skate_trail_check.isChecked(),
         }
         # サウンド連動（Windowsのみウィジェットが存在する）
         if hasattr(self, "sound_sync_btn"):
@@ -858,7 +877,7 @@ class SettingsDialog(QDialog):
     def _update_tabs_for_scene(self, scene):
         """シーンに応じてタブを切り替え"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi]
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi, self.tab_skating]
         for i in range(tabs.count() - 1, -1, -1):
             if tabs.widget(i) in scene_tabs:
                 tabs.removeTab(i)
@@ -873,6 +892,8 @@ class SettingsDialog(QDialog):
             tabs.insertTab(0, self.tab_pooh, self.tab_pooh_label)
         elif scene == "takibi":
             tabs.insertTab(0, self.tab_takibi, self.tab_takibi_label)
+        elif scene == "skating":
+            tabs.insertTab(0, self.tab_skating, self.tab_skating_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -903,6 +924,7 @@ class SettingsDialog(QDialog):
         ],
         "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
         "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_speed", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
+        "skating": ["skate_scale", "skate_count", "skate_snow", "skate_trail", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
@@ -1351,7 +1373,7 @@ class OverlayManager:
 # シーンごとの表示倍率キー（ハンバーガーボタンのサイズ連動用）
 SCENE_SCALE_KEYS = {
     "grass": "grass_scale", "aquarium": "aq_scale", "tokaido": "tk_scale",
-    "pooh": "pooh_scale", "takibi": "takibi_scale",
+    "pooh": "pooh_scale", "takibi": "takibi_scale", "skating": "skate_scale",
 }
 
 
