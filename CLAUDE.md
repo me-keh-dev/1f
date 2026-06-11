@@ -1,5 +1,16 @@
 # 1/f プロジェクト
 
+## 自動更新の配信（Cloudflare Pages）
+
+- 配信URL: `https://1f-updates.pages.dev/version.json`（updater.py の DEFAULT_UPDATE_URL）
+- Cloudflareアカウント: tsuruha.yoshihide@gmail.com（wrangler でログイン済み）/ Pagesプロジェクト名 `1f-updates`
+- リリース手順:
+  1. `version.py` の CODE_VERSION を上げる
+  2. `python tools/publish_update.py --upload --notes "更新内容"` → code.zip + version.json 生成・デプロイ
+  3. コア（exe/骨格）も変えた場合: `bootstrap.py` の SKELETON_VERSION を上げて exe を再ビルド→GitHub Release に添付→`--installer dist/1f.exe --installer-url <ReleaseのexeURL> --skeleton <版>` を付けて publish
+- 更新の仕組み: 起動4秒後に version.json を確認。コード差分は自動DL→SHA256検証→`%APPDATA%/1f/code` へ展開（bootstrapが優先ロード）→再起動提案。コア更新は同意ダイアログ→DL→バッチで自己置換・再起動。MSIX（ストア）版はストア案内のみ（Store Policy 10.2 / 2.5.2 準拠）
+- 開発実行（非frozen）では更新チェックをスキップ。テストは環境変数 `ONEF_DEV_UPDATE=1`
+
 ## 対応ログ
 
 ### 2026-06-10 セッション1
@@ -97,3 +108,5 @@
 | 海底がもっと隆起したり、がたがたのほうがかっこいい | 平坦な砂地→起伏地形に: 2波長のうねり＋ランダムウォークのゴツゴツ＋確率発生の大きな隆起（最大12ドット）。上縁にクレストの光、斜面に岩肌の陰影。 |
 | 海底（地形）はウィンドウの後ろに回り込む。珊瑚など他は手前のまま | 東海道と同じ背面レイヤー機構を利用: has_background_layer()=True とし、地形描画を draw_background() に移動。珊瑚・海藻・沈没物・サメ・魚群・スノー・泡は前面のまま。 |
 | commit / push / release して | コミット b8d7a0b を push、PyInstaller で 1f.exe を再ビルド・起動確認し、GitHub Release v2.8.0 を作成して 1f.exe を添付。 |
+| スマホゲーム式の自動更新（起動時にサーバへ差分確認→自動DL、コア変更時は同意の上インストーラーDL→更新。ストア審査に準拠した方式のみ） | `updater.py` 新設: 起動4秒後に version.json を確認、コード差分は自動DL→SHA256検証→%APPDATA%/1f/code へアトミック展開→再起動提案。コア更新（SKELETON_VERSION差分）は同意ダイアログ→進捗付きDL→検証→バッチで自己置換・自動再起動。MSIX判定時はストア案内のみ。`version.py`（CODE_VERSION）・bootstrap.py に SKELETON_VERSION=1・設定に「起動時に更新を自動確認する」・i18n日英・両specへ追加。 |
+| ConoHaの情報はメインにある→配信は claudfrea（Cloudflare）で検討 | VPSではなく Cloudflare Pages（無料・HTTPS・CDN）で配信に決定。プロジェクト `1f-updates` を作成し https://1f-updates.pages.dev/ で version.json + code.zip を配信。`tools/publish_update.py` 新設（code.zip生成→SHA256→version.json生成→wranglerでデプロイ）。CDN経由のDL→検証→適用のE2Eテスト合格。 |

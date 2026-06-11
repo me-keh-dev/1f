@@ -35,6 +35,7 @@ from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
 from scenes import get_scene_class, SCENE_MODES
 from scenes.base import PinkNoiseGenerator, PIXEL_SIZE, HAMBURGER_BASE
 from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
+import updater
 
 def _app_dir():
     """設定・セーブの保存先。
@@ -581,6 +582,10 @@ class SettingsDialog(QDialog):
         self.startup_check.setChecked(is_startup_enabled())
         self.startup_check.toggled.connect(lambda c: set_startup_enabled(c))
         g_sl.addWidget(self.startup_check)
+        self.auto_update_check = QCheckBox(t("auto_update"))
+        self.auto_update_check.setChecked(self.config.get("auto_update", True))
+        self.auto_update_check.toggled.connect(self._on_slider_changed)
+        g_sl.addWidget(self.auto_update_check)
         tel.addWidget(g_startup)
 
         tabs.addTab(tab_env, t("tab_env"))
@@ -865,6 +870,7 @@ class SettingsDialog(QDialog):
             "flower_ratio": self.flower_slider.value(),
             "palette_indices": indices,
             "flower_colors_enabled": [i for i, btn in enumerate(self.flower_color_checks) if btn.isChecked()],
+            "auto_update": self.auto_update_check.isChecked(),
             "mouse_fade_enabled": self.mouse_fade_btn.isChecked(),
             "mouse_fade_inner": self.fade_inner_slider.value(),
             "mouse_fade_range": self.fade_range_slider.value(),
@@ -1616,6 +1622,9 @@ def main():
         overlay_visible[0] = not overlay_visible[0]
 
     hotkey = HotkeyListener(toggle_overlay)
+
+    # 起動数秒後に更新確認（オフライン等の失敗はサイレント）
+    QTimer.singleShot(4000, lambda: updater.start_update_check(manager.config))
 
     icon_path = os.path.join(_resource_dir(), "icon.png")
     if os.path.exists(icon_path):

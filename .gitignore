@@ -14,3 +14,4 @@ debug.py
 .venv/
 venv/
 .env
+dist_update/

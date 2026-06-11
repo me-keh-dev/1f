@@ -6,6 +6,7 @@
 APP_CODE = [
     ('main.py', '.'), ('i18n.py', '.'), ('weather.py', '.'),
     ('weather_fx.py', '.'), ('platform_win.py', '.'), ('audio_level.py', '.'),
+    ('version.py', '.'), ('updater.py', '.'),
     ('scenes', 'scenes'),
 ]
 
@@ -18,7 +19,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['main', 'i18n', 'weather', 'weather_fx', 'platform_win', 'platform_mac', 'audio_level', 'scenes'],
+    excludes=['main', 'i18n', 'weather', 'weather_fx', 'platform_win', 'platform_mac', 'audio_level', 'version', 'updater', 'scenes'],
     noarchive=False,
     optimize=0,
 )

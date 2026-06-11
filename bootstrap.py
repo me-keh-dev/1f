@@ -38,6 +38,11 @@ if sys.platform == "win32":
     from ctypes import wintypes  # noqa: F401
 
 
+# スケルトン（凍結部）の版数。PyQt等の依存やbootstrap自体が変わったら上げる。
+# 上がると updater がコア更新（インストーラーDL）を案内する
+SKELETON_VERSION = 1
+
+
 def external_code_dir():
     if sys.platform == "darwin":
         base = os.path.expanduser("~/Library/Application Support/1f")
@@ -52,6 +57,8 @@ def bundled_code_dir():
 
 
 def run():
+    # 差し替え可能なコード側（updater）へスケルトン版数を伝える
+    os.environ["ONEF_SKELETON_VERSION"] = str(SKELETON_VERSION)
     sys.path.insert(0, bundled_code_dir())
     ext = external_code_dir()
     if os.path.isfile(os.path.join(ext, "main.py")):
