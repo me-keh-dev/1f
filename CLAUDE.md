@@ -110,3 +110,4 @@
 | commit / push / release して | コミット b8d7a0b を push、PyInstaller で 1f.exe を再ビルド・起動確認し、GitHub Release v2.8.0 を作成して 1f.exe を添付。 |
 | スマホゲーム式の自動更新（起動時にサーバへ差分確認→自動DL、コア変更時は同意の上インストーラーDL→更新。ストア審査に準拠した方式のみ） | `updater.py` 新設: 起動4秒後に version.json を確認、コード差分は自動DL→SHA256検証→%APPDATA%/1f/code へアトミック展開→再起動提案。コア更新（SKELETON_VERSION差分）は同意ダイアログ→進捗付きDL→検証→バッチで自己置換・自動再起動。MSIX判定時はストア案内のみ。`version.py`（CODE_VERSION）・bootstrap.py に SKELETON_VERSION=1・設定に「起動時に更新を自動確認する」・i18n日英・両specへ追加。 |
 | ConoHaの情報はメインにある→配信は claudfrea（Cloudflare）で検討 | VPSではなく Cloudflare Pages（無料・HTTPS・CDN）で配信に決定。プロジェクト `1f-updates` を作成し https://1f-updates.pages.dev/ で version.json + code.zip を配信。`tools/publish_update.py` 新設（code.zip生成→SHA256→version.json生成→wranglerでデプロイ）。CDN経由のDL→検証→適用のE2Eテスト合格。 |
+| はい（commit→push→release実行の承認） | コミット f94f19b を push。新骨格（SKELETON_VERSION=1, updater同梱）で 1f.exe を再ビルド・起動確認し、GitHub Release v2.9.0 を作成して添付。version.json に installer_url/sha256 を含めて Cloudflare へ配信（v2.9.0 以降のexeは自動更新が有効）。 |
