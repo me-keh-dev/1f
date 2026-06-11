@@ -530,14 +530,20 @@ class SettingsDialog(QDialog):
         self.shark_count_slider = self._add_slider(sh_layout, t("shark_count"), 1, 8, self.config.get("shark_count", 3))
         self.shark_coral_slider = self._add_slider(sh_layout, t("shark_coral"), 0, 100, self.config.get("shark_coral", 60))
         self.shark_seaweed_slider = self._add_slider(sh_layout, t("shark_seaweed"), 0, 100, self.config.get("shark_seaweed", 50))
+        self.shark_snow_slider = self._add_slider(sh_layout, t("shark_snow"), 0, 400, self.config.get("shark_snow", 100))
+        self.shark_wreck_check = QCheckBox(t("shark_wreck"))
+        self.shark_wreck_check.setChecked(self.config.get("shark_wreck", True))
+        self.shark_wreck_check.toggled.connect(self._on_slider_changed)
+        sh_layout.addWidget(self.shark_wreck_check)
+        self.shark_wreck_boats_slider = self._add_slider(sh_layout, t("shark_wreck_boats"), 0, 3, self.config.get("shark_wreck_boats", 1))
+        self.shark_wreck_planes_slider = self._add_slider(sh_layout, t("shark_wreck_planes"), 0, 4, self.config.get("shark_wreck_planes", 1))
+        self.shark_wreck_flow_slider = self._add_slider(sh_layout, t("shark_wreck_flow"), 0, 200, self.config.get("shark_wreck_flow", 80))
+        self.shark_fish_schools_slider = self._add_slider(sh_layout, t("shark_fish_schools"), 1, 6, self.config.get("shark_fish_schools", 2))
+        self.shark_fish_slider = self._add_slider(sh_layout, t("shark_fish"), 0, 60, self.config.get("shark_fish", 30))
         self.shark_bubbles_check = QCheckBox(t("shark_bubbles"))
         self.shark_bubbles_check.setChecked(self.config.get("shark_bubbles", True))
         self.shark_bubbles_check.toggled.connect(self._on_slider_changed)
         sh_layout.addWidget(self.shark_bubbles_check)
-        self.shark_rays_check = QCheckBox(t("shark_rays"))
-        self.shark_rays_check.setChecked(self.config.get("shark_rays", True))
-        self.shark_rays_check.toggled.connect(self._on_slider_changed)
-        sh_layout.addWidget(self.shark_rays_check)
         sh_layout.addStretch()
         self.tab_shark = tab_shark
         self.tab_shark_label = t("shark_settings")
@@ -936,8 +942,14 @@ class SettingsDialog(QDialog):
             "shark_count": self.shark_count_slider.value(),
             "shark_coral": self.shark_coral_slider.value(),
             "shark_seaweed": self.shark_seaweed_slider.value(),
+            "shark_snow": self.shark_snow_slider.value(),
+            "shark_wreck": self.shark_wreck_check.isChecked(),
+            "shark_wreck_boats": self.shark_wreck_boats_slider.value(),
+            "shark_wreck_planes": self.shark_wreck_planes_slider.value(),
+            "shark_wreck_flow": self.shark_wreck_flow_slider.value(),
+            "shark_fish_schools": self.shark_fish_schools_slider.value(),
+            "shark_fish": self.shark_fish_slider.value(),
             "shark_bubbles": self.shark_bubbles_check.isChecked(),
-            "shark_rays": self.shark_rays_check.isChecked(),
         }
         # サウンド連動（Windowsのみウィジェットが存在する）
         if hasattr(self, "sound_sync_btn"):
@@ -1012,7 +1024,7 @@ class SettingsDialog(QDialog):
             "skate_grass_spacing", "skate_grass_scatter", "skate_grass_scatter_density",
             "seed",
         ],
-        "shark": ["shark_scale", "shark_count", "shark_coral", "shark_seaweed", "shark_bubbles", "shark_rays", "seed"],
+        "shark": ["shark_scale", "shark_count", "shark_coral", "shark_seaweed", "shark_snow", "shark_wreck", "shark_wreck_boats", "shark_wreck_planes", "shark_wreck_flow", "shark_fish_schools", "shark_fish", "shark_bubbles", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
