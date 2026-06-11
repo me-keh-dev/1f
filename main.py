@@ -470,7 +470,10 @@ class SettingsDialog(QDialog):
 
         # === Tab: Skating (figure skating) ===
         tab_skating = QWidget()
-        sk_layout = QVBoxLayout(tab_skating)
+        sk_scroll = QScrollArea()
+        sk_scroll.setWidgetResizable(True)
+        sk_inner = QWidget()
+        sk_layout = QVBoxLayout(sk_inner)
         self.skate_scale_slider = self._add_slider(sk_layout, t("display_scale"), 25, 200, self.config.get("skate_scale", 100))
         self.skate_count_slider = self._add_slider(sk_layout, t("skate_count"), 1, 5, self.config.get("skate_count", 2))
         self.skate_snow_slider = self._add_slider(sk_layout, t("skate_snow"), 0, 100, self.config.get("skate_snow", 40))
@@ -478,7 +481,44 @@ class SettingsDialog(QDialog):
         self.skate_trail_check.setChecked(self.config.get("skate_trail", True))
         self.skate_trail_check.toggled.connect(self._on_slider_changed)
         sk_layout.addWidget(self.skate_trail_check)
+
+        # 岸辺の草（ON/OFF可・設定項目は草原と同様）
+        g_sg = QGroupBox(t("skate_grass"))
+        g_sg.setCheckable(True)
+        g_sg.setChecked(self.config.get("skate_grass", True))
+        g_sg.toggled.connect(self._on_slider_changed)
+        self.skate_grass_group = g_sg
+        g_sgl = QVBoxLayout(g_sg)
+        sg1 = QGroupBox(t("grass_length"))
+        sg1l = QVBoxLayout(sg1)
+        self.sg_min_slider = self._add_slider(sg1l, t("min"), 2, 15, self.config.get("skate_grass_min", 3))
+        self.sg_max_slider = self._add_slider(sg1l, t("max"), 5, 30, self.config.get("skate_grass_max", 7))
+        self.sg_thickness_slider = self._add_slider(sg1l, t("thickness"), 1, 12, self.config.get("skate_grass_thickness", 4))
+        g_sgl.addWidget(sg1)
+        sg2 = QGroupBox(t("grass_type"))
+        sg2l = QVBoxLayout(sg2)
+        self.sg_slim_slider = self._add_slider(sg2l, t("slim"), 0, 100, self.config.get("skate_grass_slim", 40))
+        self.sg_flower_slider = self._add_slider(sg2l, t("flower"), 0, 100, self.config.get("skate_grass_flower", 0))
+        g_sgl.addWidget(sg2)
+        sg3 = QGroupBox(t("cluster_area"))
+        sg3l = QVBoxLayout(sg3)
+        self.sg_clusters_slider = self._add_slider(sg3l, t("num_clusters"), 0, 20, self.config.get("skate_grass_clusters", 5))
+        self.sg_cluster_count_slider = self._add_slider(sg3l, t("total_count"), 0, 150, self.config.get("skate_grass_cluster_count", 40))
+        self.sg_density_slider = self._add_slider(sg3l, t("density"), 0, 100, self.config.get("skate_grass_density", 70))
+        self.sg_spacing_slider = self._add_slider(sg3l, t("spacing"), 0, 100, self.config.get("skate_grass_spacing", 50))
+        g_sgl.addWidget(sg3)
+        sg4 = QGroupBox(t("scatter_area"))
+        sg4l = QVBoxLayout(sg4)
+        self.sg_scatter_slider = self._add_slider(sg4l, t("count"), 0, 150, self.config.get("skate_grass_scatter", 20))
+        self.sg_scatter_density_slider = self._add_slider(sg4l, t("scatter_density"), 0, 100, self.config.get("skate_grass_scatter_density", 20))
+        g_sgl.addWidget(sg4)
+        sk_layout.addWidget(g_sg)
+
         sk_layout.addStretch()
+        sk_scroll.setWidget(sk_inner)
+        tab_sk_layout = QVBoxLayout(tab_skating)
+        tab_sk_layout.setContentsMargins(0, 0, 0, 0)
+        tab_sk_layout.addWidget(sk_scroll)
         self.tab_skating = tab_skating
         self.tab_skating_label = t("skating_settings")
         tabs.addTab(tab_skating, self.tab_skating_label)
@@ -860,6 +900,18 @@ class SettingsDialog(QDialog):
             "skate_count": self.skate_count_slider.value(),
             "skate_snow": self.skate_snow_slider.value(),
             "skate_trail": self.skate_trail_check.isChecked(),
+            "skate_grass": self.skate_grass_group.isChecked(),
+            "skate_grass_min": self.sg_min_slider.value(),
+            "skate_grass_max": max(self.sg_max_slider.value(), self.sg_min_slider.value() + 1),
+            "skate_grass_thickness": self.sg_thickness_slider.value(),
+            "skate_grass_slim": self.sg_slim_slider.value(),
+            "skate_grass_flower": self.sg_flower_slider.value(),
+            "skate_grass_clusters": self.sg_clusters_slider.value(),
+            "skate_grass_cluster_count": self.sg_cluster_count_slider.value(),
+            "skate_grass_density": self.sg_density_slider.value(),
+            "skate_grass_spacing": self.sg_spacing_slider.value(),
+            "skate_grass_scatter": self.sg_scatter_slider.value(),
+            "skate_grass_scatter_density": self.sg_scatter_density_slider.value(),
         }
         # サウンド連動（Windowsのみウィジェットが存在する）
         if hasattr(self, "sound_sync_btn"):
@@ -924,7 +976,14 @@ class SettingsDialog(QDialog):
         ],
         "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
         "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_speed", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
-        "skating": ["skate_scale", "skate_count", "skate_snow", "skate_trail", "seed"],
+        "skating": [
+            "skate_scale", "skate_count", "skate_snow", "skate_trail",
+            "skate_grass", "skate_grass_min", "skate_grass_max", "skate_grass_thickness",
+            "skate_grass_slim", "skate_grass_flower",
+            "skate_grass_clusters", "skate_grass_cluster_count", "skate_grass_density",
+            "skate_grass_spacing", "skate_grass_scatter", "skate_grass_scatter_density",
+            "seed",
+        ],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",

@@ -24,6 +24,14 @@ COSTUMES = [
     {"dress": (235, 235, 245), "trim": (180, 200, 230)},  # ホワイト
 ]
 HAIR_COLORS = [(40, 30, 28), (25, 25, 30), (120, 80, 40), (190, 150, 80), (90, 45, 30)]
+
+# 岸辺の冬草（霜の降りた青系トーン）
+FROST_GRASS = {
+    "dark": (38, 72, 86),
+    "mid": (62, 108, 122),
+    "bright": (110, 158, 170),
+    "tip": (180, 222, 230),
+}
 SKIN = (240, 205, 175)
 TIGHTS = (235, 230, 235)
 SKATE = (245, 245, 250)
@@ -618,6 +626,7 @@ class SkatingScene(BaseScene):
         self._trace_pm = None    # 焼き込み済みの古いトレース層
         self._trace_key = None
         self._trace_seed = 0
+        self.shore_grass = None  # 手前の岸辺の草（GrassSceneを内包）
 
     def get_area_height(self, config):
         s = config.get("skate_scale", 100) / 100.0
@@ -674,6 +683,37 @@ class SkatingScene(BaseScene):
             s0 = rng.uniform(0, math.tau)
             self.skaters.append(Skater(rng, self.ps, dance, s0, min_x, max_x))
 
+        # 手前の岸辺の草（青系・背の低い冬草）。設定項目は草原と同様
+        self.shore_grass = None
+        if config.get("skate_grass", True):
+            from scenes.grass import GrassScene
+            gmin = config.get("skate_grass_min", 3)
+            gmax = max(gmin + 1, config.get("skate_grass_max", 7))
+            gcfg = {
+                "seed": seed ^ 0x6A55,
+                "wind": config.get("wind", 50),
+                "grass_scale": config.get("skate_scale", 100),
+                "grass_thickness": config.get("skate_grass_thickness", 4),
+                "min_height": gmin,
+                "max_height": gmax,
+                "slim_ratio": config.get("skate_grass_slim", 40),
+                "flower_ratio": config.get("skate_grass_flower", 0),
+                "num_clusters": config.get("skate_grass_clusters", 5),
+                "cluster_count": config.get("skate_grass_cluster_count", 40),
+                "cluster_density": config.get("skate_grass_density", 70),
+                "sparseness": config.get("skate_grass_spacing", 50),
+                "scatter_count": config.get("skate_grass_scatter", 20),
+                "scatter_density": config.get("skate_grass_scatter_density", 20),
+            }
+            self.shore_grass = GrassScene()
+            self.shore_grass.rebuild(gcfg, screen_width, widget_width)
+            # 霜の降りた青系パレットに差し替え
+            for g in self.shore_grass.grasses:
+                g.colors = [
+                    QColor(*FROST_GRASS["dark"]), QColor(*FROST_GRASS["mid"]),
+                    QColor(*FROST_GRASS["bright"]), QColor(*FROST_GRASS["tip"]),
+                ]
+
     def _build_trace_pm(self, tint, get_alpha):
         """リンクに刻まれた無数の古いトレースを1枚のピクスマップに焼き込む。
         毎フレームは転送1回で済むため、本数を増やしてもメモリは画像1枚分
@@ -713,6 +753,8 @@ class SkatingScene(BaseScene):
         for s in self.skaters:
             wave = wind_sim.get_wave_at(s.x)
             s.update(wave, self.trail_on, self.ice_h)
+        if self.shore_grass:
+            self.shore_grass.update(wind_sim)
         # 雪はゆっくり落ち、風で流れる
         for f in self.flakes:
             f[1] += f[2]
@@ -810,6 +852,10 @@ class SkatingScene(BaseScene):
         for s in ordered:
             alpha = get_alpha(s.x) if get_alpha else 255
             s.draw(painter, ground_y, tint, alpha)
+
+        # 手前の岸辺の草（スケーターより手前・青系の冬草）
+        if self.shore_grass:
+            self.shore_grass.draw(painter, ground_y, tint, get_alpha)
 
         # 雪（最前面）
         fs = max(2, ps // 2)
