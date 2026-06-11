@@ -14,51 +14,59 @@ from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, h
 from PyQt5.QtGui import QColor, QLinearGradient
 
 
-# --- サメのドット絵（右向き、ASCIIアートから生成） ---
-# B=体, W=腹, F=ヒレ, T=尾ビレ, E=目, G=エラ, M=口, t=歯
+# --- サメのドット絵（ぬいぐるみ風・原画は左向き32×16、パース時に反転） ---
+# o=輪郭(濃紺), B=体(やわらかい青), W=おなか(白), e=目, s=口のステッチ
 SHARK_ART = [
-    "..............FF..........",
-    ".............FFF..........",
-    "............FFFF..........",
-    ".T........BBFFFBBB........",
-    ".TT.....BBBBBBBBBBBB......",
-    "..TT.BBBBBBBBBBBBBBBBB....",
-    "..TTBBBBBBBBBBBBBBBBEBB...",
-    ".TTBBBBBBBBBGGBBBBBBBBBB..",
-    ".TTBBWWWWWWWWWWWWWWWMtMtW.",
-    ".T...WWWWWWWWWWWWWWMMMW...",
-    "......FFWWWWWWWWWW........",
-    ".....FFF...WWWW...........",
-    "......F...................",
+    "............ooo.................",
+    "...........oBBBo................",
+    "..........oBBBBBo...............",
+    ".........oBBBBBBBo.........oo...",
+    "....ooooooBBBBBBBooooo....oBBo..",
+    "..ooBBBBBBBBBBBBBBBBBBoo.oBBo...",
+    ".oBBBBBBBBBBBBBBBBBBBBBooBBo....",
+    "oBBBeBBBBBBBBBBBBBBBBBBBBBo.....",
+    "oBBBBBBBBBBBBBBBBBBBBBBBBBo.....",
+    "osssWWWWWWWWWWWWWWWWBBBBoBBo....",
+    ".oWWWWWWWWWWWWWWWWWWBBBoooBBo...",
+    "..ooWWWWWWWWWWWWWWWooo....oBBo..",
+    "....oooBBBBBooooooo........oo...",
+    ".......oBBBo....................",
+    "........oBBo....................",
+    ".........oo.....................",
 ]
-SHARK_ANCHOR = (13, 6)  # (col, row) が回遊の中心
+SHARK_ANCHOR = (12, 8)  # (col, row) が回遊の中心
+TAIL_COL = 24           # この列から右（原画）が尾ビレ＝揺れに連動
 
 
 def _parse_art(art, anchor):
     ax, ay = anchor
     pixels = []
-    parts = {"B": "body", "W": "belly", "F": "fin", "T": "tail",
-             "E": "eye", "G": "gill", "M": "mouth", "t": "teeth"}
+    parts = {"B": "body", "W": "belly", "o": "outline",
+             "e": "eye", "s": "mouth"}
     for r, row in enumerate(art):
         for c, ch in enumerate(row):
             if ch in parts:
-                pixels.append((c - ax, r - ay, parts[ch]))
+                part = parts[ch]
+                if c >= TAIL_COL:
+                    part = "outline_tail" if part == "outline" else "tail"
+                # 左向きの原画を反転し、direction=1 で右向きになる座標系に
+                pixels.append((ax - c, r - ay, part))
     return pixels
 
 
 SHARK_SHAPE = _parse_art(SHARK_ART, SHARK_ANCHOR)
 
-# サメの色（やわらかい青系のバリエーション）
+# サメの色（ぬいぐるみトーンの青＋濃紺の輪郭、3バリエーション）
 SHARK_VARIANTS = [
-    {"body": (108, 142, 182), "belly": (224, 234, 244), "fin": (88, 120, 160),
-     "tail": (88, 120, 160), "eye": (28, 34, 46), "gill": (86, 114, 152),
-     "mouth": (70, 84, 106), "teeth": (246, 250, 252)},
-    {"body": (96, 128, 170), "belly": (216, 228, 240), "fin": (76, 106, 148),
-     "tail": (76, 106, 148), "eye": (28, 34, 46), "gill": (76, 102, 140),
-     "mouth": (62, 76, 98), "teeth": (246, 250, 252)},
-    {"body": (118, 150, 178), "belly": (228, 238, 244), "fin": (98, 128, 158),
-     "tail": (98, 128, 158), "eye": (28, 34, 46), "gill": (94, 122, 150),
-     "mouth": (74, 90, 110), "teeth": (246, 250, 252)},
+    {"body": (127, 168, 201), "tail": (127, 168, 201),
+     "belly": (244, 247, 249), "eye": (27, 42, 58),
+     "mouth": (143, 166, 184), "outline": (46, 74, 102)},
+    {"body": (117, 157, 194), "tail": (117, 157, 194),
+     "belly": (240, 244, 247), "eye": (27, 42, 58),
+     "mouth": (134, 156, 176), "outline": (42, 68, 96)},
+    {"body": (139, 177, 208), "tail": (139, 177, 208),
+     "belly": (246, 249, 251), "eye": (27, 42, 58),
+     "mouth": (152, 174, 190), "outline": (52, 80, 108)},
 ]
 
 # 奥行きの霞（深海の青）
@@ -104,6 +112,7 @@ class Shark:
         variant = rng.choice(SHARK_VARIANTS)
         self.colors = {k: QColor(*_haze(v, depth, 0.55))
                        for k, v in variant.items()}
+        self.colors["outline_tail"] = self.colors["outline"]
         self.direction = rng.choice([-1, 1])
         self.target_dir = self.direction
         self.vx = self.speed * self.direction
@@ -155,11 +164,11 @@ class Shark:
         for dx, dy, part in SHARK_SHAPE:
             ddx = dx * self.direction
             ddy = dy
-            if part == "tail":
-                # 尾ビレは付け根から先端ほど大きく揺れる
-                k = min(1.0, max(0, abs(dx) - 7) / 3.0)
+            if part in ("tail", "outline_tail"):
+                # 尾ビレは付け根から先端ほど大きく揺れる（輪郭線も一緒に）
+                k = min(1.0, max(0, abs(dx) - 12) / 4.0)
                 ddx += tail_sway * k * self.direction * (-1)
-            elif part in ("body", "belly", "fin"):
+            elif part in ("body", "belly"):
                 ddy += math.sin(self.swim_phase + dx * 0.25) * 0.10
             c = apply_tint(self.colors[part], tint)
             c.setAlpha(a)
@@ -358,7 +367,7 @@ class SharkScene(BaseScene):
             if self.bubble_timer % 30 == 0:
                 if self.sharks and random.random() < 0.5:
                     s = random.choice(self.sharks)
-                    nose = s.x + 10 * s.direction * self.ps
+                    nose = s.x + 12 * s.direction * self.ps
                     self.bubbles.append(Bubble(nose, s.y - self.ps, self.ps))
                 elif self.seaweeds:
                     w = random.choice(self.seaweeds)
