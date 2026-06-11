@@ -1,7 +1,7 @@
 """Pooh scene - Pooh floating with a blue balloon over the 100 Acre Wood"""
 import math
 import random
-from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
+from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, hamburger_avoid_px
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QLinearGradient
 
@@ -976,9 +976,11 @@ class PoohScene(BaseScene):
         self.balloon_size = config.get("pooh_balloon_size", 30)  # 10-100 → maps to radius
         self._b_rmin = max(3, self.balloon_size * 0.2)
         self._b_rmax = max(5, self.balloon_size * 0.7)
+        # 左下のハンバーガーボタンのエリアを避ける
+        self._avoid = min(hamburger_avoid_px(self.scale), widget_width)
         self.balloons = []
         for i in range(self.balloon_count):
-            bx = rng.randint(0, widget_width)
+            bx = rng.randint(self._avoid, widget_width)
             by = self.area_height + rng.uniform(0, 50) + i * 15
             self.balloons.append(DriftBalloon(bx, by, rng, self.area_height,
                                               radius_min=self._b_rmin, radius_max=self._b_rmax))
@@ -1015,7 +1017,7 @@ class PoohScene(BaseScene):
 
     def _generate_forest(self, rng, width):
         self.forest_elements = []
-        x = rng.randint(10, 40)
+        x = self._avoid + rng.randint(10, 40)
         while x < width:
             kind = rng.choice(['tree', 'tree', 'tree', 'house', 'bridge'])
             if kind == 'tree':

@@ -1,7 +1,7 @@
 """Aquarium scene - water plants swaying with goldfish swimming (water physics)"""
 import math
 import random
-from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
+from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, hamburger_avoid_px
 from PyQt5.QtGui import QColor, QLinearGradient
 
 # --- Water plant palettes ---
@@ -345,6 +345,11 @@ class AquariumScene(BaseScene):
         rng = random.Random(seed)
         wind = config.get("wind", 50)
         self._generate_plants(rng, widget_width, wind, config)
+        # 左下のハンバーガーボタンのエリアを避ける（水草を右に詰める）
+        avoid = hamburger_avoid_px(self.scale)
+        if widget_width > avoid:
+            for p in self.plants:
+                p.base_x = avoid + p.base_x * (widget_width - avoid) // widget_width
         self._generate_fish(rng, widget_width, config)
         self.bubbles = []
 

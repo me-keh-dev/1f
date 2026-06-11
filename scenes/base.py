@@ -4,6 +4,14 @@ from PyQt5.QtGui import QColor
 
 PIXEL_SIZE = 4
 
+# 画面左下のハンバーガーメニューボタンの基準サイズ（表示倍率1.0のときのpx）
+HAMBURGER_BASE = 48
+
+
+def hamburger_avoid_px(scale):
+    """左下のハンバーガーボタン用に空けておくエリアの幅(px)"""
+    return int((HAMBURGER_BASE + 16) * scale)
+
 
 class PinkNoiseGenerator:
     def __init__(self, num_octaves=8):

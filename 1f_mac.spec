@@ -12,7 +12,8 @@
 # only bootstrap.py + dependencies (Python, PyQt5, pyobjc, stdlib) are frozen.
 APP_CODE = [
     ('main.py', '.'), ('i18n.py', '.'), ('weather.py', '.'),
-    ('weather_fx.py', '.'), ('platform_mac.py', '.'), ('scenes', 'scenes'),
+    ('weather_fx.py', '.'), ('platform_mac.py', '.'), ('audio_level.py', '.'),
+    ('scenes', 'scenes'),
 ]
 
 a = Analysis(
@@ -25,7 +26,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['main', 'i18n', 'weather', 'weather_fx', 'platform_win', 'platform_mac', 'scenes'],
+    excludes=['main', 'i18n', 'weather', 'weather_fx', 'platform_win', 'platform_mac', 'audio_level', 'scenes'],
     noarchive=False,
     optimize=0,
 )

@@ -38,3 +38,14 @@
 | 言語を変えた瞬間に全部書き換わってほしい | SettingsDialog に on_language_change コールバックを追加。言語変更時にトレイメニュー文言を更新し、設定画面を同じ位置・同じタブのまま新言語で開き直す。「開き直すと反映」の注記を削除。 |
 | macで毎回ビルドせず、骨格＋ファイル差し替えで更新したい | bootstrap.py（凍結される唯一のエントリ）を新設。アプリコード（main.py/scenes/i18n/weather/weather_fx/platform_*）は datas の素の .py として同梱し excludes でPYZから除外。起動時に外部コードdir（Win: %APPDATA%/1f/code、mac: ~/Library/Application Support/1f/code）に main.py があれば sys.path 先頭に挿入して優先読み込み（=ファイル差し替えだけで更新、削除でバンドル版に戻る）。両spec を bootstrap エントリに変更。Windows exe で「バンドル版起動」「外部コード優先」の両方を実機検証済み。注意: 新しい外部ライブラリを使う変更は骨格の再ビルドが必要。 |
 | 1f_mac_fix(1).zip はマージされているか／mac用更新ファイル | 未マージだった。zip（6/6時点）から mac 実装2関数（set_behind_windows / is_fullscreen_active）を platform_mac.py に移植し、main.py の darwin import を更新（スタブ削除）。zip の main.py 本体は焚火以前の旧版のため不使用。LaunchAgentラベルは新しい com.1f を維持。 |
+
+### 2026-06-11 セッション1
+| プロンプト要約 | 対応内容 |
+|---|---|
+| 画面左下にハンバーガーメニューボタン。全モードでそのエリアを避ける。サイズは表示倍率連動。マウス接近で消えるがShift押下中は消えずクリック可、メニューはボタンから上に展開（展開後はShiftを離しても閉じない） | main.py に `HamburgerButton` を新設（フレームレス・最前面・半透明の角丸ボタン、トレイと同じ QMenu をボタン位置から上方向に popup）。通常はクリック透過＋マウス接近でフェードアウト、Shift中・メニュー展開中は表示＆クリック可（platform_win/mac に `set_clickable`・`is_shift_pressed` を追加）。サイズは現在シーンの表示倍率（SCENE_SCALE_KEYS）に連動し毎tick追従、全画面検出・オーバーレイ非表示時は隠れる。scenes/base.py に `HAMBURGER_BASE`/`hamburger_avoid_px` を追加し、全5シーンの rebuild で左下エリアを回避（grass/aquarium: x座標を右に再マップ、tokaido: 丘・建物列・道端草の開始位置をシフト、pooh: 森と風船スポーン、takibi: 焚火の等間隔配置を avoid 以降に） |
+| タスクバーが消えるのはメニューバー変更のせい？ | 原因はハンバーガーボタンの毎秒 ensure_topmost（topmost再主張の連発でタスクバーがz順位競合に負ける）。定期再主張を削除し WindowStaysOnTopHint のみに変更。 |
+| スピーカーの音を拾って揺らぎに連動できる？→Windows限定・ON/OFF・音量→揺らぎの強さ＋感度スライダーで実装 | `audio_level.py` 新設（soundcardでWASAPIループバック録音、別スレッドでRMS→平方根圧縮→アタック速/リリース遅エンベロープの0..1レベル、約10秒ごとに既定スピーカー再取得）。WindSimulator に sound_level を追加し get_wave_at の振幅に加算（風・水草・炎の傾き全シーンに効く）。OverlayManager が毎tick レベル×感度を注入、apply_config でモニタ start/stop。設定→オプションに「サウンド連動」グループ（ON/OFF＋感度10〜200、Windowsのみ表示）、ENV_KEYS・i18n日英追加。requirements.txt と 1f.spec/1f_mac.spec に soundcard/audio_level.py を追加（**配布exeは骨格再ビルド必要**）。 |
+| 火の粉10倍＋ベースのドン！で焚火がボン！（ウーハー追従パラメータ） | audio_level.py にFFTで低音帯域（~150Hz, bin1..7）の `bass` レベルを追加（アタック0.85/リリース0.22のパンチ重視エンベロープ）。WindSimulator に sound_bass、設定に「低音の爆ぜ」スライダー（0〜300%、デフォルト100）追加。焚火: bass最大時に火の粉スポーン率10倍、熱注入もflicker×(1+0.6b)＋基部エンベロープ拡幅で炎が燃え上がる。 |
+| 噴き出す速度は速くせず、量を多く・ゆっくりに（草でいう「動く量が大きい」） | 火の粉の速度ブースト（上昇1.8倍・横散り2.5倍）を撤去。低音では量（最大10倍）だけ増え、各火の粉は通常のゆっくりした速度で舞い上がる。草側はもともと振幅（動く量）のみ増える実装で速度は不変のためそのまま。 |
+| 火の粉が表示領域の上端で切れて線が見える。高さ以内で消失するように | 上端から表示高さの25%のフェードゾーンを設け、火の粉のアルファを上昇に伴い徐々に0へ（上端到達前に自然消滅）。カリングも y>0 に変更し領域外描画を撤廃。 |
+| ベースのドン!に合わせてバフッと吹き出すように（常時噴出をやめる）。草はドン!で首を振る感じ | audio_level に `bass_hit`（オンセット検出: 低音RMSの急な立ち上がりでパルスを立て46ms毎に×0.70減衰、持続音では発火しない）を追加。sound_bass を持続レベルからこのパルスに変更し、焚火の火の粉バースト・炎の燃え上がりはキックの瞬間のみ反応。get_wave_at にも sound_bass×2.2 を加算し、草が「ドン!」で首を振る動きに。 |

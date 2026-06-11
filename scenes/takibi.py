@@ -8,7 +8,7 @@ The flame silhouette emerges from the physics instead of a fixed shape.
 import datetime
 import math
 import random
-from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
+from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, hamburger_avoid_px
 from PyQt5.QtGui import QColor, QRadialGradient
 
 
@@ -244,6 +244,9 @@ class Campfire:
                                              (make_camper_spec("marshmallow", 1), -1, 0)]
         self.rng = rng
         self._base_y = area_height - 4 * ps  # refined in draw via set_base_y
+        # Sparks fade out within this distance from the top of the overlay,
+        # so they never get clipped at the window edge (no visible line)
+        self._spark_fade_top = max(1, int(area_height * 0.25))
         self._wind = 0.0
         self.noise = PinkNoiseGenerator()
         self.level = 0.0       # smoothed flame intensity (-1..1), 1/f yuragi
@@ -276,6 +279,8 @@ class Campfire:
         # between arrive and depart o'clock
         self.present = True
         self.arrive, self.depart, self.wraps = 0.0, 24.0, False
+        # Sound sync: bass level (0..2), kicks make the fire flare and spit sparks
+        self._bass = 0.0
         # Heat grid: heat[y][x], y=0 at the base
         self.heat = [[0.0] * self.GRID_W for _ in range(self.GRID_H)]
         # Per-column 1/f noise modulating the heat injection
@@ -300,13 +305,16 @@ class Campfire:
         W, H = self.GRID_W, self.GRID_H
         rng = self.rng
         half = (W - 1) / 2.0
-        flicker = 0.82 + 0.28 * self.level
+        # Bass hit ("ドン!") makes the flame flare up ("ボン!")
+        b = min(1.0, self._bass)
+        flicker = (0.82 + 0.28 * self.level) * (1.0 + b * 0.6)
 
         # Inject heat at the base: bell envelope * per-column 1/f yuragi
         # (when the fire is out, injection stops and the flame dies naturally)
         for x in range(W):
             d = abs(x - half) / half  # 0 center .. 1 edge
-            env = max(0.0, 1.0 - d * d * 2.2)  # narrower than the grid
+            # Bass widens the base envelope -> bigger, taller flame
+            env = max(0.0, 1.0 - d * d * (2.2 - 0.9 * b))
             self.col_inj[x] += (self.col_noise[x].next() - self.col_inj[x]) * 0.3 * self.speed
             inj = env * flicker * self.burn * (0.95 + 0.25 * self.col_inj[x]) if self.fire_on else 0.0
             self.heat[0][x] = max(0.0, min(1.0, inj))
@@ -333,8 +341,9 @@ class Campfire:
                 else:
                     row[x] = 0.0
 
-    def update(self, wind, spark_amount, smoke_on):
+    def update(self, wind, spark_amount, smoke_on, bass=0.0):
         self.frame += 1
+        self._bass = bass
         self.t += self.speed  # flicker clock scaled by flame speed
         # 1/f flicker, smoothed (small factor = slow, relaxed yuragi)
         self.level += (self.noise.next() - self.level) * 0.15 * self.speed
@@ -342,11 +351,19 @@ class Campfire:
         sim_every = max(2, min(12, round(3 / self.speed)))
         if self.frame % sim_every == 0:
             self._step_heat(wind)
-        # Spawn sparks from flame area
-        if self.fire_on and spark_amount > 0 and self.rng.random() < spark_amount / 100.0 * 0.35:
-            sx = self.x + self.rng.uniform(-2, 2) * self.ps
-            sy = self._base_y - self.rng.uniform(4, 10) * self.ps
-            self.sparks.append(Spark(sx, sy, self.rng, self.ps))
+        # Spawn sparks from flame area.
+        # Bass hits multiply the spawn count (up to ~10x) but each ember
+        # drifts at its normal gentle speed: a kick drum "ドン!" releases a
+        # thick, slow-rising cloud of embers ("ボン!")
+        if self.fire_on and spark_amount > 0:
+            chance = spark_amount / 100.0 * 0.35 * (1.0 + min(1.0, bass) * 9.0)
+            n = int(chance)
+            if self.rng.random() < chance - n:
+                n += 1
+            for _ in range(n):
+                sx = self.x + self.rng.uniform(-2, 2) * self.ps
+                sy = self._base_y - self.rng.uniform(4, 10) * self.ps
+                self.sparks.append(Spark(sx, sy, self.rng, self.ps))
         # Extinguished fire: only thin wisps of smoke from the embers
         smoke_interval = 18 if self.fire_on else 42
         if smoke_on and self.frame % smoke_interval == 0:
@@ -358,7 +375,7 @@ class Campfire:
             s.update(wind)
         for s in self.smoke:
             s.update(wind)
-        self.sparks = [s for s in self.sparks if s.alive and s.y > -20]
+        self.sparks = [s for s in self.sparks if s.alive and s.y > 0]
         self.smoke = [s for s in self.smoke if s.alive and s.y > -30]
         self._wind = wind
 
@@ -660,7 +677,10 @@ class Campfire:
 
         # --- Sparks (in front of flame) ---
         for s in self.sparks:
-            s.draw(painter, tint, fade)
+            # Fade toward the top edge so sparks vanish inside the view
+            k = min(1.0, s.y / self._spark_fade_top)
+            if k > 0:
+                s.draw(painter, tint, fade * k)
 
 
 class TakibiScene(BaseScene):
@@ -771,10 +791,12 @@ class TakibiScene(BaseScene):
             rng.shuffle(depths)
         self.fires = []
         combo_i = 0
+        # 左下のハンバーガーボタンのエリアを避けて設営する
+        avoid = min(hamburger_avoid_px(self.scale), widget_width)
         for i in range(count):
             # Spread evenly; single fire goes to center
-            x = widget_width * (i + 1) / (count + 1)
-            x += rng.uniform(-0.05, 0.05) * widget_width / count
+            x = avoid + (widget_width - avoid) * (i + 1) / (count + 1)
+            x += rng.uniform(-0.05, 0.05) * (widget_width - avoid) / count
             depth = depths[i]
             # Perspective: farther fires are drawn smaller
             f_ps = max(1, round(self.ps * (1.0 - 0.45 * depth)))
@@ -836,11 +858,12 @@ class TakibiScene(BaseScene):
             if phase != self.phase:
                 self._apply_phase(phase)
             self._update_presence()
+        bass = getattr(wind_sim, "sound_bass", 0.0)
         for f in self.fires:
             if not f.present:
                 continue
             wind = wind_sim.get_wave_at(f.x)
-            f.update(wind, self.spark_amount, self.smoke_on)
+            f.update(wind, self.spark_amount, self.smoke_on, bass)
 
     def draw(self, painter, ground_y, tint=None, get_alpha=None):
         # The campfire is its own light source: ignore the global tint and

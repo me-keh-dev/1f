@@ -33,6 +33,23 @@ def set_click_through(hwnd):
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     )
 
+def set_clickable(hwnd, clickable):
+    """ハンバーガーボタン用: クリック透過のON/OFFを切り替える"""
+    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+    if clickable:
+        style &= ~WS_EX_TRANSPARENT
+    else:
+        style |= WS_EX_TRANSPARENT
+    ctypes.windll.user32.SetWindowLongW(
+        hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TOOLWINDOW
+    )
+
+VK_SHIFT = 0x10
+
+def is_shift_pressed():
+    """Shiftキーが押されているか（フォーカスに依存しないグローバル判定）"""
+    return bool(ctypes.windll.user32.GetAsyncKeyState(VK_SHIFT) & 0x8000)
+
 def ensure_topmost(hwnd):
     """定期的に呼んで最前面を再設定する"""
     ctypes.windll.user32.SetWindowPos(

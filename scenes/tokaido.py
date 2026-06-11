@@ -1,7 +1,7 @@
 """Tokaido scene - Edo-period pine-lined road with travelers"""
 import math
 import random
-from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
+from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, hamburger_avoid_px
 from scenes.grass import generate_slim_grass, GrassBlade, PALETTE_PRESETS
 from PyQt5.QtGui import QColor, QLinearGradient, QPainterPath
 
@@ -882,6 +882,8 @@ class TokaidoScene(BaseScene):
         rng = random.Random(seed)
         wind = config.get("wind", 50)
         ratio = screen_width / self.BASE_WIDTH
+        # 左下のハンバーガーボタンのエリアには建物・木・草を置かない
+        self._avoid = min(hamburger_avoid_px(self.scale), widget_width)
         self._generate_scene(rng, widget_width, wind, ratio, config)
         self._generate_fuji(rng, widget_width, config)
         self._generate_roadside_grass(rng, widget_width, wind, config)
@@ -912,7 +914,7 @@ class TokaidoScene(BaseScene):
 
         # Background hills (drawn behind everything)
         for _ in range(counts['hill']):
-            hx = rng.randint(0, width)
+            hx = rng.randint(self._avoid, width)
             hw = rng.randint(15, 35)
             hh = rng.randint(8, 18)
             self.hills.append(Hill(hx, hw, hh))
@@ -959,7 +961,7 @@ class TokaidoScene(BaseScene):
                 all_items.append(tree_items[ti])
                 ti += 1
 
-        x = rng.randint(20, 60)
+        x = self._avoid + rng.randint(20, 60)
         for item in all_items:
             if x >= width:
                 break
@@ -1056,7 +1058,7 @@ class TokaidoScene(BaseScene):
             return False
 
         palettes = [PALETTE_PRESETS[7]]  # Moss palette
-        x = rng.randint(5, 15)
+        x = self._avoid + rng.randint(5, 15)
         placed = 0
         while x < width and placed < grass_count:
             if not in_building(x):

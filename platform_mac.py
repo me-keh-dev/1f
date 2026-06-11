@@ -49,6 +49,35 @@ def set_click_through(hwnd):
     except Exception:
         pass
 
+def set_clickable(hwnd, clickable):
+    """ハンバーガーボタン用: クリック透過のON/OFFを切り替える"""
+    try:
+        import objc
+        from AppKit import NSFloatingWindowLevel
+        ns_view = objc.objc_object(c_void_p=int(hwnd))
+        ns_window = ns_view.window()
+        if ns_window is not None:
+            ns_window.setLevel_(NSFloatingWindowLevel)
+            ns_window.setIgnoresMouseEvents_(not clickable)
+            ns_window.setCollectionBehavior_(1 | 16)
+            try:
+                ns_window.setHidesOnDeactivate_(False)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def is_shift_pressed():
+    """Shiftキーが押されているか（フォーカスに依存しないグローバル判定）"""
+    try:
+        import Quartz
+        flags = Quartz.CGEventSourceFlagsState(Quartz.kCGEventSourceStateHIDSystemState)
+        return bool(flags & Quartz.kCGEventFlagMaskShift)
+    except Exception:
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import Qt
+        return bool(QApplication.queryKeyboardModifiers() & Qt.ShiftModifier)
+
 def set_behind_windows(hwnd):
     """ウィンドウを通常ウィンドウの後ろに配置する（東海道・富士山モード用）"""
     try:

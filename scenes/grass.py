@@ -1,6 +1,6 @@
 """Grass scene - the original 1/f grassland"""
 import random
-from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint
+from scenes.base import BaseScene, PinkNoiseGenerator, PIXEL_SIZE, apply_tint, hamburger_avoid_px
 from PyQt5.QtGui import QColor
 
 
@@ -302,6 +302,11 @@ class GrassScene(BaseScene):
                 scaled_config[key] = max(1, round(scaled_config[key] * ratio))
         data_list, _ = generate_grass_data(scaled_config, widget_width)
         self.grasses = [GrassBlade(d, palettes) for d in data_list]
+        # 左下のハンバーガーボタンのエリアを避ける（全体を右に詰める）
+        avoid = hamburger_avoid_px(self.scale)
+        if widget_width > avoid:
+            for g in self.grasses:
+                g.base_x = avoid + g.base_x * (widget_width - avoid) // widget_width
 
     def update(self, wind_sim, mouse_pos=None):
         for g in self.grasses:

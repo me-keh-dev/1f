@@ -1,2 +1,3 @@
 PyQt5>=5.15
 pyobjc; sys_platform == "darwin"
+soundcard; sys_platform == "win32"

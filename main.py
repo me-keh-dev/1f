@@ -15,14 +15,14 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QPushButton,
     QGroupBox, QComboBox,
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
 if sys.platform == "win32":
-    from platform_win import init_dpi, set_click_through, ensure_topmost, set_behind_windows, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
+    from platform_win import init_dpi, set_click_through, set_clickable, is_shift_pressed, ensure_topmost, set_behind_windows, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled, is_fullscreen_active
 elif sys.platform == "darwin":
-    from platform_mac import init_dpi, setup_mac_app, set_click_through, ensure_topmost, set_behind_windows, is_fullscreen_active, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
+    from platform_mac import init_dpi, setup_mac_app, set_click_through, set_clickable, is_shift_pressed, ensure_topmost, set_behind_windows, is_fullscreen_active, get_cursor_pos, HotkeyListener, is_startup_enabled, set_startup_enabled
 else:
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
@@ -30,9 +30,10 @@ init_dpi()
 
 from i18n import t, set_language, get_language, detect_language
 from weather import WeatherMonitor
+from audio_level import AudioLevelMonitor, is_supported as audio_supported
 from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
 from scenes import get_scene_class, SCENE_MODES
-from scenes.base import PinkNoiseGenerator, PIXEL_SIZE
+from scenes.base import PinkNoiseGenerator, PIXEL_SIZE, HAMBURGER_BASE
 from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
 
 def _app_dir():
@@ -127,6 +128,8 @@ class WindSimulator:
         self.gust_timer = 0.0
         self.gust_value = 0.0
         self.current_gust = 0.0
+        self.sound_level = 0.0  # サウンド連動 0..2（音量×感度）
+        self.sound_bass = 0.0   # キックの「ドン!」パルス 0..2（焚火の爆ぜ・草の首振り）
 
     def set_wind(self, wind_value):
         ratio = wind_value / 50.0
@@ -154,8 +157,10 @@ class WindSimulator:
         phase3 = (x - self.wave_speed * 0.4 * self.time) / (self.wave_length * 2.5)
         wave3 = math.sin(phase3 * 2 * math.pi) * 0.3
         base = (wave1 + wave2 + wave3)
-        # 突風で振幅が増える
-        strength = self.base_strength * (1.0 + self.current_gust * 1.5)
+        # 突風とサウンド連動で振幅が増える（sound_bass はキックの瞬間だけ立つ
+        # パルスなので、ドン!に合わせて首を振るような動きになる）
+        strength = self.base_strength * (
+            1.0 + self.current_gust * 1.5 + self.sound_level * 2.0 + self.sound_bass * 2.2)
         return base * strength
 
 
@@ -573,9 +578,27 @@ class SettingsDialog(QDialog):
         limit_note.setStyleSheet("color: #888; font-size: 10px;")
         g_wsl.addWidget(limit_note)
 
+        # サウンド連動（Windowsのみ）
+        if audio_supported():
+            g_ssync = QGroupBox(t("sound_sync"))
+            g_ssl = QVBoxLayout(g_ssync)
+            ssync_desc = QLabel(t("sound_sync_desc"))
+            ssync_desc.setStyleSheet("color: #666; font-size: 11px;")
+            ssync_desc.setWordWrap(True)
+            g_ssl.addWidget(ssync_desc)
+            self.sound_sync_btn = QPushButton("ON" if self.config.get("sound_sync_enabled", False) else "OFF")
+            self.sound_sync_btn.setCheckable(True)
+            self.sound_sync_btn.setChecked(self.config.get("sound_sync_enabled", False))
+            self.sound_sync_btn.toggled.connect(self._on_sound_sync_toggled)
+            g_ssl.addWidget(self.sound_sync_btn)
+            self.sound_gain_slider = self._add_slider(g_ssl, t("sound_gain"), 10, 200, self.config.get("sound_sync_gain", 50))
+            self.sound_bass_slider = self._add_slider(g_ssl, t("sound_bass"), 0, 300, self.config.get("sound_bass_gain", 100))
+
         tol.addWidget(g_light)
         tol.addWidget(g_weather)
         tol.addWidget(g_wsync)
+        if audio_supported():
+            tol.addWidget(g_ssync)
         tol.addWidget(g_lang)
 
         tol.addStretch()
@@ -671,6 +694,10 @@ class SettingsDialog(QDialog):
         # 初期シーンに応じてタブ表示を調整
         self._update_tabs_for_scene(self._initial_scene)
 
+    def _on_sound_sync_toggled(self, checked):
+        self.sound_sync_btn.setText("ON" if checked else "OFF")
+        self.on_apply({"sound_sync_enabled": checked})
+
     def _on_wind_sync_toggled(self, checked):
         self.wind_sync_btn.setText("ON" if checked else "OFF")
         self.on_apply({"wind_sync_enabled": checked})
@@ -741,7 +768,7 @@ class SettingsDialog(QDialog):
 
     def _gather_config(self):
         indices = self.config.get("palette_indices", [0])
-        return {
+        cfg = {
             "min_height": self.min_h_slider.value(),
             "max_height": max(self.max_h_slider.value(), self.min_h_slider.value() + 1),
             "grass_thickness": self.thickness_slider.value(),
@@ -815,6 +842,12 @@ class SettingsDialog(QDialog):
             "takibi_smoke": self.takibi_smoke_check.isChecked(),
             "takibi_glow": self.takibi_glow_check.isChecked(),
         }
+        # サウンド連動（Windowsのみウィジェットが存在する）
+        if hasattr(self, "sound_sync_btn"):
+            cfg["sound_sync_enabled"] = self.sound_sync_btn.isChecked()
+            cfg["sound_sync_gain"] = self.sound_gain_slider.value()
+            cfg["sound_bass_gain"] = self.sound_bass_slider.value()
+        return cfg
 
     def _on_scene_changed(self):
         scene = self.scene_combo.currentData()
@@ -883,6 +916,7 @@ class SettingsDialog(QDialog):
         "wind", "sway_speed", "mouse_fade_enabled", "mouse_fade_inner",
         "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
         "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
+        "sound_sync_enabled", "sound_sync_gain", "sound_bass_gain",
     ]
 
     def _on_save_scene(self):
@@ -1113,6 +1147,11 @@ class OverlayManager:
         self.overlays = []
         self._create_overlays()
 
+        # サウンド連動（Windowsのみ）
+        self.audio_monitor = AudioLevelMonitor()
+        if self.config.get("sound_sync_enabled", False):
+            self.audio_monitor.start()
+
         # 天気監視
         self.weather_monitor = WeatherMonitor()
         self.weather_monitor.signal.updated.connect(self._on_weather_update)
@@ -1226,6 +1265,11 @@ class OverlayManager:
             self.weather_monitor.stop()
             for o in self.overlays:
                 o.weather_fx.set_weather("clear")
+        # サウンド連動ON/OFF制御
+        if self.config.get("sound_sync_enabled", False):
+            self.audio_monitor.start()
+        else:
+            self.audio_monitor.stop()
 
     def save_preset(self, category, data):
         cat_dir = os.path.join(SAVE_DIR, category)
@@ -1289,9 +1333,125 @@ class OverlayManager:
         dt = now - self.last_time
         self.last_time = now
         sway_speed = self.config.get("sway_speed", 50) / 50.0
+        # サウンド連動: スピーカー出力の音量を揺らぎの強さにブレンド
+        if self.config.get("sound_sync_enabled", False):
+            gain = self.config.get("sound_sync_gain", 50) / 50.0
+            self.wind_sim.sound_level = min(2.0, self.audio_monitor.level * gain)
+            bass_gain = self.config.get("sound_bass_gain", 100) / 100.0
+            # 持続レベルではなくオンセットパルス: ドン!の瞬間だけ反応する
+            self.wind_sim.sound_bass = min(2.0, self.audio_monitor.bass_hit * bass_gain)
+        else:
+            self.wind_sim.sound_level = 0.0
+            self.wind_sim.sound_bass = 0.0
         self.wind_sim.update(dt * sway_speed)
         for o in self.overlays:
             o.update_scene()
+
+
+# シーンごとの表示倍率キー（ハンバーガーボタンのサイズ連動用）
+SCENE_SCALE_KEYS = {
+    "grass": "grass_scale", "aquarium": "aq_scale", "tokaido": "tk_scale",
+    "pooh": "pooh_scale", "takibi": "takibi_scale",
+}
+
+
+class HamburgerButton(QWidget):
+    """画面左下のハンバーガーメニューボタン。
+    通常はマウスが近づくとフェードアウトして消える（クリックも透過）。
+    Shiftを押している間は消えずにクリックでき、メニューがボタンから展開する。
+    展開後はShiftを離してもメニューは閉じない。
+    サイズは現在のシーンの表示倍率に連動する。
+    """
+
+    def __init__(self, manager, menu):
+        super().__init__()
+        self.manager = manager
+        self.menu = menu
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self._opacity = 1.0
+        self._clickable = False
+        self._reposition()
+        self.show()
+        QTimer.singleShot(100, lambda: set_clickable(int(self.winId()), False))
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(50)
+
+    def _scale(self):
+        cfg = self.manager.config
+        key = SCENE_SCALE_KEYS.get(cfg.get("scene_mode", "grass"), "grass_scale")
+        return cfg.get(key, 100) / 100.0
+
+    def _size(self):
+        return max(24, int(HAMBURGER_BASE * self._scale()))
+
+    def _reposition(self):
+        s = self._scale()
+        size = self._size()
+        margin = max(4, int(8 * s))
+        avail = QApplication.primaryScreen().availableGeometry()
+        self.setGeometry(avail.x() + margin,
+                         avail.y() + avail.height() - size - margin,
+                         size, size)
+
+    def _tick(self):
+        # 表示倍率の変更に追従
+        if self._size() != self.width():
+            self._reposition()
+            self.update()
+        # オーバーレイ非表示・全画面時はボタンも隠す
+        want_visible = self.manager.user_visible and not self.manager._fullscreen_hidden
+        if want_visible != self.isVisible():
+            self.setVisible(want_visible)
+            if want_visible:
+                QTimer.singleShot(100, lambda: set_clickable(int(self.winId()), self._clickable))
+        if not want_visible:
+            return
+        menu_open = self.menu.isVisible()
+        shift = is_shift_pressed()
+        if menu_open or shift:
+            target = 1.0
+        else:
+            mx, my = get_cursor_pos()
+            c = self.geometry().center()
+            near = math.hypot(mx - c.x(), my - c.y()) < self.width() * 1.6
+            target = 0.0 if near else 1.0
+        self._opacity += (target - self._opacity) * 0.3
+        if abs(self._opacity - target) < 0.02:
+            self._opacity = target
+        self.setWindowOpacity(self._opacity)
+        # Shift中（またはメニュー展開中）だけクリック可能にする
+        clickable = bool(shift) or menu_open
+        if clickable != self._clickable:
+            self._clickable = clickable
+            set_clickable(int(self.winId()), clickable)
+        # 注意: ここで ensure_topmost を定期的に呼ぶとタスクバーが
+        # z順位の競り合いに負けて消えることがあるため呼ばない
+        # （WindowStaysOnTopHint だけで十分）
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # ボタンの位置から上方向にメニューを展開（スタートメニュー風）
+            mh = self.menu.sizeHint().height()
+            self.menu.popup(QPoint(self.x(), self.y() - mh - 4))
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        w = self.width()
+        r = int(w * 0.22)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(20, 24, 28, 200))
+        p.drawRoundedRect(0, 0, w, w, r, r)
+        p.setBrush(QColor(235, 238, 240))
+        bar_w = int(w * 0.56)
+        bar_h = max(2, int(w * 0.08))
+        x0 = (w - bar_w) // 2
+        for i in range(3):
+            y = int(w * (0.30 + 0.20 * i)) - bar_h // 2
+            p.drawRect(x0, y, bar_w, bar_h)
+        p.end()
 
 
 def _make_rounded_pixmap(icon_path, size=44, radius_ratio=0.22):
@@ -1399,6 +1559,9 @@ def main():
     tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
+
+    # 画面左下のハンバーガーメニューボタン（トレイと同じメニューを展開）
+    hamburger = HamburgerButton(manager, menu)
 
     sys.exit(app.exec_())
 
