@@ -523,6 +523,26 @@ class SettingsDialog(QDialog):
         self.tab_skating_label = t("skating_settings")
         tabs.addTab(tab_skating, self.tab_skating_label)
 
+        # === Tab: Shark (deep sea) ===
+        tab_shark = QWidget()
+        sh_layout = QVBoxLayout(tab_shark)
+        self.shark_scale_slider = self._add_slider(sh_layout, t("display_scale"), 25, 200, self.config.get("shark_scale", 100))
+        self.shark_count_slider = self._add_slider(sh_layout, t("shark_count"), 1, 8, self.config.get("shark_count", 3))
+        self.shark_coral_slider = self._add_slider(sh_layout, t("shark_coral"), 0, 100, self.config.get("shark_coral", 60))
+        self.shark_seaweed_slider = self._add_slider(sh_layout, t("shark_seaweed"), 0, 100, self.config.get("shark_seaweed", 50))
+        self.shark_bubbles_check = QCheckBox(t("shark_bubbles"))
+        self.shark_bubbles_check.setChecked(self.config.get("shark_bubbles", True))
+        self.shark_bubbles_check.toggled.connect(self._on_slider_changed)
+        sh_layout.addWidget(self.shark_bubbles_check)
+        self.shark_rays_check = QCheckBox(t("shark_rays"))
+        self.shark_rays_check.setChecked(self.config.get("shark_rays", True))
+        self.shark_rays_check.toggled.connect(self._on_slider_changed)
+        sh_layout.addWidget(self.shark_rays_check)
+        sh_layout.addStretch()
+        self.tab_shark = tab_shark
+        self.tab_shark_label = t("shark_settings")
+        tabs.addTab(tab_shark, self.tab_shark_label)
+
         # === タブ: 環境 ===
         tab_env = QWidget()
         tel = QVBoxLayout(tab_env)
@@ -912,6 +932,12 @@ class SettingsDialog(QDialog):
             "skate_grass_spacing": self.sg_spacing_slider.value(),
             "skate_grass_scatter": self.sg_scatter_slider.value(),
             "skate_grass_scatter_density": self.sg_scatter_density_slider.value(),
+            "shark_scale": self.shark_scale_slider.value(),
+            "shark_count": self.shark_count_slider.value(),
+            "shark_coral": self.shark_coral_slider.value(),
+            "shark_seaweed": self.shark_seaweed_slider.value(),
+            "shark_bubbles": self.shark_bubbles_check.isChecked(),
+            "shark_rays": self.shark_rays_check.isChecked(),
         }
         # サウンド連動（Windowsのみウィジェットが存在する）
         if hasattr(self, "sound_sync_btn"):
@@ -929,7 +955,7 @@ class SettingsDialog(QDialog):
     def _update_tabs_for_scene(self, scene):
         """シーンに応じてタブを切り替え"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi, self.tab_skating]
+        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi, self.tab_skating, self.tab_shark]
         for i in range(tabs.count() - 1, -1, -1):
             if tabs.widget(i) in scene_tabs:
                 tabs.removeTab(i)
@@ -946,6 +972,8 @@ class SettingsDialog(QDialog):
             tabs.insertTab(0, self.tab_takibi, self.tab_takibi_label)
         elif scene == "skating":
             tabs.insertTab(0, self.tab_skating, self.tab_skating_label)
+        elif scene == "shark":
+            tabs.insertTab(0, self.tab_shark, self.tab_shark_label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -984,6 +1012,7 @@ class SettingsDialog(QDialog):
             "skate_grass_spacing", "skate_grass_scatter", "skate_grass_scatter_density",
             "seed",
         ],
+        "shark": ["shark_scale", "shark_count", "shark_coral", "shark_seaweed", "shark_bubbles", "shark_rays", "seed"],
         "tokaido": [
             "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
             "tk_inn_count", "tk_shop_count", "tk_kura_count",
@@ -1433,6 +1462,7 @@ class OverlayManager:
 SCENE_SCALE_KEYS = {
     "grass": "grass_scale", "aquarium": "aq_scale", "tokaido": "tk_scale",
     "pooh": "pooh_scale", "takibi": "takibi_scale", "skating": "skate_scale",
+    "shark": "shark_scale",
 }
 
 
