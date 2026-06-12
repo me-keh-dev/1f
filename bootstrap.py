@@ -29,6 +29,7 @@ import time
 import datetime
 import threading
 import locale
+import uuid  # noqa: F401  (将来のアプリコード用。v1スケルトンには無いので注意)
 import urllib.request
 import urllib.error
 import ctypes  # noqa: F401  (platform_win)
@@ -40,7 +41,7 @@ if sys.platform == "win32":
 
 # スケルトン（凍結部）の版数。PyQt等の依存やbootstrap自体が変わったら上げる。
 # 上がると updater がコア更新（インストーラーDL）を案内する
-SKELETON_VERSION = 1
+SKELETON_VERSION = 2
 
 
 def external_code_dir():

@@ -9,7 +9,6 @@ import json
 import math
 import random
 import time
-import uuid
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QSystemTrayIcon, QMenu, QAction,
@@ -1093,10 +1092,11 @@ class SettingsDialog(QDialog):
 
     # --- 人気投票（みんなのお気に入りモード） ---
     def _stats_uid(self):
-        """匿名ID（uuid4 hex）。初回オプトイン時に生成して保存"""
+        """匿名ID（ランダム32桁hex）。初回オプトイン時に生成して保存。
+        uuid モジュールは旧スケルトン(v1)に同梱されていないため os.urandom を使う"""
         uid = self.config.get("stats_uid")
         if not uid:
-            uid = uuid.uuid4().hex
+            uid = os.urandom(16).hex()
             self.config["stats_uid"] = uid
         return uid
 
