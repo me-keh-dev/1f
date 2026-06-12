@@ -17,16 +17,13 @@ APP_CODE = [
     ('version.py', '.'), ('updater.py', '.'), ('stats.py', '.'),
     ('scenes', 'scenes'),
 ]
-# 非公開モード（別リポジトリ管理）。存在する場合のみ .py だけ同梱する
-# （ディレクトリ丸ごとだと .git までバンドルされるため列挙する）
+# 非公開モード（別リポジトリ管理）。存在する場合のみ直下の .py だけ同梱する
+# （丸ごとだと .git や creator_kit 等の未公開資料までバンドルされるため）
 if _os.path.isdir('private_scenes'):
-    for _root, _dirs, _files in _os.walk('private_scenes'):
-        _dirs[:] = [d for d in _dirs
-                    if d != '__pycache__' and not d.startswith('.')]
-        for _f in _files:
-            if _f.endswith('.py'):
-                _p = _os.path.join(_root, _f)
-                APP_CODE.append((_p, _os.path.dirname(_p)))
+    for _f in _os.listdir('private_scenes'):
+        if _f.endswith('.py'):
+            APP_CODE.append((_os.path.join('private_scenes', _f),
+                             'private_scenes'))
 
 a = Analysis(
     ['bootstrap.py'],

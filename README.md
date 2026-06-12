@@ -90,15 +90,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 自分のモードを作る（プラグイン）
-
-モードは **Python ファイル1つで作れるプラグイン**です。雛形
-[`plugins/_template.py`](plugins/_template.py) をコピーして、プラグインフォルダ
-（Windows: `%APPDATA%\1f\plugins\`、macOS: `~/Library/Application Support/1f/plugins/`）
-に置くだけでモード一覧に追加されます。
-
-作り方の全ガイド: [docs/plugin_guide.md](docs/plugin_guide.md)
-（将来はクリエイターズマーケット「liplico store（仮称）」での販売を予定しています）
 
 ### 使い方
 

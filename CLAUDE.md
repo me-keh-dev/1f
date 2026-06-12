@@ -19,14 +19,15 @@
 - **ユーザープラグイン（一般クリエイター向け・liplico store 流通予定）**: 第3のスキャン場所
   `%APPDATA%/1f/plugins/`（mac: `~/Library/Application Support/1f/plugins/`）と開発用のリポジトリ直下 `plugins/`。
   1ファイル=1モード=1パッケージ（.py をフォルダに置くだけでインストール）。キー衝突時は同梱モード優先で
-  プラグイン側を黙殺。公開雛形は `plugins/_template.py`（チューリップの動く見本）、クリエイター向けガイドは
-  `docs/plugin_guide.md`、提出前チェックは `python tools/validate_plugin.py <file.py>`（契約・日英ラベル・
-  configキー衝突・オフスクリーン描画・ストア用 meta を検査）。`SCENE["meta"]`（author/version/description/license）
-  が将来のストア掲載情報。安定APIの境界は plugin_guide.md に明記（SCENE契約・BaseScene・scenes.base・
-  wind_sim・dialog._add_slider・i18n.t）。クリエイターの開発環境は各自の Claude Code / Codex 等の
-  AIコーディングエージェント前提: リポジトリ直下 `AGENTS.md` がエージェント向け作業手順
-  （エンジン側変更禁止・検証ループ）、`validate_plugin.py --preview out.png` が描画3コマ
-  （昼/フェード/夜）をPNG出力し、エージェントが見た目を自己確認して反復できる。
+  プラグイン側を黙殺。提出前チェックは `python tools/validate_plugin.py <file.py> [--preview out.png]`
+  （契約・日英ラベル・configキー衝突・オフスクリーン描画・ストア用 meta を検査。--preview は昼/フェード/夜の
+  3コマPNGを出力し、AIエージェントが見た目を自己確認して反復できる）。`SCENE["meta"]`
+  （author/version/description/license）が将来のストア掲載情報。
+- **クリエイター向け資料は未公開（2026-06-13判断: 時が来たらリリース）**: ガイド `plugin_guide.md`・
+  エージェント手順 `AGENTS.md`・雛形 `plugin_template.py`（チューリップの動く見本）は
+  **private リポジトリの `private_scenes/creator_kit/` に退避**。公開時の戻し先は同フォルダの README に記載
+  （AGENTS.md→ルート、plugin_guide.md→docs/、plugin_template.py→plugins/_template.py、README導線復活=履歴 7ed4ecb）。
+  エンジン側のプラグイン機能と validate_plugin.py は公開リポジトリに残してあるので、資料を戻せば即日開放できる。
 - 回帰テスト: `python tools/test_scenes.py`（オフスクリーン。private・ユーザープラグインのモードも自動でテスト対象）。
 
 ## リリースの振り分けルール（tools/release.py が自動判定）
@@ -186,6 +187,7 @@
 
 | プロンプト | 対応内容 |
 |---|---|
+| クリエイター向け資料はまだ出さない（ベースを作っただけ。時が来たらリリース） | 公開リポジトリから AGENTS.md・docs/plugin_guide.md・plugins/_template.py・README の案内セクションを削除し、private リポジトリの `private_scenes/creator_kit/` へ退避（戻し先の対応表を creator_kit/README.md に記載）。エンジンのプラグイン読み込み機能と tools/validate_plugin.py は公開側に残置（アプリUIに案内なし＝ユーザーには見えない）。git 履歴には残る点はユーザー了承済み。 |
 | 起動確認をしましょう | 実機で起動確認を完了。G-Master の隠れセッションで python main.py のコールドスタート・40秒稼働・error.log/crash.log クリーンを確認後、ユーザーの実画面でオーバーレイ表示・設定画面・プラグイン（チューリップ）のモード一覧表示まで目視確認（1〜3 ALL OK）。途中で発見した問題: サウンド連動の WASAPI ループバックが 0x80070490 で失敗する環境では同じエラーが2秒ごとにコンソールへ出続ける → audio_level.py を「同じエラーは1回だけ表示（リトライと復帰検知は継続）」に修正。プラグイン化とは無関係の既存挙動で、アプリ本体は正常動作。 |
 | クリエイターの開発環境は各自の Claude Code / Codex 等のAIコーディング環境 | エージェント前提の制作導線を追加。リポジトリ直下に `AGENTS.md`（モード制作タスクの手順・「エンジン側は変更しない」等のルール・検証ループ）を新設し、`validate_plugin.py` に `--preview out.png` を追加（昼/マウスフェード/夜ライティングの3コマを1枚のPNGに出力→エージェントが画像を読んで見た目を自己確認・反復できる。チューリップ雛形で動作確認済み）。plugin_guide.md に「AIコーディング環境で作る」セクションとコピペ用プロンプト例を追記。 |
 | プラグインを一般ユーザーがLINEスタンプの様に開発できるようパッケージ化＋ドキュメント化（liplico storeで販売予定） | パッケージ仕様を「1ファイル=1モード=1パッケージ（.py）」に決定し、第3のスキャン場所としてユーザープラグインフォルダ（`%APPDATA%/1f/plugins` ほか・開発用は repo の `plugins/`）を scenes/__init__.py に追加（`register_plugin_file()` API、キー衝突は同梱優先で黙殺）。公開雛形 `plugins/_template.py`（風に揺れるチューリップ＝動く見本、ストア用 meta 付き）、クリエイター向け完全ガイド `docs/plugin_guide.md`（SCENE契約・BaseScene・設定タブAPI・お約束・安定API境界・配布/ストア提出）、提出前チェッカー `tools/validate_plugin.py`（契約/日英ラベル/configキー衝突/オフスクリーン描画/meta を検査）を新設。README に導線追加。検証: テンプレートが validate で PASS、APPDATA プラグインフォルダからの自動登録・キー衝突拒否・設定タブ表示を実機テスト済み。 |

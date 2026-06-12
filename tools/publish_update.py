@@ -64,6 +64,10 @@ def build_code_zip():
                 # __pycache__ と .git（private_scenes は独立リポジトリ）を除外
                 dirs[:] = [x for x in dirs
                            if x != "__pycache__" and not x.startswith(".")]
+                if d == "private_scenes":
+                    # モードのスキャンは直下のみ。サブフォルダ（creator_kit 等の
+                    # 未公開資料置き場）は配信に含めない
+                    dirs[:] = []
                 if "__pycache__" in root:
                     continue
                 for f in files:

@@ -1,10 +1,9 @@
 """Scene registry - 起動時に scenes/（OSS）・private_scenes/（非公開）・
 ユーザープラグインフォルダをスキャンしてシーンプラグインを自動登録する。
 
-ユーザープラグイン（一般クリエイターが作るモード）:
+ユーザープラグイン:
   Windows: %APPDATA%/1f/plugins/   mac: ~/Library/Application Support/1f/plugins/
   に .py を1つ置くだけで次回起動時にモード一覧へ追加される（1ファイル=1モード）。
-  作り方は docs/plugin_guide.md、雛形は plugins/_template.py、
   検証は tools/validate_plugin.py。
 
 プラグイン契約: シーンモジュールはモジュール末尾に SCENE 辞書を定義する。
