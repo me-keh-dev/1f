@@ -15,3 +15,6 @@ debug.py
 venv/
 .env
 dist_update/
+.wrangler/
+_MEI*/
+.claude/
