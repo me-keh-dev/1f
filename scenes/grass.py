@@ -324,3 +324,186 @@ class GrassScene(BaseScene):
         for g in self.grasses:
             alpha = get_alpha(g.base_x) if get_alpha else 255
             g.draw(painter, ground_y, alpha, tint, int(self.pixel_size * s), s)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    """設定タブ（草・配置）を構築して [(widget, タブ名), ...] を返す"""
+    from PyQt5.QtWidgets import (
+        QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QCheckBox,
+    )
+    from i18n import t
+
+    # === タブ1: 草 ===
+    tab_grass = QWidget()
+    tgl = QVBoxLayout(tab_grass)
+
+    g1 = QGroupBox(t("grass_length"))
+    g1l = QVBoxLayout(g1)
+    dialog.min_h_slider = dialog._add_slider(g1l, t("min"), 2, 15, dialog.config.get("min_height", 4))
+    dialog.max_h_slider = dialog._add_slider(g1l, t("max"), 5, 30, dialog.config.get("max_height", 20))
+    dialog.thickness_slider = dialog._add_slider(g1l, t("thickness"), 1, 12, dialog.config.get("grass_thickness", 4))
+    tgl.addWidget(g1)
+
+    dialog.grass_scale_slider = dialog._add_slider(g1l, t("display_scale"), 25, 200, dialog.config.get("grass_scale", 100))
+
+    g_type = QGroupBox(t("grass_type"))
+    g_type_l = QVBoxLayout(g_type)
+    desc = QLabel(t("type_desc"))
+    desc.setStyleSheet("color: #666; font-size: 11px;")
+    g_type_l.addWidget(desc)
+    dialog.slim_slider = dialog._add_slider(g_type_l, t("slim"), 0, 100, dialog.config.get("slim_ratio", 40))
+    dialog.flower_slider = dialog._add_slider(g_type_l, t("flower"), 0, 100, dialog.config.get("flower_ratio", 15))
+    dialog.balance_label = QLabel()
+    dialog.balance_label.setStyleSheet("color: #444; font-size: 11px;")
+    g_type_l.addWidget(dialog.balance_label)
+
+    def update_balance_label():
+        s = dialog.slim_slider.value()
+        f = dialog.flower_slider.value()
+        leafy = max(0, 100 - s - f)
+        if s + f > 100:
+            # 正規化表示
+            total = s + f
+            s_pct = int(s / total * 100)
+            f_pct = 100 - s_pct
+            leafy = 0
+        else:
+            s_pct = s
+            f_pct = f
+        dialog.balance_label.setText(
+            t("balance_fmt").format(s=s_pct, l=leafy, f=f_pct)
+        )
+
+    dialog.slim_slider.valueChanged.connect(update_balance_label)
+    dialog.flower_slider.valueChanged.connect(update_balance_label)
+    update_balance_label()
+    tgl.addWidget(g_type)
+
+    # 花の色
+    g_fc = QGroupBox(t("flower_colors"))
+    g_fcl = QVBoxLayout(g_fc)
+    dialog.flower_color_checks = []
+    enabled_flowers = dialog.config.get("flower_colors_enabled", list(range(len(FLOWER_COLORS_ALL))))
+    for i, fc in enumerate(FLOWER_COLORS_ALL):
+        row = QHBoxLayout()
+        cb = QCheckBox(t(fc["key"]))
+        cb.setChecked(i in enabled_flowers)
+        color_icon = QLabel()
+        color_icon.setFixedSize(16, 16)
+        r, g, b = fc["rgb"]
+        color_icon.setStyleSheet(f"background-color: rgb({r},{g},{b}); border: 1px solid #999;")
+        row.addWidget(cb)
+        row.addWidget(color_icon)
+        row.addStretch()
+        g_fcl.addLayout(row)
+        dialog.flower_color_checks.append(cb)
+    tgl.addWidget(g_fc)
+
+    # === タブ2: 配置 ===
+    tab_layout = QWidget()
+    tll = QVBoxLayout(tab_layout)
+
+    gc = QGroupBox(t("cluster_area"))
+    gcl = QVBoxLayout(gc)
+    dialog.num_clusters_slider = dialog._add_slider(gcl, t("num_clusters"), 0, 20, dialog.config.get("num_clusters", 5))
+    dialog.cluster_count_slider = dialog._add_slider(gcl, t("total_count"), 0, 150, dialog.config.get("cluster_count", 40))
+    dialog.cluster_density_slider = dialog._add_slider(gcl, t("density"), 0, 100, dialog.config.get("cluster_density", 70))
+    dialog.sparseness_slider = dialog._add_slider(gcl, t("spacing"), 0, 100, dialog.config.get("sparseness", 50))
+    cd_desc = QLabel(t("cluster_desc"))
+    cd_desc.setStyleSheet("color: #666; font-size: 10px;")
+    gcl.addWidget(cd_desc)
+    tll.addWidget(gc)
+
+    gs = QGroupBox(t("scatter_area"))
+    gsl = QVBoxLayout(gs)
+    dialog.scatter_count_slider = dialog._add_slider(gsl, t("count"), 0, 150, dialog.config.get("scatter_count", 20))
+    dialog.scatter_density_slider = dialog._add_slider(gsl, t("scatter_density"), 0, 100, dialog.config.get("scatter_density", 20))
+    sd_desc = QLabel(t("scatter_desc"))
+    sd_desc.setStyleSheet("color: #666; font-size: 10px;")
+    gsl.addWidget(sd_desc)
+    tll.addWidget(gs)
+
+    return [(tab_grass, t("tab_grass")), (tab_layout, t("tab_layout"))]
+
+
+def _gather(dialog):
+    """設定タブの現在値を config 辞書で返す"""
+    return {
+        "min_height": dialog.min_h_slider.value(),
+        "max_height": max(dialog.max_h_slider.value(), dialog.min_h_slider.value() + 1),
+        "grass_thickness": dialog.thickness_slider.value(),
+        "grass_scale": dialog.grass_scale_slider.value(),
+        "num_clusters": dialog.num_clusters_slider.value(),
+        "cluster_count": dialog.cluster_count_slider.value(),
+        "cluster_density": dialog.cluster_density_slider.value(),
+        "sparseness": dialog.sparseness_slider.value(),
+        "scatter_count": dialog.scatter_count_slider.value(),
+        "scatter_density": dialog.scatter_density_slider.value(),
+        "slim_ratio": dialog.slim_slider.value(),
+        "flower_ratio": dialog.flower_slider.value(),
+        "palette_indices": dialog.config.get("palette_indices", [0]),
+        "flower_colors_enabled": [i for i, btn in enumerate(dialog.flower_color_checks) if btn.isChecked()],
+    }
+
+
+SCENE = {
+    "key": "grass",
+    "label_key": "scene_grass",
+    "class": GrassScene,
+    "order": 10,
+    "scale_key": "grass_scale",
+    "preset_keys": [
+        "min_height", "max_height", "grass_thickness", "num_clusters", "cluster_count",
+        "cluster_density", "sparseness", "scatter_count", "scatter_density",
+        "slim_ratio", "flower_ratio", "palette_indices", "flower_colors_enabled", "seed",
+    ],
+    "preset_label_key": "grass_preset",
+    "texts": {
+        "ja": {
+            "scene_grass": "草原",
+            "tab_grass": "草",
+            "tab_layout": "配置",
+            "type_desc": "しゅっとした草 / 葉付き草 / 花付き草 の比率",
+            "balance_fmt": "  → 細い草 {s}% : 葉付き {l}% : 花 {f}%",
+            "flower_colors": "花の色",
+            "fc_red": "赤",
+            "fc_vermilion": "朱色",
+            "fc_blue": "青",
+            "fc_lightblue": "水色",
+            "fc_yellow": "黄色",
+            "fc_pink": "ピンク",
+            "fc_purple": "紫",
+            "fc_white": "白",
+            "cluster_desc": "塊の数x密集度=茂みの見た目 / 間隔=塊どうしの距離",
+            "scatter_desc": "画面全体にまばらに生える草",
+            "grass_preset": "草原プリセット",
+            "save_grass": "草を保存",
+        },
+        "en": {
+            "scene_grass": "Grassland",
+            "tab_grass": "Grass",
+            "tab_layout": "Layout",
+            "type_desc": "Ratio of slim / leafy / flowering grass",
+            "balance_fmt": "  → Slim {s}% : Leafy {l}% : Flower {f}%",
+            "flower_colors": "Flower Colors",
+            "fc_red": "Red",
+            "fc_vermilion": "Vermilion",
+            "fc_blue": "Blue",
+            "fc_lightblue": "Light Blue",
+            "fc_yellow": "Yellow",
+            "fc_pink": "Pink",
+            "fc_purple": "Purple",
+            "fc_white": "White",
+            "cluster_desc": "Clusters x Density = Bush look / Spacing = Distance between",
+            "scatter_desc": "Grass scattered across the entire screen",
+            "grass_preset": "Grassland Preset",
+            "save_grass": "Save Grass",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

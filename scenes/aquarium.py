@@ -453,3 +453,125 @@ class AquariumScene(BaseScene):
             f.draw(painter, alpha, tint, ps)
         for b in self.bubbles:
             b.draw(painter)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import (
+        QWidget, QVBoxLayout, QGroupBox, QScrollArea,
+    )
+    from i18n import t
+
+    tab_aq = QWidget()
+    aq_scroll = QScrollArea()
+    aq_scroll.setWidgetResizable(True)
+    aq_inner = QWidget()
+    aq_layout = QVBoxLayout(aq_inner)
+
+    dialog.aq_scale_slider = dialog._add_slider(aq_layout, t("display_scale"), 25, 200, dialog.config.get("aq_scale", 100))
+
+    g_aq_plant = QGroupBox(t("aq_plant_length"))
+    g_apl = QVBoxLayout(g_aq_plant)
+    dialog.aq_min_h_slider = dialog._add_slider(g_apl, t("min"), 2, 20, dialog.config.get("aq_plant_min_height", 8))
+    dialog.aq_max_h_slider = dialog._add_slider(g_apl, t("max"), 5, 40, dialog.config.get("aq_plant_max_height", 30))
+    aq_layout.addWidget(g_aq_plant)
+
+    g_aq_cluster = QGroupBox(t("aq_cluster"))
+    g_acl = QVBoxLayout(g_aq_cluster)
+    dialog.aq_cluster_count_slider = dialog._add_slider(g_acl, t("num_clusters"), 0, 10, dialog.config.get("aq_cluster_count", 3))
+    dialog.aq_cluster_size_slider = dialog._add_slider(g_acl, t("total_count"), 1, 20, dialog.config.get("aq_cluster_size", 8))
+    dialog.aq_cluster_density_slider = dialog._add_slider(g_acl, t("density"), 0, 100, dialog.config.get("aq_cluster_density", 70))
+    aq_layout.addWidget(g_aq_cluster)
+
+    g_aq_scatter = QGroupBox(t("aq_scatter"))
+    g_asl = QVBoxLayout(g_aq_scatter)
+    dialog.aq_scatter_count_slider = dialog._add_slider(g_asl, t("count"), 0, 50, dialog.config.get("aq_scatter_count", 15))
+    dialog.aq_scatter_density_slider = dialog._add_slider(g_asl, t("scatter_density"), 0, 100, dialog.config.get("aq_scatter_density", 30))
+    aq_layout.addWidget(g_aq_scatter)
+
+    g_aq_fish = QGroupBox(t("aq_fish_settings"))
+    g_afl = QVBoxLayout(g_aq_fish)
+    dialog.aq_fish_count_slider = dialog._add_slider(g_afl, t("aq_fish_count"), 1, 20, dialog.config.get("aq_fish_count", 6))
+    dialog.aq_speed_min_slider = dialog._add_slider(g_afl, t("aq_speed_min"), 5, 100, dialog.config.get("aq_fish_speed_min", 30))
+    dialog.aq_speed_max_slider = dialog._add_slider(g_afl, t("aq_speed_max"), 5, 100, dialog.config.get("aq_fish_speed_max", 65))
+    dialog.aq_fish_y_top_slider = dialog._add_slider(g_afl, t("aq_y_top"), 0, 80, dialog.config.get("aq_fish_y_top", 10))
+    dialog.aq_fish_y_bottom_slider = dialog._add_slider(g_afl, t("aq_y_bottom"), 20, 90, dialog.config.get("aq_fish_y_bottom", 55))
+    aq_layout.addWidget(g_aq_fish)
+
+    aq_layout.addStretch()
+    aq_scroll.setWidget(aq_inner)
+    tab_aq_layout = QVBoxLayout(tab_aq)
+    tab_aq_layout.setContentsMargins(0, 0, 0, 0)
+    tab_aq_layout.addWidget(aq_scroll)
+
+    return [(tab_aq, t("aq_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "aq_plant_min_height": dialog.aq_min_h_slider.value(),
+        "aq_plant_max_height": dialog.aq_max_h_slider.value(),
+        "aq_cluster_count": dialog.aq_cluster_count_slider.value(),
+        "aq_cluster_size": dialog.aq_cluster_size_slider.value(),
+        "aq_cluster_density": dialog.aq_cluster_density_slider.value(),
+        "aq_scatter_count": dialog.aq_scatter_count_slider.value(),
+        "aq_scatter_density": dialog.aq_scatter_density_slider.value(),
+        "aq_fish_count": dialog.aq_fish_count_slider.value(),
+        "aq_fish_speed_min": dialog.aq_speed_min_slider.value(),
+        "aq_fish_speed_max": dialog.aq_speed_max_slider.value(),
+        "aq_scale": dialog.aq_scale_slider.value(),
+        "aq_fish_y_top": dialog.aq_fish_y_top_slider.value(),
+        "aq_fish_y_bottom": dialog.aq_fish_y_bottom_slider.value(),
+    }
+
+
+SCENE = {
+    "key": "aquarium",
+    "label_key": "scene_aquarium",
+    "class": AquariumScene,
+    "order": 20,
+    "scale_key": "aq_scale",
+    "preset_keys": [
+        "aq_plant_min_height", "aq_plant_max_height",
+        "aq_cluster_count", "aq_cluster_size", "aq_cluster_density",
+        "aq_scatter_count", "aq_scatter_density",
+        "aq_fish_count", "aq_fish_speed_min", "aq_fish_speed_max",
+        "aq_fish_y_top", "aq_fish_y_bottom", "seed",
+    ],
+    "preset_label_key": "aq_preset",
+    "texts": {
+        "ja": {
+            "scene_aquarium": "アクアリウム（水草＋金魚）",
+            "aq_settings": "アクアリウム設定",
+            "aq_plant_length": "水草の長さ",
+            "aq_cluster": "密集エリア",
+            "aq_scatter": "散在エリア",
+            "aq_fish_settings": "金魚",
+            "aq_fish_count": "数",
+            "aq_speed_min": "速度 最低",
+            "aq_speed_max": "速度 最高",
+            "aq_y_top": "上限位置",
+            "aq_y_bottom": "下限位置",
+            "aq_preset": "アクアリウムプリセット",
+        },
+        "en": {
+            "scene_aquarium": "Aquarium (Water Plants + Goldfish)",
+            "aq_settings": "Aquarium Settings",
+            "aq_plant_length": "Plant Length",
+            "aq_cluster": "Cluster Area",
+            "aq_scatter": "Scatter Area",
+            "aq_fish_settings": "Goldfish",
+            "aq_fish_count": "Count",
+            "aq_speed_min": "Speed Min",
+            "aq_speed_max": "Speed Max",
+            "aq_y_top": "Top Pos",
+            "aq_y_bottom": "Bottom Pos",
+            "aq_preset": "Aquarium Preset",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

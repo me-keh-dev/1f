@@ -878,3 +878,87 @@ class TakibiScene(BaseScene):
                 continue
             f.draw(painter, ground_y, None, alpha / 255.0,
                    self.glow_on, self.smoke_on, campers_on, self.tents_on)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import QWidget, QVBoxLayout, QCheckBox
+    from i18n import t
+
+    tab_takibi = QWidget()
+    takibi_layout = QVBoxLayout(tab_takibi)
+    dialog.takibi_scale_slider = dialog._add_slider(takibi_layout, t("display_scale"), 25, 200, dialog.config.get("takibi_scale", 100))
+    dialog.takibi_count_slider = dialog._add_slider(takibi_layout, t("takibi_count"), 1, 5, dialog.config.get("takibi_count", 1))
+    dialog.takibi_sparks_slider = dialog._add_slider(takibi_layout, t("takibi_sparks"), 0, 100, dialog.config.get("takibi_sparks", 25))
+    dialog.takibi_speed_slider = dialog._add_slider(takibi_layout, t("takibi_speed"), 10, 100, dialog.config.get("takibi_speed", 30))
+    dialog.takibi_campers_check = QCheckBox(t("takibi_campers"))
+    dialog.takibi_campers_check.setChecked(dialog.config.get("takibi_campers", True))
+    dialog.takibi_campers_check.toggled.connect(dialog._on_slider_changed)
+    takibi_layout.addWidget(dialog.takibi_campers_check)
+    dialog.takibi_tents_check = QCheckBox(t("takibi_tents"))
+    dialog.takibi_tents_check.setChecked(dialog.config.get("takibi_tents", True))
+    dialog.takibi_tents_check.toggled.connect(dialog._on_slider_changed)
+    takibi_layout.addWidget(dialog.takibi_tents_check)
+    dialog.takibi_smoke_check = QCheckBox(t("takibi_smoke"))
+    dialog.takibi_smoke_check.setChecked(dialog.config.get("takibi_smoke", True))
+    dialog.takibi_smoke_check.toggled.connect(dialog._on_slider_changed)
+    takibi_layout.addWidget(dialog.takibi_smoke_check)
+    dialog.takibi_glow_check = QCheckBox(t("takibi_glow"))
+    dialog.takibi_glow_check.setChecked(dialog.config.get("takibi_glow", True))
+    dialog.takibi_glow_check.toggled.connect(dialog._on_slider_changed)
+    takibi_layout.addWidget(dialog.takibi_glow_check)
+    takibi_layout.addStretch()
+
+    return [(tab_takibi, t("takibi_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "takibi_scale": dialog.takibi_scale_slider.value(),
+        "takibi_count": dialog.takibi_count_slider.value(),
+        "takibi_sparks": dialog.takibi_sparks_slider.value(),
+        "takibi_speed": dialog.takibi_speed_slider.value(),
+        "takibi_campers": dialog.takibi_campers_check.isChecked(),
+        "takibi_tents": dialog.takibi_tents_check.isChecked(),
+        "takibi_smoke": dialog.takibi_smoke_check.isChecked(),
+        "takibi_glow": dialog.takibi_glow_check.isChecked(),
+    }
+
+
+SCENE = {
+    "key": "takibi",
+    "label_key": "scene_takibi",
+    "class": TakibiScene,
+    "order": 50,
+    "scale_key": "takibi_scale",
+    "preset_keys": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_speed", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
+    "texts": {
+        "ja": {
+            "scene_takibi": "焚火",
+            "takibi_settings": "焚火設定",
+            "takibi_count": "焚火の数",
+            "takibi_sparks": "火の粉の量",
+            "takibi_speed": "めらめらの速さ",
+            "takibi_campers": "キャンパー",
+            "takibi_tents": "テント",
+            "takibi_smoke": "煙",
+            "takibi_glow": "炎の明かり",
+        },
+        "en": {
+            "scene_takibi": "Campfire",
+            "takibi_settings": "Campfire Settings",
+            "takibi_count": "Campfires",
+            "takibi_sparks": "Sparks",
+            "takibi_speed": "Flame speed",
+            "takibi_campers": "Campers",
+            "takibi_tents": "Tent",
+            "takibi_smoke": "Smoke",
+            "takibi_glow": "Fire Glow",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

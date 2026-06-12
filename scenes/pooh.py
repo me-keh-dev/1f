@@ -1114,3 +1114,108 @@ class PoohScene(BaseScene):
             self.tigger.draw(painter, ground_y, tint, ps)
         if self.pooh and self._show.get('pooh', True):
             self.pooh.draw(painter, tint, ps)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import (
+        QWidget, QVBoxLayout, QGroupBox, QLabel, QCheckBox,
+    )
+    from i18n import t
+
+    tab_pooh = QWidget()
+    pooh_layout = QVBoxLayout(tab_pooh)
+    dialog.pooh_scale_slider = dialog._add_slider(pooh_layout, t("display_scale"), 25, 200, dialog.config.get("pooh_scale", 100))
+    # Character ON/OFF
+    char_group = QGroupBox(t("pooh_characters"))
+    char_layout = QVBoxLayout(char_group)
+    dialog.pooh_pooh_check = QCheckBox("Winnie-the-Pooh")
+    dialog.pooh_pooh_check.setChecked(dialog.config.get("pooh_show_pooh", True))
+    dialog.pooh_pooh_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_pooh_check)
+    dialog.pooh_tigger_check = QCheckBox("Tigger")
+    dialog.pooh_tigger_check.setChecked(dialog.config.get("pooh_show_tigger", True))
+    dialog.pooh_tigger_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_tigger_check)
+    dialog.pooh_eeyore_check = QCheckBox("Eeyore")
+    dialog.pooh_eeyore_check.setChecked(dialog.config.get("pooh_show_eeyore", True))
+    dialog.pooh_eeyore_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_eeyore_check)
+    dialog.pooh_piglet_check = QCheckBox("Piglet")
+    dialog.pooh_piglet_check.setChecked(dialog.config.get("pooh_show_piglet", True))
+    dialog.pooh_piglet_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_piglet_check)
+    dialog.pooh_rabbit_check = QCheckBox("Rabbit")
+    dialog.pooh_rabbit_check.setChecked(dialog.config.get("pooh_show_rabbit", True))
+    dialog.pooh_rabbit_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_rabbit_check)
+    dialog.pooh_owl_check = QCheckBox("Owl")
+    dialog.pooh_owl_check.setChecked(dialog.config.get("pooh_show_owl", True))
+    dialog.pooh_owl_check.toggled.connect(dialog._on_slider_changed)
+    char_layout.addWidget(dialog.pooh_owl_check)
+    pooh_layout.addWidget(char_group)
+
+    dialog.pooh_balloon_slider = dialog._add_slider(pooh_layout, t("pooh_balloon_count"), 0, 400, dialog.config.get("pooh_balloon_count", 8))
+    dialog.pooh_balloon_size_slider = dialog._add_slider(pooh_layout, t("pooh_balloon_size"), 1, 30, dialog.config.get("pooh_balloon_size", 30))
+    dialog.pooh_bird_slider = dialog._add_slider(pooh_layout, t("pooh_bird_count"), 0, 10, dialog.config.get("pooh_bird_count", 3))
+
+    # Credit notice
+    credit = QLabel(t("pooh_credit"))
+    credit.setWordWrap(True)
+    credit.setStyleSheet("color: #888; font-size: 9px; margin-top: 8px;")
+    pooh_layout.addWidget(credit)
+    pooh_layout.addStretch()
+
+    return [(tab_pooh, t("pooh_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "pooh_scale": dialog.pooh_scale_slider.value(),
+        "pooh_show_pooh": dialog.pooh_pooh_check.isChecked(),
+        "pooh_show_tigger": dialog.pooh_tigger_check.isChecked(),
+        "pooh_show_eeyore": dialog.pooh_eeyore_check.isChecked(),
+        "pooh_show_piglet": dialog.pooh_piglet_check.isChecked(),
+        "pooh_show_rabbit": dialog.pooh_rabbit_check.isChecked(),
+        "pooh_show_owl": dialog.pooh_owl_check.isChecked(),
+        "pooh_balloon_count": dialog.pooh_balloon_slider.value(),
+        "pooh_balloon_size": dialog.pooh_balloon_size_slider.value(),
+        "pooh_bird_count": dialog.pooh_bird_slider.value(),
+    }
+
+
+SCENE = {
+    "key": "pooh",
+    "label_key": "scene_pooh",
+    "class": PoohScene,
+    "order": 40,
+    "scale_key": "pooh_scale",
+    "preset_keys": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
+    "texts": {
+        "ja": {
+            "scene_pooh": "風船プーさん",
+            "pooh_settings": "プーさん設定",
+            "pooh_credit": "出典：A・A・ミルネ著／E・H・シェパード挿絵\n『クマのプーさん』（1926年）、『プー横丁にたった家』（1928年）\n※原著（パブリックドメイン）をベースに制作",
+            "pooh_characters": "キャラクター表示",
+            "pooh_balloon_count": "飛ぶ風船の数",
+            "pooh_balloon_size": "風船サイズ",
+            "pooh_cloud_count": "雲の数",
+            "pooh_bird_count": "鳥の数",
+        },
+        "en": {
+            "scene_pooh": "Balloon Pooh",
+            "pooh_settings": "Pooh Settings",
+            "pooh_credit": "Based on \"Winnie-the-Pooh\" (1926) and \"The House at Pooh Corner\" (1928)\nby A.A. Milne, illustrated by E.H. Shepard. (Public Domain)",
+            "pooh_characters": "Characters",
+            "pooh_balloon_count": "Flying Balloons",
+            "pooh_balloon_size": "Balloon Size",
+            "pooh_cloud_count": "Clouds",
+            "pooh_bird_count": "Birds",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

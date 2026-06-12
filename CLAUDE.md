@@ -1,5 +1,35 @@
 # 1/f プロジェクト
 
+## モードのプラグイン化と非公開モード（2026-06-13〜）
+
+- モード（シーン）はプラグイン式。`scenes/`（OSS公開）と `private_scenes/`（非公開）を
+  起動時に `scenes/__init__.py` がスキャンし、モジュール末尾の `SCENE` 辞書を持つ *.py を自動登録する。
+  **新モードの追加でエンジン側（main.py / i18n.py / scenes/__init__.py / spec / publish_update.py）を触る必要はない。**
+- `SCENE` 契約: key / label_key / class / order（公開10..70, 非公開100+）/ scale_key /
+  preset_keys / preset_label_key（任意）/ texts（ja・enのi18nラベル辞書）/
+  build_settings(dialog)→[(QWidget,タブ名),...] / gather(dialog)→config辞書。
+  雛形は `private_scenes/_template.py`。`_` 始まりのファイル名と base.py はスキャン対象外。
+- 壊れたモジュールは黙殺して他のモードで起動継続（読み込み失敗は stderr に記録のみ）。
+- `private_scenes/` は公開リポジトリの .gitignore で除外し、**別の private リポジトリ
+  `1f-modes-private`** として独立に git 管理（作業ツリー内にそのまま clone する。submodule不使用）。
+- 配布: `tools/publish_update.py` と両 spec は `private_scenes/` が存在すれば .py だけ自動同梱
+  （.git は含まれない）。existしない構成（OSSユーザー）でも公開モードだけで動く。
+- 既存7モード（grass/aquarium/tokaido/pooh/takibi/skating/shark）はOSSのまま。
+  今後の新モードは原則 `private_scenes/` に置く（将来課金へ移行する可能性のため。当面は code.zip で全員に無料配布）。
+- 回帰テスト: `python tools/test_scenes.py`（オフスクリーン。private のモードも自動でテスト対象）。
+
+## リリースの振り分けルール（tools/release.py が自動判定）
+
+`python tools/release.py` を実行（--dry-run で判定のみ）。変更パスで判定:
+
+| 変更 | 手順 |
+|---|---|
+| `private_scenes/` のみ | private リポジトリへ commit+push → 公開側 `version.py` の CODE_VERSION↑（極小コミット）→ `publish_update --upload`。**exe不要** |
+| エンジン（公開側 .py / spec 等） | 公開リポジトリへ commit+push → CODE_VERSION↑ → `publish_update --upload` |
+| 骨格（bootstrap.py / requirements.txt=新ライブラリ） | 上記＋ SKELETON_VERSION↑ → exe再ビルド → GitHub Release → `--installer --skeleton` 付き配信 |
+
+注意: モードだけの変更でも公開側 version.py の極小コミットは発生する（現行更新方式の都合）。
+
 ## 自動更新の配信（Cloudflare Pages）
 
 - 配信URL: `https://1f-updates.pages.dev/version.json`（updater.py の DEFAULT_UPDATE_URL）
@@ -139,3 +169,10 @@
 | OSSから外すか商用と両立か／20文字チャット構想／電気通信事業法の該当性・届出時期・海外利用の相談→ドキュメント化 | 方針整理: OSS（MIT）継続＋有料コンテンツとチャットサーバ側はリポジトリに入れずサーバ側で課金（LINEスタンプ型）。電気通信事業法: DM型チャットは「媒介」に該当するが無収益なら「事業」に当たらず届出不要、収益化前に届出（無料・資格不要・事前届出制）。海外ユーザーがいても日本の届出義務は不変、OTTチャットに海外通信ライセンスは基本不要、プライバシー法（GDPR/PDPA）は無料でも適用→日英プラポリ＋データ最小化で対応。`docs/commercialization_notes.md` に全体を記録。 |
 | 20文字通信は別サービス liplico（自社運営・商標出願済み）のクライアントとして1/fが窓口になる（メールソフト型）／シーンマーケット構想とOSSクローン懸念→Thunderbirdはどうしていたか | メールソフト型分離: 規制・規約・課金は全て liplico 側に集約され、1/f 本体は単なるソフトウェアで規制対象外・MITのまま。Thunderbird方式（コードは公開、商標とマーケット＝場で守る。フォークは改名強制・ストアは空・二面市場は複製不可、Android/AOSPとGoogle Playの関係と同型）を分析し、docs/commercialization_notes.md にセクション5（liplico分離）・6（クローン対策・シーンマーケット）として追記。 |
 | モードの線引きを決定: 無料モードはOSS継続、有料モードはstore配信でリポジトリ外。無料新モードは起動時の自動更新で配布 | docs/commercialization_notes.md に「モードの線引きルール」を追記: エンジン＋無料モード=OSS（集客装置・クリエイター教材）、有料モード=liplico store配信。無料新モードは既存の自動更新（code.zip）で全ユーザーに自動配布、有料は購入後に個別DL。DRMには投資せず購入体験とクリエイター報酬に投資する方針。 |
+| はい（commit→push→コード配信の承認）／push and release | コミット 4740384 を push し v2.10.1 をコード配信。release用のexeビルドで起動クラッシュを発見: stats機能の `import uuid` がスケルトンv1のPYZに未同梱（exeアーカイブ検査で欠落は uuid のみと特定。faulthandlerは組み込み、traceback/warningsはbase_library同梱）。**配信済み2.10.x コードはv2.9.0 exeでも起動前クラッシュし自動更新で自己修復不可**だった。修正: main.py の uuid を `os.urandom(16).hex()`（同じ32桁hex）に置換＝旧骨格でも動くコードにし、bootstrap.py に import uuid 追加＋SKELETON_VERSION=2。コミット 77f3fa5 を push、exe再ビルド・起動確認、GitHub Release v2.10.2 作成、`--installer --skeleton 2` 付きで v2.10.2 をコード配信（curl検証済み）。既にクラッシュした環境は %APPDATA%/1f/code 削除か新exeで復旧。 |
+
+### 2026-06-13 セッション1
+
+| プロンプト | 対応内容 |
+|---|---|
+| メモリの plugin-refactor-plan に従いプラグイン化フル改修を実施 | モードのプラグイン化を完了（「書き直さず移設」方針）。(1) `scenes/__init__.py` を動的レジストリ化: scenes/ と private_scenes/ をスキャンし `SCENE` 辞書を自動登録、壊れたモジュールは黙殺、`get_scene_class`/`SCENE_MODES` は後方互換維持。(2) i18n.py に `register_texts()` を追加し、シーン別ラベル（scene_*, tk_*, aq_*, pooh_*, takibi_*, skate_*, shark_*, fc_* 等）を各シーンモジュールの `SCENE["texts"]` へ移設。(3) main.py のシーン別タブ構築（約320行）・_gather_config のシーン別スライス・SCENE_KEYS・SCENE_SCALE_KEYS・プリセットラベルをすべて各シーンの `build_settings`/`gather`/`preset_keys`/`scale_key` へ移設し、main.py はレジストリ駆動に。(4) `private_scenes/` を新設（.gitignore 除外・独立 git リポジトリ・契約雛形 `_template.py`）。publish_update.py と両 spec は private_scenes 存在時のみ .py を自動同梱（.git 混入なし、zip 検査済み）。(5) `tools/release.py`（変更パスでルートA/B/C を自動判定、確認プロンプト付き）と `tools/test_scenes.py`（回帰テスト）を新設。検証: 改修前後のゴールデン比較（モード一覧・日英ラベル・タブ構成・プリセットキー・gather出力・get_area_height）が**全項目一致**、全7シーンのオフスクリーン描画・private モードの動的登録・壊れたモジュール耐性・private_scenes 無し構成の起動を確認。新ライブラリなし＝骨格再ビルド不要。GitHub への push と private リポジトリ（1f-modes-private）のリモート作成は、この環境に gh / 資格情報が無いため保留（ローカルコミットまで完了）。 |

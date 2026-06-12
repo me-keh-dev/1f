@@ -32,9 +32,11 @@ from i18n import t, set_language, get_language, detect_language
 from weather import WeatherMonitor
 from audio_level import AudioLevelMonitor, is_supported as audio_supported
 from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
-from scenes import get_scene_class, SCENE_MODES
+from scenes import (
+    get_scene_class, get_scene_info, get_scale_key, get_preset_keys,
+    scene_registry, SCENE_MODES,
+)
 from scenes.base import PinkNoiseGenerator, PIXEL_SIZE, HAMBURGER_BASE
-from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
 import updater
 import stats
 
@@ -400,330 +402,21 @@ class SettingsDialog(QDialog):
         tabs2.setMinimumWidth(320)
         hbox.addWidget(tabs2, 1)
 
-        # === タブ1: 草 ===
-        tab_grass = QWidget()
-        tgl = QVBoxLayout(tab_grass)
-
-        g1 = QGroupBox(t("grass_length"))
-        g1l = QVBoxLayout(g1)
-        self.min_h_slider = self._add_slider(g1l, t("min"), 2, 15, self.config.get("min_height", 4))
-        self.max_h_slider = self._add_slider(g1l, t("max"), 5, 30, self.config.get("max_height", 20))
-        self.thickness_slider = self._add_slider(g1l, t("thickness"), 1, 12, self.config.get("grass_thickness", 4))
-        tgl.addWidget(g1)
-
-        self.grass_scale_slider = self._add_slider(g1l, t("display_scale"), 25, 200, self.config.get("grass_scale", 100))
-
-        g_type = QGroupBox(t("grass_type"))
-        g_type_l = QVBoxLayout(g_type)
-        desc = QLabel(t("type_desc"))
-        desc.setStyleSheet("color: #666; font-size: 11px;")
-        g_type_l.addWidget(desc)
-        self.slim_slider = self._add_slider(g_type_l, t("slim"), 0, 100, self.config.get("slim_ratio", 40))
-        self.flower_slider = self._add_slider(g_type_l, t("flower"), 0, 100, self.config.get("flower_ratio", 15))
-        self.balance_label = QLabel()
-        self.balance_label.setStyleSheet("color: #444; font-size: 11px;")
-        g_type_l.addWidget(self.balance_label)
-        self.slim_slider.valueChanged.connect(self._update_balance_label)
-        self.flower_slider.valueChanged.connect(self._update_balance_label)
-        self._update_balance_label()
-        tgl.addWidget(g_type)
-
-
-        # 花の色
-        g_fc = QGroupBox(t("flower_colors"))
-        g_fcl = QVBoxLayout(g_fc)
-        self.flower_color_checks = []
-        enabled_flowers = self.config.get("flower_colors_enabled", list(range(len(FLOWER_COLORS_ALL))))
-        for i, fc in enumerate(FLOWER_COLORS_ALL):
-            row = QHBoxLayout()
-            cb = QCheckBox(t(fc["key"]))
-            cb.setChecked(i in enabled_flowers)
-            color_icon = QLabel()
-            color_icon.setFixedSize(16, 16)
-            r, g, b = fc["rgb"]
-            color_icon.setStyleSheet(f"background-color: rgb({r},{g},{b}); border: 1px solid #999;")
-            row.addWidget(cb)
-            row.addWidget(color_icon)
-            row.addStretch()
-            g_fcl.addLayout(row)
-            self.flower_color_checks.append(cb)
-        tgl.addWidget(g_fc)
-
-        self.tab_grass = tab_grass
-        self.tab_grass_label = t("tab_grass")
-        tabs.addTab(tab_grass, self.tab_grass_label)
-
-        # === タブ2: 配置 ===
-        tab_layout = QWidget()
-        tll = QVBoxLayout(tab_layout)
-
-        gc = QGroupBox(t("cluster_area"))
-        gcl = QVBoxLayout(gc)
-        self.num_clusters_slider = self._add_slider(gcl, t("num_clusters"), 0, 20, self.config.get("num_clusters", 5))
-        self.cluster_count_slider = self._add_slider(gcl, t("total_count"), 0, 150, self.config.get("cluster_count", 40))
-        self.cluster_density_slider = self._add_slider(gcl, t("density"), 0, 100, self.config.get("cluster_density", 70))
-        self.sparseness_slider = self._add_slider(gcl, t("spacing"), 0, 100, self.config.get("sparseness", 50))
-        cd_desc = QLabel(t("cluster_desc"))
-        cd_desc.setStyleSheet("color: #666; font-size: 10px;")
-        gcl.addWidget(cd_desc)
-        tll.addWidget(gc)
-
-        gs = QGroupBox(t("scatter_area"))
-        gsl = QVBoxLayout(gs)
-        self.scatter_count_slider = self._add_slider(gsl, t("count"), 0, 150, self.config.get("scatter_count", 20))
-        self.scatter_density_slider = self._add_slider(gsl, t("scatter_density"), 0, 100, self.config.get("scatter_density", 20))
-        sd_desc = QLabel(t("scatter_desc"))
-        sd_desc.setStyleSheet("color: #666; font-size: 10px;")
-        gsl.addWidget(sd_desc)
-        tll.addWidget(gs)
-
-        self.tab_layout = tab_layout
-        self.tab_layout_label = t("tab_layout")
-        tabs.addTab(tab_layout, self.tab_layout_label)
-
-        # === タブ: アクアリウム ===
-        tab_aq = QWidget()
-        aq_scroll = QScrollArea()
-        aq_scroll.setWidgetResizable(True)
-        aq_inner = QWidget()
-        aq_layout = QVBoxLayout(aq_inner)
-
-        self.aq_scale_slider = self._add_slider(aq_layout, t("display_scale"), 25, 200, self.config.get("aq_scale", 100))
-
-        g_aq_plant = QGroupBox(t("aq_plant_length"))
-        g_apl = QVBoxLayout(g_aq_plant)
-        self.aq_min_h_slider = self._add_slider(g_apl, t("min"), 2, 20, self.config.get("aq_plant_min_height", 8))
-        self.aq_max_h_slider = self._add_slider(g_apl, t("max"), 5, 40, self.config.get("aq_plant_max_height", 30))
-        aq_layout.addWidget(g_aq_plant)
-
-        g_aq_cluster = QGroupBox(t("aq_cluster"))
-        g_acl = QVBoxLayout(g_aq_cluster)
-        self.aq_cluster_count_slider = self._add_slider(g_acl, t("num_clusters"), 0, 10, self.config.get("aq_cluster_count", 3))
-        self.aq_cluster_size_slider = self._add_slider(g_acl, t("total_count"), 1, 20, self.config.get("aq_cluster_size", 8))
-        self.aq_cluster_density_slider = self._add_slider(g_acl, t("density"), 0, 100, self.config.get("aq_cluster_density", 70))
-        aq_layout.addWidget(g_aq_cluster)
-
-        g_aq_scatter = QGroupBox(t("aq_scatter"))
-        g_asl = QVBoxLayout(g_aq_scatter)
-        self.aq_scatter_count_slider = self._add_slider(g_asl, t("count"), 0, 50, self.config.get("aq_scatter_count", 15))
-        self.aq_scatter_density_slider = self._add_slider(g_asl, t("scatter_density"), 0, 100, self.config.get("aq_scatter_density", 30))
-        aq_layout.addWidget(g_aq_scatter)
-
-        g_aq_fish = QGroupBox(t("aq_fish_settings"))
-        g_afl = QVBoxLayout(g_aq_fish)
-        self.aq_fish_count_slider = self._add_slider(g_afl, t("aq_fish_count"), 1, 20, self.config.get("aq_fish_count", 6))
-        self.aq_speed_min_slider = self._add_slider(g_afl, t("aq_speed_min"), 5, 100, self.config.get("aq_fish_speed_min", 30))
-        self.aq_speed_max_slider = self._add_slider(g_afl, t("aq_speed_max"), 5, 100, self.config.get("aq_fish_speed_max", 65))
-        self.aq_fish_y_top_slider = self._add_slider(g_afl, t("aq_y_top"), 0, 80, self.config.get("aq_fish_y_top", 10))
-        self.aq_fish_y_bottom_slider = self._add_slider(g_afl, t("aq_y_bottom"), 20, 90, self.config.get("aq_fish_y_bottom", 55))
-        aq_layout.addWidget(g_aq_fish)
-
-        aq_layout.addStretch()
-        aq_scroll.setWidget(aq_inner)
-        tab_aq_layout = QVBoxLayout(tab_aq)
-        tab_aq_layout.setContentsMargins(0, 0, 0, 0)
-        tab_aq_layout.addWidget(aq_scroll)
-
-        self.tab_aquarium = tab_aq
-        self.tab_aquarium_label = t("aq_settings")
-        tabs.addTab(tab_aq, self.tab_aquarium_label)
-
-        # === タブ: 東海道 ===
-        tab_tk = QWidget()
-        tk_scroll = QScrollArea()
-        tk_scroll.setWidgetResizable(True)
-        tk_inner = QWidget()
-        tk_layout = QVBoxLayout(tk_inner)
-
-        self.tk_scale_slider = self._add_slider(tk_layout, t("display_scale"), 25, 200, self.config.get("tk_scale", 100))
-
-        g_tk_obj = QGroupBox(t("tk_objects"))
-        g_tol = QVBoxLayout(g_tk_obj)
-        self.tk_pine_slider = self._add_slider(g_tol, t("tk_pine"), 0, 10, self.config.get("tk_pine_count", 2))
-        self.tk_willow_slider = self._add_slider(g_tol, t("tk_willow_item"), 0, 10, self.config.get("tk_willow_count", 2))
-        self.tk_teahouse_slider = self._add_slider(g_tol, t("tk_teahouse"), 0, 5, self.config.get("tk_teahouse_count", 2))
-        self.tk_inn_slider = self._add_slider(g_tol, t("tk_inn"), 0, 5, self.config.get("tk_inn_count", 1))
-        self.tk_shop_slider = self._add_slider(g_tol, t("tk_shop"), 0, 5, self.config.get("tk_shop_count", 2))
-        self.tk_kura_slider = self._add_slider(g_tol, t("tk_kura"), 0, 5, self.config.get("tk_kura_count", 1))
-        self.tk_house_slider = self._add_slider(g_tol, t("tk_house"), 0, 10, self.config.get("tk_house_count", 3))
-        self.tk_torii_slider = self._add_slider(g_tol, t("tk_torii"), 0, 3, self.config.get("tk_torii_count", 0))
-        self.tk_hill_slider = self._add_slider(g_tol, t("tk_hill"), 0, 5, self.config.get("tk_hill_count", 2))
-        self.tk_grass_slider = self._add_slider(g_tol, t("tk_grass"), 0, 150, self.config.get("tk_grass_count", 60))
-        self.tk_traveler_slider = self._add_slider(g_tol, t("tk_traveler"), 0, 20, self.config.get("tk_traveler_count", 8))
-        tk_layout.addWidget(g_tk_obj)
-
-        g_tk_willow = QGroupBox(t("tk_willow"))
-        g_twl = QVBoxLayout(g_tk_willow)
-        self.tk_leaf_thickness_slider = self._add_slider(g_twl, t("tk_leaf_w"), 1, 6, self.config.get("tk_leaf_thickness", 4))
-        self.tk_willow_min_slider = self._add_slider(g_twl, t("min"), 15, 60, self.config.get("tk_willow_min_h", 45))
-        self.tk_willow_max_slider = self._add_slider(g_twl, t("max"), 30, 90, self.config.get("tk_willow_max_h", 68))
-        tk_layout.addWidget(g_tk_willow)
-
-        tk_layout.addStretch()
-        tk_scroll.setWidget(tk_inner)
-        tab_tk_l = QVBoxLayout(tab_tk)
-        tab_tk_l.setContentsMargins(0, 0, 0, 0)
-        tab_tk_l.addWidget(tk_scroll)
-
-        self.tab_tokaido = tab_tk
-        self.tab_tokaido_label = t("tk_settings")
-        tabs.addTab(tab_tk, self.tab_tokaido_label)
-
-        # === Tab: Pooh ===
-        tab_pooh = QWidget()
-        pooh_layout = QVBoxLayout(tab_pooh)
-        self.pooh_scale_slider = self._add_slider(pooh_layout, t("display_scale"), 25, 200, self.config.get("pooh_scale", 100))
-        # Character ON/OFF
-        char_group = QGroupBox(t("pooh_characters"))
-        char_layout = QVBoxLayout(char_group)
-        self.pooh_pooh_check = QCheckBox("Winnie-the-Pooh")
-        self.pooh_pooh_check.setChecked(self.config.get("pooh_show_pooh", True))
-        self.pooh_pooh_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_pooh_check)
-        self.pooh_tigger_check = QCheckBox("Tigger")
-        self.pooh_tigger_check.setChecked(self.config.get("pooh_show_tigger", True))
-        self.pooh_tigger_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_tigger_check)
-        self.pooh_eeyore_check = QCheckBox("Eeyore")
-        self.pooh_eeyore_check.setChecked(self.config.get("pooh_show_eeyore", True))
-        self.pooh_eeyore_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_eeyore_check)
-        self.pooh_piglet_check = QCheckBox("Piglet")
-        self.pooh_piglet_check.setChecked(self.config.get("pooh_show_piglet", True))
-        self.pooh_piglet_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_piglet_check)
-        self.pooh_rabbit_check = QCheckBox("Rabbit")
-        self.pooh_rabbit_check.setChecked(self.config.get("pooh_show_rabbit", True))
-        self.pooh_rabbit_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_rabbit_check)
-        self.pooh_owl_check = QCheckBox("Owl")
-        self.pooh_owl_check.setChecked(self.config.get("pooh_show_owl", True))
-        self.pooh_owl_check.toggled.connect(self._on_slider_changed)
-        char_layout.addWidget(self.pooh_owl_check)
-        pooh_layout.addWidget(char_group)
-
-        self.pooh_balloon_slider = self._add_slider(pooh_layout, t("pooh_balloon_count"), 0, 400, self.config.get("pooh_balloon_count", 8))
-        self.pooh_balloon_size_slider = self._add_slider(pooh_layout, t("pooh_balloon_size"), 1, 30, self.config.get("pooh_balloon_size", 30))
-        self.pooh_bird_slider = self._add_slider(pooh_layout, t("pooh_bird_count"), 0, 10, self.config.get("pooh_bird_count", 3))
-
-        # Credit notice
-        credit = QLabel(t("pooh_credit"))
-        credit.setWordWrap(True)
-        credit.setStyleSheet("color: #888; font-size: 9px; margin-top: 8px;")
-        pooh_layout.addWidget(credit)
-        pooh_layout.addStretch()
-        self.tab_pooh = tab_pooh
-        self.tab_pooh_label = t("pooh_settings")
-        tabs.addTab(tab_pooh, self.tab_pooh_label)
-
-        # === Tab: Takibi (campfire) ===
-        tab_takibi = QWidget()
-        takibi_layout = QVBoxLayout(tab_takibi)
-        self.takibi_scale_slider = self._add_slider(takibi_layout, t("display_scale"), 25, 200, self.config.get("takibi_scale", 100))
-        self.takibi_count_slider = self._add_slider(takibi_layout, t("takibi_count"), 1, 5, self.config.get("takibi_count", 1))
-        self.takibi_sparks_slider = self._add_slider(takibi_layout, t("takibi_sparks"), 0, 100, self.config.get("takibi_sparks", 25))
-        self.takibi_speed_slider = self._add_slider(takibi_layout, t("takibi_speed"), 10, 100, self.config.get("takibi_speed", 30))
-        self.takibi_campers_check = QCheckBox(t("takibi_campers"))
-        self.takibi_campers_check.setChecked(self.config.get("takibi_campers", True))
-        self.takibi_campers_check.toggled.connect(self._on_slider_changed)
-        takibi_layout.addWidget(self.takibi_campers_check)
-        self.takibi_tents_check = QCheckBox(t("takibi_tents"))
-        self.takibi_tents_check.setChecked(self.config.get("takibi_tents", True))
-        self.takibi_tents_check.toggled.connect(self._on_slider_changed)
-        takibi_layout.addWidget(self.takibi_tents_check)
-        self.takibi_smoke_check = QCheckBox(t("takibi_smoke"))
-        self.takibi_smoke_check.setChecked(self.config.get("takibi_smoke", True))
-        self.takibi_smoke_check.toggled.connect(self._on_slider_changed)
-        takibi_layout.addWidget(self.takibi_smoke_check)
-        self.takibi_glow_check = QCheckBox(t("takibi_glow"))
-        self.takibi_glow_check.setChecked(self.config.get("takibi_glow", True))
-        self.takibi_glow_check.toggled.connect(self._on_slider_changed)
-        takibi_layout.addWidget(self.takibi_glow_check)
-        takibi_layout.addStretch()
-        self.tab_takibi = tab_takibi
-        self.tab_takibi_label = t("takibi_settings")
-        tabs.addTab(tab_takibi, self.tab_takibi_label)
-
-        # === Tab: Skating (figure skating) ===
-        tab_skating = QWidget()
-        sk_scroll = QScrollArea()
-        sk_scroll.setWidgetResizable(True)
-        sk_inner = QWidget()
-        sk_layout = QVBoxLayout(sk_inner)
-        self.skate_scale_slider = self._add_slider(sk_layout, t("display_scale"), 25, 200, self.config.get("skate_scale", 100))
-        self.skate_count_slider = self._add_slider(sk_layout, t("skate_count"), 1, 5, self.config.get("skate_count", 2))
-        self.skate_snow_slider = self._add_slider(sk_layout, t("skate_snow"), 0, 100, self.config.get("skate_snow", 40))
-        self.skate_trail_check = QCheckBox(t("skate_trail"))
-        self.skate_trail_check.setChecked(self.config.get("skate_trail", True))
-        self.skate_trail_check.toggled.connect(self._on_slider_changed)
-        sk_layout.addWidget(self.skate_trail_check)
-
-        # 岸辺の草（ON/OFF可・設定項目は草原と同様）
-        g_sg = QGroupBox(t("skate_grass"))
-        g_sg.setCheckable(True)
-        g_sg.setChecked(self.config.get("skate_grass", True))
-        g_sg.toggled.connect(self._on_slider_changed)
-        self.skate_grass_group = g_sg
-        g_sgl = QVBoxLayout(g_sg)
-        sg1 = QGroupBox(t("grass_length"))
-        sg1l = QVBoxLayout(sg1)
-        self.sg_min_slider = self._add_slider(sg1l, t("min"), 2, 15, self.config.get("skate_grass_min", 3))
-        self.sg_max_slider = self._add_slider(sg1l, t("max"), 5, 30, self.config.get("skate_grass_max", 7))
-        self.sg_thickness_slider = self._add_slider(sg1l, t("thickness"), 1, 12, self.config.get("skate_grass_thickness", 4))
-        g_sgl.addWidget(sg1)
-        sg2 = QGroupBox(t("grass_type"))
-        sg2l = QVBoxLayout(sg2)
-        self.sg_slim_slider = self._add_slider(sg2l, t("slim"), 0, 100, self.config.get("skate_grass_slim", 40))
-        self.sg_flower_slider = self._add_slider(sg2l, t("flower"), 0, 100, self.config.get("skate_grass_flower", 0))
-        g_sgl.addWidget(sg2)
-        sg3 = QGroupBox(t("cluster_area"))
-        sg3l = QVBoxLayout(sg3)
-        self.sg_clusters_slider = self._add_slider(sg3l, t("num_clusters"), 0, 20, self.config.get("skate_grass_clusters", 5))
-        self.sg_cluster_count_slider = self._add_slider(sg3l, t("total_count"), 0, 150, self.config.get("skate_grass_cluster_count", 40))
-        self.sg_density_slider = self._add_slider(sg3l, t("density"), 0, 100, self.config.get("skate_grass_density", 70))
-        self.sg_spacing_slider = self._add_slider(sg3l, t("spacing"), 0, 100, self.config.get("skate_grass_spacing", 50))
-        g_sgl.addWidget(sg3)
-        sg4 = QGroupBox(t("scatter_area"))
-        sg4l = QVBoxLayout(sg4)
-        self.sg_scatter_slider = self._add_slider(sg4l, t("count"), 0, 150, self.config.get("skate_grass_scatter", 20))
-        self.sg_scatter_density_slider = self._add_slider(sg4l, t("scatter_density"), 0, 100, self.config.get("skate_grass_scatter_density", 20))
-        g_sgl.addWidget(sg4)
-        sk_layout.addWidget(g_sg)
-
-        sk_layout.addStretch()
-        sk_scroll.setWidget(sk_inner)
-        tab_sk_layout = QVBoxLayout(tab_skating)
-        tab_sk_layout.setContentsMargins(0, 0, 0, 0)
-        tab_sk_layout.addWidget(sk_scroll)
-        self.tab_skating = tab_skating
-        self.tab_skating_label = t("skating_settings")
-        tabs.addTab(tab_skating, self.tab_skating_label)
-
-        # === Tab: Shark (deep sea) ===
-        tab_shark = QWidget()
-        sh_layout = QVBoxLayout(tab_shark)
-        self.shark_scale_slider = self._add_slider(sh_layout, t("display_scale"), 25, 200, self.config.get("shark_scale", 100))
-        self.shark_count_slider = self._add_slider(sh_layout, t("shark_count"), 1, 8, self.config.get("shark_count", 3))
-        self.shark_coral_slider = self._add_slider(sh_layout, t("shark_coral"), 0, 100, self.config.get("shark_coral", 60))
-        self.shark_seaweed_slider = self._add_slider(sh_layout, t("shark_seaweed"), 0, 100, self.config.get("shark_seaweed", 50))
-        self.shark_snow_slider = self._add_slider(sh_layout, t("shark_snow"), 0, 400, self.config.get("shark_snow", 100))
-        self.shark_wreck_check = QCheckBox(t("shark_wreck"))
-        self.shark_wreck_check.setChecked(self.config.get("shark_wreck", True))
-        self.shark_wreck_check.toggled.connect(self._on_slider_changed)
-        sh_layout.addWidget(self.shark_wreck_check)
-        self.shark_wreck_boats_slider = self._add_slider(sh_layout, t("shark_wreck_boats"), 0, 3, self.config.get("shark_wreck_boats", 1))
-        self.shark_wreck_planes_slider = self._add_slider(sh_layout, t("shark_wreck_planes"), 0, 4, self.config.get("shark_wreck_planes", 1))
-        self.shark_wreck_flow_slider = self._add_slider(sh_layout, t("shark_wreck_flow"), 0, 200, self.config.get("shark_wreck_flow", 80))
-        self.shark_fish_schools_slider = self._add_slider(sh_layout, t("shark_fish_schools"), 1, 6, self.config.get("shark_fish_schools", 2))
-        self.shark_fish_slider = self._add_slider(sh_layout, t("shark_fish"), 0, 60, self.config.get("shark_fish", 30))
-        self.shark_bubbles_check = QCheckBox(t("shark_bubbles"))
-        self.shark_bubbles_check.setChecked(self.config.get("shark_bubbles", True))
-        self.shark_bubbles_check.toggled.connect(self._on_slider_changed)
-        sh_layout.addWidget(self.shark_bubbles_check)
-        sh_layout.addStretch()
-        self.tab_shark = tab_shark
-        self.tab_shark_label = t("shark_settings")
-        tabs.addTab(tab_shark, self.tab_shark_label)
+        # === シーン別設定タブ（各シーンモジュールが build_settings で提供） ===
+        # key -> [(widget, タブ名), ...]。表示は _update_tabs_for_scene が行う
+        self._scene_tabs = {}
+        for info in scene_registry():
+            builder = info.get("build_settings")
+            if not builder:
+                self._scene_tabs[info["key"]] = []
+                continue
+            try:
+                self._scene_tabs[info["key"]] = builder(self)
+            except Exception:
+                # 1シーンのタブ構築失敗で設定画面全体を道連れにしない
+                import traceback
+                traceback.print_exc()
+                self._scene_tabs[info["key"]] = []
 
         # === タブ: 環境 ===
         tab_env = QWidget()
@@ -1051,23 +744,6 @@ class SettingsDialog(QDialog):
         if self.on_language_change:
             self.on_language_change()
 
-    def _update_balance_label(self):
-        s = self.slim_slider.value()
-        f = self.flower_slider.value()
-        leafy = max(0, 100 - s - f)
-        if s + f > 100:
-            # 正規化表示
-            total = s + f
-            s_pct = int(s / total * 100)
-            f_pct = 100 - s_pct
-            leafy = 0
-        else:
-            s_pct = s
-            f_pct = f
-        self.balance_label.setText(
-            t("balance_fmt").format(s=s_pct, l=leafy, f=f_pct)
-        )
-
     def _add_slider(self, layout, label, min_val, max_val, current):
         row = QHBoxLayout()
         lbl = QLabel(label)
@@ -1179,23 +855,8 @@ class SettingsDialog(QDialog):
         super().done(r)
 
     def _gather_config(self):
-        indices = self.config.get("palette_indices", [0])
         cfg = {
-            "min_height": self.min_h_slider.value(),
-            "max_height": max(self.max_h_slider.value(), self.min_h_slider.value() + 1),
-            "grass_thickness": self.thickness_slider.value(),
-            "grass_scale": self.grass_scale_slider.value(),
-            "num_clusters": self.num_clusters_slider.value(),
-            "cluster_count": self.cluster_count_slider.value(),
-            "cluster_density": self.cluster_density_slider.value(),
-            "sparseness": self.sparseness_slider.value(),
-            "scatter_count": self.scatter_count_slider.value(),
-            "scatter_density": self.scatter_density_slider.value(),
             "wind": self.wind_slider.value(),
-            "slim_ratio": self.slim_slider.value(),
-            "flower_ratio": self.flower_slider.value(),
-            "palette_indices": indices,
-            "flower_colors_enabled": [i for i, btn in enumerate(self.flower_color_checks) if btn.isChecked()],
             "auto_update": self.auto_update_check.isChecked(),
             "startup_random": self.startup_random_check.isChecked(),
             "startup_scenes": [k for k, cb in self.startup_scene_checks
@@ -1212,81 +873,18 @@ class SettingsDialog(QDialog):
             "language": self.lang_combo.currentData(),
             "scene_mode": self.scene_combo.currentData(),
             "sway_speed": self.sway_speed_slider.value(),
-            "aq_plant_min_height": self.aq_min_h_slider.value(),
-            "aq_plant_max_height": self.aq_max_h_slider.value(),
-            "aq_cluster_count": self.aq_cluster_count_slider.value(),
-            "aq_cluster_size": self.aq_cluster_size_slider.value(),
-            "aq_cluster_density": self.aq_cluster_density_slider.value(),
-            "aq_scatter_count": self.aq_scatter_count_slider.value(),
-            "aq_scatter_density": self.aq_scatter_density_slider.value(),
-            "aq_fish_count": self.aq_fish_count_slider.value(),
-            "aq_fish_speed_min": self.aq_speed_min_slider.value(),
-            "aq_fish_speed_max": self.aq_speed_max_slider.value(),
-            "aq_scale": self.aq_scale_slider.value(),
-            "aq_fish_y_top": self.aq_fish_y_top_slider.value(),
-            "aq_fish_y_bottom": self.aq_fish_y_bottom_slider.value(),
-            "tk_pine_count": self.tk_pine_slider.value(),
-            "tk_willow_count": self.tk_willow_slider.value(),
-            "tk_teahouse_count": self.tk_teahouse_slider.value(),
-            "tk_inn_count": self.tk_inn_slider.value(),
-            "tk_shop_count": self.tk_shop_slider.value(),
-            "tk_kura_count": self.tk_kura_slider.value(),
-            "tk_house_count": self.tk_house_slider.value(),
-            "tk_torii_count": self.tk_torii_slider.value(),
-            "tk_hill_count": self.tk_hill_slider.value(),
-            "tk_grass_count": self.tk_grass_slider.value(),
-            "tk_traveler_count": self.tk_traveler_slider.value(),
-            "tk_scale": self.tk_scale_slider.value(),
-            "pooh_scale": self.pooh_scale_slider.value(),
-            "pooh_show_pooh": self.pooh_pooh_check.isChecked(),
-            "pooh_show_tigger": self.pooh_tigger_check.isChecked(),
-            "pooh_show_eeyore": self.pooh_eeyore_check.isChecked(),
-            "pooh_show_piglet": self.pooh_piglet_check.isChecked(),
-            "pooh_show_rabbit": self.pooh_rabbit_check.isChecked(),
-            "pooh_show_owl": self.pooh_owl_check.isChecked(),
-            "pooh_balloon_count": self.pooh_balloon_slider.value(),
-            "pooh_balloon_size": self.pooh_balloon_size_slider.value(),
-            "pooh_bird_count": self.pooh_bird_slider.value(),
-            "tk_leaf_thickness": self.tk_leaf_thickness_slider.value(),
-            "tk_willow_min_h": self.tk_willow_min_slider.value(),
-            "tk_willow_max_h": self.tk_willow_max_slider.value(),
-            "takibi_scale": self.takibi_scale_slider.value(),
-            "takibi_count": self.takibi_count_slider.value(),
-            "takibi_sparks": self.takibi_sparks_slider.value(),
-            "takibi_speed": self.takibi_speed_slider.value(),
-            "takibi_campers": self.takibi_campers_check.isChecked(),
-            "takibi_tents": self.takibi_tents_check.isChecked(),
-            "takibi_smoke": self.takibi_smoke_check.isChecked(),
-            "takibi_glow": self.takibi_glow_check.isChecked(),
-            "skate_scale": self.skate_scale_slider.value(),
-            "skate_count": self.skate_count_slider.value(),
-            "skate_snow": self.skate_snow_slider.value(),
-            "skate_trail": self.skate_trail_check.isChecked(),
-            "skate_grass": self.skate_grass_group.isChecked(),
-            "skate_grass_min": self.sg_min_slider.value(),
-            "skate_grass_max": max(self.sg_max_slider.value(), self.sg_min_slider.value() + 1),
-            "skate_grass_thickness": self.sg_thickness_slider.value(),
-            "skate_grass_slim": self.sg_slim_slider.value(),
-            "skate_grass_flower": self.sg_flower_slider.value(),
-            "skate_grass_clusters": self.sg_clusters_slider.value(),
-            "skate_grass_cluster_count": self.sg_cluster_count_slider.value(),
-            "skate_grass_density": self.sg_density_slider.value(),
-            "skate_grass_spacing": self.sg_spacing_slider.value(),
-            "skate_grass_scatter": self.sg_scatter_slider.value(),
-            "skate_grass_scatter_density": self.sg_scatter_density_slider.value(),
-            "shark_scale": self.shark_scale_slider.value(),
-            "shark_count": self.shark_count_slider.value(),
-            "shark_coral": self.shark_coral_slider.value(),
-            "shark_seaweed": self.shark_seaweed_slider.value(),
-            "shark_snow": self.shark_snow_slider.value(),
-            "shark_wreck": self.shark_wreck_check.isChecked(),
-            "shark_wreck_boats": self.shark_wreck_boats_slider.value(),
-            "shark_wreck_planes": self.shark_wreck_planes_slider.value(),
-            "shark_wreck_flow": self.shark_wreck_flow_slider.value(),
-            "shark_fish_schools": self.shark_fish_schools_slider.value(),
-            "shark_fish": self.shark_fish_slider.value(),
-            "shark_bubbles": self.shark_bubbles_check.isChecked(),
         }
+        # シーン別設定（各シーンモジュールの gather から収集）
+        for info in scene_registry():
+            gather = info.get("gather")
+            if not gather:
+                continue
+            try:
+                cfg.update(gather(self))
+            except Exception:
+                # 1シーンの不具合で設定保存全体を壊さない
+                import traceback
+                traceback.print_exc()
         # サウンド連動（Windowsのみウィジェットが存在する）
         if hasattr(self, "sound_sync_btn"):
             cfg["sound_sync_enabled"] = self.sound_sync_btn.isChecked()
@@ -1304,27 +902,15 @@ class SettingsDialog(QDialog):
         self.on_apply({"scene_mode": scene})
 
     def _update_tabs_for_scene(self, scene):
-        """シーンに応じてタブを切り替え"""
+        """シーンに応じてタブを切り替え（現在シーンのタブを先頭に挿す）"""
         tabs = self.tabs
-        scene_tabs = [self.tab_grass, self.tab_layout, self.tab_aquarium, self.tab_tokaido, self.tab_pooh, self.tab_takibi, self.tab_skating, self.tab_shark]
+        all_scene_widgets = {w for pairs in self._scene_tabs.values()
+                             for w, _ in pairs}
         for i in range(tabs.count() - 1, -1, -1):
-            if tabs.widget(i) in scene_tabs:
+            if tabs.widget(i) in all_scene_widgets:
                 tabs.removeTab(i)
-        if scene == "grass":
-            tabs.insertTab(0, self.tab_grass, self.tab_grass_label)
-            tabs.insertTab(1, self.tab_layout, self.tab_layout_label)
-        elif scene == "aquarium":
-            tabs.insertTab(0, self.tab_aquarium, self.tab_aquarium_label)
-        elif scene == "tokaido":
-            tabs.insertTab(0, self.tab_tokaido, self.tab_tokaido_label)
-        elif scene == "pooh":
-            tabs.insertTab(0, self.tab_pooh, self.tab_pooh_label)
-        elif scene == "takibi":
-            tabs.insertTab(0, self.tab_takibi, self.tab_takibi_label)
-        elif scene == "skating":
-            tabs.insertTab(0, self.tab_skating, self.tab_skating_label)
-        elif scene == "shark":
-            tabs.insertTab(0, self.tab_shark, self.tab_shark_label)
+        for i, (widget, label) in enumerate(self._scene_tabs.get(scene, [])):
+            tabs.insertTab(i, widget, label)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -1339,39 +925,8 @@ class SettingsDialog(QDialog):
         cfg = self._gather_config()
         self.on_apply(cfg)
 
-    # シーン別プリセットキー
-    SCENE_KEYS = {
-        "grass": [
-            "min_height", "max_height", "grass_thickness", "num_clusters", "cluster_count",
-            "cluster_density", "sparseness", "scatter_count", "scatter_density",
-            "slim_ratio", "flower_ratio", "palette_indices", "flower_colors_enabled", "seed",
-        ],
-        "aquarium": [
-            "aq_plant_min_height", "aq_plant_max_height",
-            "aq_cluster_count", "aq_cluster_size", "aq_cluster_density",
-            "aq_scatter_count", "aq_scatter_density",
-            "aq_fish_count", "aq_fish_speed_min", "aq_fish_speed_max",
-            "aq_fish_y_top", "aq_fish_y_bottom", "seed",
-        ],
-        "pooh": ["pooh_scale", "pooh_balloon_count", "pooh_balloon_size", "pooh_bird_count", "seed"],
-        "takibi": ["takibi_scale", "takibi_count", "takibi_sparks", "takibi_speed", "takibi_campers", "takibi_tents", "takibi_smoke", "takibi_glow", "seed"],
-        "skating": [
-            "skate_scale", "skate_count", "skate_snow", "skate_trail",
-            "skate_grass", "skate_grass_min", "skate_grass_max", "skate_grass_thickness",
-            "skate_grass_slim", "skate_grass_flower",
-            "skate_grass_clusters", "skate_grass_cluster_count", "skate_grass_density",
-            "skate_grass_spacing", "skate_grass_scatter", "skate_grass_scatter_density",
-            "seed",
-        ],
-        "shark": ["shark_scale", "shark_count", "shark_coral", "shark_seaweed", "shark_snow", "shark_wreck", "shark_wreck_boats", "shark_wreck_planes", "shark_wreck_flow", "shark_fish_schools", "shark_fish", "shark_bubbles", "seed"],
-        "tokaido": [
-            "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
-            "tk_inn_count", "tk_shop_count", "tk_kura_count",
-            "tk_house_count", "tk_torii_count", "tk_hill_count",
-            "tk_grass_count", "tk_traveler_count",
-            "tk_willow_min_h", "tk_willow_max_h", "seed",
-        ],
-    }
+    # シーン別プリセットキーは各シーンモジュールの SCENE["preset_keys"]
+    # （scenes.get_preset_keys で取得）
     # 環境設定のキー
     ENV_KEYS = [
         "wind", "sway_speed", "mouse_fade_enabled", "mouse_fade_inner",
@@ -1383,7 +938,7 @@ class SettingsDialog(QDialog):
 
     def _on_save_scene(self):
         scene = self.scene_combo.currentData()
-        keys = self.SCENE_KEYS.get(scene, [])
+        keys = get_preset_keys(scene)
         cfg = self._gather_config()
         self.on_save(scene, {k: cfg[k] for k in keys if k in cfg})
         self._refresh_scene_saves()
@@ -1412,9 +967,9 @@ class SettingsDialog(QDialog):
             for f in sorted(os.listdir(scene_dir)):
                 if f.endswith(".json"):
                     self.scene_preset_combo.addItem(f[:-5])
-        # Update group title
-        label_map = {"grass": t("grass_preset"), "aquarium": t("aq_preset"), "tokaido": t("tokaido_preset")}
-        self.scene_preset_group.setTitle(label_map.get(scene, t("scene_preset")))
+        # Update group title（シーンが preset_label_key を持てばそれを使う）
+        label_key = get_scene_info(scene).get("preset_label_key", "scene_preset")
+        self.scene_preset_group.setTitle(t(label_key))
 
     def _refresh_env_saves(self):
         self.env_combo.clear()
@@ -1854,14 +1409,6 @@ class OverlayManager:
             o.update_scene()
 
 
-# シーンごとの表示倍率キー（ハンバーガーボタンのサイズ連動用）
-SCENE_SCALE_KEYS = {
-    "grass": "grass_scale", "aquarium": "aq_scale", "tokaido": "tk_scale",
-    "pooh": "pooh_scale", "takibi": "takibi_scale", "skating": "skate_scale",
-    "shark": "shark_scale",
-}
-
-
 class HamburgerButton(QWidget):
     """画面左下のハンバーガーメニューボタン。
     通常はマウスが近づくとフェードアウトして消える（クリックも透過）。
@@ -1887,7 +1434,8 @@ class HamburgerButton(QWidget):
 
     def _scale(self):
         cfg = self.manager.config
-        key = SCENE_SCALE_KEYS.get(cfg.get("scene_mode", "grass"), "grass_scale")
+        # シーンごとの表示倍率キーは各シーンの SCENE["scale_key"]
+        key = get_scale_key(cfg.get("scene_mode", "grass"))
         return cfg.get(key, 100) / 100.0
 
     def _size(self):

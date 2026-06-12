@@ -18,3 +18,6 @@ dist_update/
 .wrangler/
 _MEI*/
 .claude/
+# 非公開モード（別 private リポジトリ 1f-modes-private で管理）
+private_scenes/
+.stfolder/

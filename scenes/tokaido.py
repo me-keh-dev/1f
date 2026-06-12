@@ -1286,3 +1286,133 @@ class TokaidoScene(BaseScene):
             tree.draw(painter, ground_y, alpha, tint, ps)
         for willow in self.front_willows:
             willow.draw(painter, ground_y, 255, tint, get_alpha, ps)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import (
+        QWidget, QVBoxLayout, QGroupBox, QScrollArea,
+    )
+    from i18n import t
+
+    tab_tk = QWidget()
+    tk_scroll = QScrollArea()
+    tk_scroll.setWidgetResizable(True)
+    tk_inner = QWidget()
+    tk_layout = QVBoxLayout(tk_inner)
+
+    dialog.tk_scale_slider = dialog._add_slider(tk_layout, t("display_scale"), 25, 200, dialog.config.get("tk_scale", 100))
+
+    g_tk_obj = QGroupBox(t("tk_objects"))
+    g_tol = QVBoxLayout(g_tk_obj)
+    dialog.tk_pine_slider = dialog._add_slider(g_tol, t("tk_pine"), 0, 10, dialog.config.get("tk_pine_count", 2))
+    dialog.tk_willow_slider = dialog._add_slider(g_tol, t("tk_willow_item"), 0, 10, dialog.config.get("tk_willow_count", 2))
+    dialog.tk_teahouse_slider = dialog._add_slider(g_tol, t("tk_teahouse"), 0, 5, dialog.config.get("tk_teahouse_count", 2))
+    dialog.tk_inn_slider = dialog._add_slider(g_tol, t("tk_inn"), 0, 5, dialog.config.get("tk_inn_count", 1))
+    dialog.tk_shop_slider = dialog._add_slider(g_tol, t("tk_shop"), 0, 5, dialog.config.get("tk_shop_count", 2))
+    dialog.tk_kura_slider = dialog._add_slider(g_tol, t("tk_kura"), 0, 5, dialog.config.get("tk_kura_count", 1))
+    dialog.tk_house_slider = dialog._add_slider(g_tol, t("tk_house"), 0, 10, dialog.config.get("tk_house_count", 3))
+    dialog.tk_torii_slider = dialog._add_slider(g_tol, t("tk_torii"), 0, 3, dialog.config.get("tk_torii_count", 0))
+    dialog.tk_hill_slider = dialog._add_slider(g_tol, t("tk_hill"), 0, 5, dialog.config.get("tk_hill_count", 2))
+    dialog.tk_grass_slider = dialog._add_slider(g_tol, t("tk_grass"), 0, 150, dialog.config.get("tk_grass_count", 60))
+    dialog.tk_traveler_slider = dialog._add_slider(g_tol, t("tk_traveler"), 0, 20, dialog.config.get("tk_traveler_count", 8))
+    tk_layout.addWidget(g_tk_obj)
+
+    g_tk_willow = QGroupBox(t("tk_willow"))
+    g_twl = QVBoxLayout(g_tk_willow)
+    dialog.tk_leaf_thickness_slider = dialog._add_slider(g_twl, t("tk_leaf_w"), 1, 6, dialog.config.get("tk_leaf_thickness", 4))
+    dialog.tk_willow_min_slider = dialog._add_slider(g_twl, t("min"), 15, 60, dialog.config.get("tk_willow_min_h", 45))
+    dialog.tk_willow_max_slider = dialog._add_slider(g_twl, t("max"), 30, 90, dialog.config.get("tk_willow_max_h", 68))
+    tk_layout.addWidget(g_tk_willow)
+
+    tk_layout.addStretch()
+    tk_scroll.setWidget(tk_inner)
+    tab_tk_l = QVBoxLayout(tab_tk)
+    tab_tk_l.setContentsMargins(0, 0, 0, 0)
+    tab_tk_l.addWidget(tk_scroll)
+
+    return [(tab_tk, t("tk_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "tk_pine_count": dialog.tk_pine_slider.value(),
+        "tk_willow_count": dialog.tk_willow_slider.value(),
+        "tk_teahouse_count": dialog.tk_teahouse_slider.value(),
+        "tk_inn_count": dialog.tk_inn_slider.value(),
+        "tk_shop_count": dialog.tk_shop_slider.value(),
+        "tk_kura_count": dialog.tk_kura_slider.value(),
+        "tk_house_count": dialog.tk_house_slider.value(),
+        "tk_torii_count": dialog.tk_torii_slider.value(),
+        "tk_hill_count": dialog.tk_hill_slider.value(),
+        "tk_grass_count": dialog.tk_grass_slider.value(),
+        "tk_traveler_count": dialog.tk_traveler_slider.value(),
+        "tk_scale": dialog.tk_scale_slider.value(),
+        "tk_leaf_thickness": dialog.tk_leaf_thickness_slider.value(),
+        "tk_willow_min_h": dialog.tk_willow_min_slider.value(),
+        "tk_willow_max_h": dialog.tk_willow_max_slider.value(),
+    }
+
+
+SCENE = {
+    "key": "tokaido",
+    "label_key": "scene_tokaido",
+    "class": TokaidoScene,
+    "order": 30,
+    "scale_key": "tk_scale",
+    "preset_keys": [
+        "tk_pine_count", "tk_willow_count", "tk_teahouse_count",
+        "tk_inn_count", "tk_shop_count", "tk_kura_count",
+        "tk_house_count", "tk_torii_count", "tk_hill_count",
+        "tk_grass_count", "tk_traveler_count",
+        "tk_willow_min_h", "tk_willow_max_h", "seed",
+    ],
+    "preset_label_key": "tokaido_preset",
+    "texts": {
+        "ja": {
+            "scene_tokaido": "宿場町（東海道）",
+            "tk_settings": "東海道設定",
+            "tk_objects": "オブジェクト配置",
+            "tk_pine": "松の木",
+            "tk_willow_item": "柳の木",
+            "tk_teahouse": "茶屋",
+            "tk_inn": "旅籠",
+            "tk_shop": "商家",
+            "tk_kura": "蔵",
+            "tk_house": "民家",
+            "tk_torii": "鳥居",
+            "tk_hill": "丘",
+            "tk_fuji": "富士山",
+            "tk_grass": "路傍の草",
+            "tk_traveler": "旅人",
+            "tk_willow": "柳の木",
+            "tk_leaf_w": "葉の太さ",
+            "tokaido_preset": "東海道プリセット",
+        },
+        "en": {
+            "scene_tokaido": "Japanese Post Town (Tokaido)",
+            "tk_settings": "Tokaido Settings",
+            "tk_objects": "Object Placement",
+            "tk_pine": "Pine Tree",
+            "tk_willow_item": "Willow Tree",
+            "tk_teahouse": "Tea House",
+            "tk_inn": "Inn",
+            "tk_shop": "Shop",
+            "tk_kura": "Storehouse",
+            "tk_house": "House",
+            "tk_torii": "Torii Gate",
+            "tk_hill": "Hill",
+            "tk_fuji": "Mt. Fuji",
+            "tk_grass": "Roadside Grass",
+            "tk_traveler": "Traveler",
+            "tk_willow": "Willow Tree",
+            "tk_leaf_w": "Leaf Width",
+            "tokaido_preset": "Tokaido Preset",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

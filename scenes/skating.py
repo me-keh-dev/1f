@@ -864,3 +864,125 @@ class SkatingScene(BaseScene):
             c = apply_tint(QColor(*SNOW_COLOR), tint)
             c.setAlpha(int(alpha * 0.75))
             painter.fillRect(int(f[0]), int(top_y + f[1]), fs, fs, c)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import (
+        QWidget, QVBoxLayout, QGroupBox, QCheckBox, QScrollArea,
+    )
+    from i18n import t
+
+    tab_skating = QWidget()
+    sk_scroll = QScrollArea()
+    sk_scroll.setWidgetResizable(True)
+    sk_inner = QWidget()
+    sk_layout = QVBoxLayout(sk_inner)
+    dialog.skate_scale_slider = dialog._add_slider(sk_layout, t("display_scale"), 25, 200, dialog.config.get("skate_scale", 100))
+    dialog.skate_count_slider = dialog._add_slider(sk_layout, t("skate_count"), 1, 5, dialog.config.get("skate_count", 2))
+    dialog.skate_snow_slider = dialog._add_slider(sk_layout, t("skate_snow"), 0, 100, dialog.config.get("skate_snow", 40))
+    dialog.skate_trail_check = QCheckBox(t("skate_trail"))
+    dialog.skate_trail_check.setChecked(dialog.config.get("skate_trail", True))
+    dialog.skate_trail_check.toggled.connect(dialog._on_slider_changed)
+    sk_layout.addWidget(dialog.skate_trail_check)
+
+    # 岸辺の草（ON/OFF可・設定項目は草原と同様）
+    g_sg = QGroupBox(t("skate_grass"))
+    g_sg.setCheckable(True)
+    g_sg.setChecked(dialog.config.get("skate_grass", True))
+    g_sg.toggled.connect(dialog._on_slider_changed)
+    dialog.skate_grass_group = g_sg
+    g_sgl = QVBoxLayout(g_sg)
+    sg1 = QGroupBox(t("grass_length"))
+    sg1l = QVBoxLayout(sg1)
+    dialog.sg_min_slider = dialog._add_slider(sg1l, t("min"), 2, 15, dialog.config.get("skate_grass_min", 3))
+    dialog.sg_max_slider = dialog._add_slider(sg1l, t("max"), 5, 30, dialog.config.get("skate_grass_max", 7))
+    dialog.sg_thickness_slider = dialog._add_slider(sg1l, t("thickness"), 1, 12, dialog.config.get("skate_grass_thickness", 4))
+    g_sgl.addWidget(sg1)
+    sg2 = QGroupBox(t("grass_type"))
+    sg2l = QVBoxLayout(sg2)
+    dialog.sg_slim_slider = dialog._add_slider(sg2l, t("slim"), 0, 100, dialog.config.get("skate_grass_slim", 40))
+    dialog.sg_flower_slider = dialog._add_slider(sg2l, t("flower"), 0, 100, dialog.config.get("skate_grass_flower", 0))
+    g_sgl.addWidget(sg2)
+    sg3 = QGroupBox(t("cluster_area"))
+    sg3l = QVBoxLayout(sg3)
+    dialog.sg_clusters_slider = dialog._add_slider(sg3l, t("num_clusters"), 0, 20, dialog.config.get("skate_grass_clusters", 5))
+    dialog.sg_cluster_count_slider = dialog._add_slider(sg3l, t("total_count"), 0, 150, dialog.config.get("skate_grass_cluster_count", 40))
+    dialog.sg_density_slider = dialog._add_slider(sg3l, t("density"), 0, 100, dialog.config.get("skate_grass_density", 70))
+    dialog.sg_spacing_slider = dialog._add_slider(sg3l, t("spacing"), 0, 100, dialog.config.get("skate_grass_spacing", 50))
+    g_sgl.addWidget(sg3)
+    sg4 = QGroupBox(t("scatter_area"))
+    sg4l = QVBoxLayout(sg4)
+    dialog.sg_scatter_slider = dialog._add_slider(sg4l, t("count"), 0, 150, dialog.config.get("skate_grass_scatter", 20))
+    dialog.sg_scatter_density_slider = dialog._add_slider(sg4l, t("scatter_density"), 0, 100, dialog.config.get("skate_grass_scatter_density", 20))
+    g_sgl.addWidget(sg4)
+    sk_layout.addWidget(g_sg)
+
+    sk_layout.addStretch()
+    sk_scroll.setWidget(sk_inner)
+    tab_sk_layout = QVBoxLayout(tab_skating)
+    tab_sk_layout.setContentsMargins(0, 0, 0, 0)
+    tab_sk_layout.addWidget(sk_scroll)
+
+    return [(tab_skating, t("skating_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "skate_scale": dialog.skate_scale_slider.value(),
+        "skate_count": dialog.skate_count_slider.value(),
+        "skate_snow": dialog.skate_snow_slider.value(),
+        "skate_trail": dialog.skate_trail_check.isChecked(),
+        "skate_grass": dialog.skate_grass_group.isChecked(),
+        "skate_grass_min": dialog.sg_min_slider.value(),
+        "skate_grass_max": max(dialog.sg_max_slider.value(), dialog.sg_min_slider.value() + 1),
+        "skate_grass_thickness": dialog.sg_thickness_slider.value(),
+        "skate_grass_slim": dialog.sg_slim_slider.value(),
+        "skate_grass_flower": dialog.sg_flower_slider.value(),
+        "skate_grass_clusters": dialog.sg_clusters_slider.value(),
+        "skate_grass_cluster_count": dialog.sg_cluster_count_slider.value(),
+        "skate_grass_density": dialog.sg_density_slider.value(),
+        "skate_grass_spacing": dialog.sg_spacing_slider.value(),
+        "skate_grass_scatter": dialog.sg_scatter_slider.value(),
+        "skate_grass_scatter_density": dialog.sg_scatter_density_slider.value(),
+    }
+
+
+SCENE = {
+    "key": "skating",
+    "label_key": "scene_skating",
+    "class": SkatingScene,
+    "order": 60,
+    "scale_key": "skate_scale",
+    "preset_keys": [
+        "skate_scale", "skate_count", "skate_snow", "skate_trail",
+        "skate_grass", "skate_grass_min", "skate_grass_max", "skate_grass_thickness",
+        "skate_grass_slim", "skate_grass_flower",
+        "skate_grass_clusters", "skate_grass_cluster_count", "skate_grass_density",
+        "skate_grass_spacing", "skate_grass_scatter", "skate_grass_scatter_density",
+        "seed",
+    ],
+    "texts": {
+        "ja": {
+            "scene_skating": "フィギュアスケート",
+            "skating_settings": "スケート設定",
+            "skate_count": "スケーターの数",
+            "skate_snow": "雪の量",
+            "skate_trail": "氷上のトレース",
+            "skate_grass": "岸辺の草",
+        },
+        "en": {
+            "scene_skating": "Figure Skating",
+            "skating_settings": "Skating Settings",
+            "skate_count": "Skaters",
+            "skate_snow": "Snowfall",
+            "skate_trail": "Ice Traces",
+            "skate_grass": "Shore Grass",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}

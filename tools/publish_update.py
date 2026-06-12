@@ -28,6 +28,9 @@ CODE_FILES = [
     "version.py", "updater.py", "stats.py",
 ]
 CODE_DIRS = ["scenes"]
+# 非公開モード（別リポジトリ管理）。存在する場合のみ code.zip に含めて配信する
+if os.path.isdir(os.path.join(ROOT, "private_scenes")):
+    CODE_DIRS.append("private_scenes")
 
 OUT_DIR = os.path.join(ROOT, "dist_update")
 
@@ -57,7 +60,10 @@ def build_code_zip():
                 raise SystemExit("missing: " + f)
             z.write(p, f)
         for d in CODE_DIRS:
-            for root, _, files in os.walk(os.path.join(ROOT, d)):
+            for root, dirs, files in os.walk(os.path.join(ROOT, d)):
+                # __pycache__ と .git（private_scenes は独立リポジトリ）を除外
+                dirs[:] = [x for x in dirs
+                           if x != "__pycache__" and not x.startswith(".")]
                 if "__pycache__" in root:
                     continue
                 for f in files:

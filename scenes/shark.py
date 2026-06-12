@@ -963,3 +963,97 @@ class SharkScene(BaseScene):
         # 泡（最前面）
         for b in self.bubbles:
             b.draw(painter)
+
+
+# ---------------------------------------------------------------------------
+# プラグイン登録（設定タブ・gather・i18n は main.py から移設）
+# ---------------------------------------------------------------------------
+
+def _build_settings(dialog):
+    from PyQt5.QtWidgets import QWidget, QVBoxLayout, QCheckBox
+    from i18n import t
+
+    tab_shark = QWidget()
+    sh_layout = QVBoxLayout(tab_shark)
+    dialog.shark_scale_slider = dialog._add_slider(sh_layout, t("display_scale"), 25, 200, dialog.config.get("shark_scale", 100))
+    dialog.shark_count_slider = dialog._add_slider(sh_layout, t("shark_count"), 1, 8, dialog.config.get("shark_count", 3))
+    dialog.shark_coral_slider = dialog._add_slider(sh_layout, t("shark_coral"), 0, 100, dialog.config.get("shark_coral", 60))
+    dialog.shark_seaweed_slider = dialog._add_slider(sh_layout, t("shark_seaweed"), 0, 100, dialog.config.get("shark_seaweed", 50))
+    dialog.shark_snow_slider = dialog._add_slider(sh_layout, t("shark_snow"), 0, 400, dialog.config.get("shark_snow", 100))
+    dialog.shark_wreck_check = QCheckBox(t("shark_wreck"))
+    dialog.shark_wreck_check.setChecked(dialog.config.get("shark_wreck", True))
+    dialog.shark_wreck_check.toggled.connect(dialog._on_slider_changed)
+    sh_layout.addWidget(dialog.shark_wreck_check)
+    dialog.shark_wreck_boats_slider = dialog._add_slider(sh_layout, t("shark_wreck_boats"), 0, 3, dialog.config.get("shark_wreck_boats", 1))
+    dialog.shark_wreck_planes_slider = dialog._add_slider(sh_layout, t("shark_wreck_planes"), 0, 4, dialog.config.get("shark_wreck_planes", 1))
+    dialog.shark_wreck_flow_slider = dialog._add_slider(sh_layout, t("shark_wreck_flow"), 0, 200, dialog.config.get("shark_wreck_flow", 80))
+    dialog.shark_fish_schools_slider = dialog._add_slider(sh_layout, t("shark_fish_schools"), 1, 6, dialog.config.get("shark_fish_schools", 2))
+    dialog.shark_fish_slider = dialog._add_slider(sh_layout, t("shark_fish"), 0, 60, dialog.config.get("shark_fish", 30))
+    dialog.shark_bubbles_check = QCheckBox(t("shark_bubbles"))
+    dialog.shark_bubbles_check.setChecked(dialog.config.get("shark_bubbles", True))
+    dialog.shark_bubbles_check.toggled.connect(dialog._on_slider_changed)
+    sh_layout.addWidget(dialog.shark_bubbles_check)
+    sh_layout.addStretch()
+
+    return [(tab_shark, t("shark_settings"))]
+
+
+def _gather(dialog):
+    return {
+        "shark_scale": dialog.shark_scale_slider.value(),
+        "shark_count": dialog.shark_count_slider.value(),
+        "shark_coral": dialog.shark_coral_slider.value(),
+        "shark_seaweed": dialog.shark_seaweed_slider.value(),
+        "shark_snow": dialog.shark_snow_slider.value(),
+        "shark_wreck": dialog.shark_wreck_check.isChecked(),
+        "shark_wreck_boats": dialog.shark_wreck_boats_slider.value(),
+        "shark_wreck_planes": dialog.shark_wreck_planes_slider.value(),
+        "shark_wreck_flow": dialog.shark_wreck_flow_slider.value(),
+        "shark_fish_schools": dialog.shark_fish_schools_slider.value(),
+        "shark_fish": dialog.shark_fish_slider.value(),
+        "shark_bubbles": dialog.shark_bubbles_check.isChecked(),
+    }
+
+
+SCENE = {
+    "key": "shark",
+    "label_key": "scene_shark",
+    "class": SharkScene,
+    "order": 70,
+    "scale_key": "shark_scale",
+    "preset_keys": ["shark_scale", "shark_count", "shark_coral", "shark_seaweed", "shark_snow", "shark_wreck", "shark_wreck_boats", "shark_wreck_planes", "shark_wreck_flow", "shark_fish_schools", "shark_fish", "shark_bubbles", "seed"],
+    "texts": {
+        "ja": {
+            "scene_shark": "さめちゃん(ホホジロザメ)",
+            "shark_settings": "深海設定",
+            "shark_count": "サメの数",
+            "shark_coral": "珊瑚の量",
+            "shark_seaweed": "海藻の量",
+            "shark_snow": "マリンスノーの量",
+            "shark_wreck": "戦艦（大型レック）を配置",
+            "shark_wreck_boats": "沈没船の数",
+            "shark_wreck_planes": "航空機の残骸の数",
+            "shark_wreck_flow": "噴出（湧昇流）の強さ",
+            "shark_fish_schools": "魚群の数",
+            "shark_fish": "魚群の大きさ（前後ランダム）",
+            "shark_bubbles": "泡",
+        },
+        "en": {
+            "scene_shark": "Same-chan(Great White)",
+            "shark_settings": "Deep Sea Settings",
+            "shark_count": "Sharks",
+            "shark_coral": "Coral",
+            "shark_seaweed": "Seaweed",
+            "shark_snow": "Marine Snow",
+            "shark_wreck": "Battleship Wreck",
+            "shark_wreck_boats": "Sunken Ships",
+            "shark_wreck_planes": "Aircraft Wrecks",
+            "shark_wreck_flow": "Upwelling Strength",
+            "shark_fish_schools": "Fish Schools",
+            "shark_fish": "School Size (approx.)",
+            "shark_bubbles": "Bubbles",
+        },
+    },
+    "build_settings": _build_settings,
+    "gather": _gather,
+}
