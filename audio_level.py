@@ -50,10 +50,12 @@ class AudioLevelMonitor:
             print(f"[AUDIO] soundcard unavailable: {e}")
             self._running = False
             return
+        last_err = None  # 同じエラーの連続表示を抑制（リトライは続ける）
         while self._running:
             try:
                 spk = sc.default_speaker()
                 mic = sc.get_microphone(spk.name, include_loopback=True)
+                last_err = None  # 復帰したら次の障害はまた表示する
                 # 約46ms単位で録音してRMSを計算
                 with mic.recorder(samplerate=44100, blocksize=1024) as rec:
                     frames = 0
@@ -94,6 +96,9 @@ class AudioLevelMonitor:
                         if frames >= 215:
                             break
             except Exception as e:
-                print(f"[AUDIO] capture error (retrying): {e}")
+                # デバイス無し等で毎回同じエラーになるため、変化した時だけ表示
+                if str(e) != last_err:
+                    last_err = str(e)
+                    print(f"[AUDIO] capture error (retrying quietly): {e}")
                 self.level = 0.0
                 time.sleep(2.0)
