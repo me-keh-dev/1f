@@ -42,6 +42,12 @@ def fetch_stats(base_url=None, callback=None):
     _request((base_url or DEFAULT_STATS_URL) + "/stats", None, callback)
 
 
+def submit_usage(uid, scene, base_url=None, callback=None):
+    """利用記録（1人×1モード×1日でサーバ側upsert）を送信（別スレッド）"""
+    data = json.dumps({"uid": uid, "scene": scene}).encode("utf-8")
+    _request((base_url or DEFAULT_STATS_URL) + "/usage", data, callback)
+
+
 def submit_errlog(payload, base_url=None, callback=None):
     """同意済みの匿名エラーログ {ver, skeleton, platform, os, log} を送信（別スレッド）"""
     data = json.dumps(payload).encode("utf-8")

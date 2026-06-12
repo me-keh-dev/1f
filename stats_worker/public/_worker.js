@@ -1,6 +1,7 @@
 // 1/f みんなのお気に入りモード（人気投票）集計 Worker
 // POST /favorites {uid, scenes:[...]} → 投票をupsertし最新集計を返す
 // GET  /stats                         → 集計のみ返す
+// POST /usage {uid, scene}             → 利用記録（1人×1モード×1日）をupsertし最新集計を返す
 // POST /errlog {ver, skeleton, platform, os, log} → 匿名エラーログを保存
 // 保存するのは匿名ID（uuid4 hex）とモード名だけ。個人情報なし。
 
@@ -33,6 +34,23 @@ export default {
         return json(await stats(env));
       }
       if (req.method === "GET" && url.pathname === "/stats") {
+        return json(await stats(env));
+      }
+      if (req.method === "POST" && url.pathname === "/usage") {
+        let body;
+        try {
+          body = await req.json();
+        } catch {
+          return err(400);
+        }
+        const uid = typeof body.uid === "string" ? body.uid : "";
+        if (!/^[0-9a-f]{32}$/.test(uid)) return err(400);
+        if (!SCENES.includes(body.scene)) return err(400);
+        await env.DB.prepare(
+          "INSERT OR IGNORE INTO usage (uid, scene, day) VALUES (?, ?, ?)"
+        )
+          .bind(uid, body.scene, Math.floor(Date.now() / 86400000))
+          .run();
         return json(await stats(env));
       }
       if (req.method === "POST" && url.pathname === "/errlog") {
@@ -94,7 +112,26 @@ async function stats(env) {
       if (r[key] > 0) periods[key][r.scene] = r[key];
     }
   }
-  return { users, counts, periods };
+  // 利用記録（1人×1モード×1日）の期間別集計
+  const today = Math.floor(Date.now() / 86400000);
+  const usums = PERIODS.map(
+    ([key], i) => `SUM(day > ?${i + 1}) AS ${key}`
+  ).join(", ");
+  const ucuts = PERIODS.map(([, days]) => today - days);
+  const urows = (
+    await env.DB.prepare(
+      `SELECT scene, COUNT(*) AS total, ${usums} FROM usage GROUP BY scene`
+    ).bind(...ucuts).all()
+  ).results;
+  const usage = { total: {} };
+  for (const [key] of PERIODS) usage[key] = {};
+  for (const r of urows) {
+    usage.total[r.scene] = r.total;
+    for (const [key] of PERIODS) {
+      if (r[key] > 0) usage[key][r.scene] = r[key];
+    }
+  }
+  return { users, counts, periods, usage };
 }
 
 function json(obj) {

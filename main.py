@@ -854,6 +854,7 @@ class SettingsDialog(QDialog):
         self.wind_sync_btn.toggled.connect(self._on_wind_sync_toggled)
         g_wsl.addWidget(self.wind_sync_btn)
         limit_desc = QLabel(t("wind_limit_desc"))
+        limit_desc.setWordWrap(True)
         limit_desc.setStyleSheet("color: #666; font-size: 10px;")
         g_wsl.addWidget(limit_desc)
         self.wind_limit_slider = self._add_slider(g_wsl, t("wind_limit"), 10, 30, self.config.get("wind_sync_limit", 15))
@@ -952,11 +953,21 @@ class SettingsDialog(QDialog):
         self.poll_status.setStyleSheet("color: #666; font-size: 10px;")
         tpl.addWidget(self.poll_status)
         self._poll_periods = {}
+        self._poll_sources = {}
+        combo_row = QHBoxLayout()
+        self.poll_src_combo = QComboBox()
+        self.poll_src_combo.addItem(t("stats_src_fav"), "fav")
+        self.poll_src_combo.addItem(t("stats_src_usage"), "usage")
+        self.poll_src_combo.currentIndexChanged.connect(
+            self._on_poll_source_changed)
+        self.poll_src_combo.hide()
+        combo_row.addWidget(self.poll_src_combo, 1)
         self.poll_period_combo = QComboBox()
         self.poll_period_combo.currentIndexChanged.connect(
             self._on_poll_period_changed)
         self.poll_period_combo.hide()
-        tpl.addWidget(self.poll_period_combo)
+        combo_row.addWidget(self.poll_period_combo, 1)
+        tpl.addLayout(combo_row)
         self.poll_graph = PollGraph()
         tpl.addWidget(self.poll_graph)
         tpl.addStretch()
@@ -1061,7 +1072,8 @@ class SettingsDialog(QDialog):
     def _add_slider(self, layout, label, min_val, max_val, current):
         row = QHBoxLayout()
         lbl = QLabel(label)
-        lbl.setFixedWidth(50)
+        # 固定幅だと長いラベルが切れてスライダーに隠れるため、最小幅のみ指定
+        lbl.setMinimumWidth(50)
         slider = NoWheelSlider(Qt.Horizontal)
         slider.setRange(min_val, max_val)
         slider.setValue(current)
@@ -1107,6 +1119,7 @@ class SettingsDialog(QDialog):
                                   self.stats_received.emit)
         else:
             self.poll_status.setText("")
+            self.poll_src_combo.hide()
             self.poll_period_combo.hide()
             self.poll_graph.clear()
 
@@ -1123,12 +1136,21 @@ class SettingsDialog(QDialog):
             return
         if not data:
             self.poll_status.setText(t("stats_failed"))
+            self.poll_src_combo.hide()
             self.poll_period_combo.hide()
             self.poll_graph.clear()
             return
         self.poll_status.setText("")
-        self._poll_periods = data.get("periods") or \
-            {"total": data.get("counts", {})}
+        self._poll_sources = {
+            "fav": data.get("periods") or {"total": data.get("counts", {})},
+            "usage": data.get("usage") or {},
+        }
+        self.poll_src_combo.show()
+        self._on_poll_source_changed()
+
+    def _on_poll_source_changed(self):
+        src = self.poll_src_combo.currentData() or "fav"
+        self._poll_periods = self._poll_sources.get(src) or {}
         cur = self.poll_period_combo.currentData()
         self.poll_period_combo.blockSignals(True)
         self.poll_period_combo.clear()
@@ -1586,12 +1608,15 @@ class OverlayManager:
         if saved_lang:
             set_language(saved_lang)
         # 起動時のモード抽選: お気に入り（未設定なら全モード）からランダムに選ぶ
+        # 抽選で選ばれたモードは「指名」ではないため利用記録の対象外
+        self._scene_designated = True
         if self.config.get("startup_random", True):
             valid = [k for k, _ in SCENE_MODES]
             pool = [k for k in (self.config.get("startup_scenes") or valid)
                     if k in valid]
             if pool:
                 self.config["scene_mode"] = random.choice(pool)
+                self._scene_designated = False
         self.wind_sim = WindSimulator()
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self.last_time = time.monotonic()
@@ -1611,6 +1636,10 @@ class OverlayManager:
 
         self.user_visible = True
         self._fullscreen_hidden = False
+
+        # 利用記録（人気投票オプトイン時のみ、1モード×1日につき1回）
+        self._usage_sent = set()
+        self._report_usage()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self._tick)
@@ -1649,6 +1678,24 @@ class OverlayManager:
             overlay = ScreenOverlay(screen, self.config, self.wind_sim)
             self.overlays.append(overlay)
 
+    def _report_usage(self):
+        """現在のモードの利用を記録（オプトイン時のみ）。
+        ユーザーが指名したモードだけが対象（起動時の抽選は数えない）。
+        同じモード×同じ日は一度しか送らない（サーバ側もupsertで重複なし）"""
+        if not self._scene_designated:
+            return
+        if not self.config.get("stats_optin", False):
+            return
+        uid = self.config.get("stats_uid")
+        if not uid:
+            return
+        scene = self.config.get("scene_mode", "grass")
+        key = (scene, time.strftime("%Y-%m-%d"))
+        if key in self._usage_sent:
+            return
+        self._usage_sent.add(key)
+        stats.submit_usage(uid, scene, self.config.get("stats_url"))
+
     def _refresh_screens(self):
         current_screens = set(id(s) for s in QApplication.screens())
         overlay_screens = set(id(o.screen) for o in self.overlays)
@@ -1657,6 +1704,8 @@ class OverlayManager:
         else:
             for o in self.overlays:
                 o._position_window()
+        # 日付が変わった・モードが変わったときの利用記録（5秒ごとの軽いチェック）
+        self._report_usage()
 
     def _load_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -1701,6 +1750,10 @@ class OverlayManager:
                 o.config = self.config
             return
 
+        # 設定でモードを明示的に切り替えた＝指名（利用記録の対象になる）
+        new_mode = new_config.get("scene_mode")
+        if new_mode and new_mode != self.config.get("scene_mode"):
+            self._scene_designated = True
         self.config.update(new_config)
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self._save_config()
@@ -1721,6 +1774,8 @@ class OverlayManager:
             self.audio_monitor.start()
         else:
             self.audio_monitor.stop()
+        # モード変更・オプトイン変更を利用記録に反映
+        self._report_usage()
 
     def save_preset(self, category, data):
         cat_dir = os.path.join(SAVE_DIR, category)

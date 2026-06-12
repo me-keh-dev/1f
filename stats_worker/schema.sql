@@ -6,6 +6,15 @@ CREATE TABLE IF NOT EXISTS votes (
 );
 CREATE INDEX IF NOT EXISTS idx_votes_scene ON votes (scene);
 
+-- 利用記録（1人×1モード×1日）。day = floor(unix_ms / 86400000)
+CREATE TABLE IF NOT EXISTS usage (
+  uid TEXT NOT NULL,
+  scene TEXT NOT NULL,
+  day INTEGER NOT NULL,
+  PRIMARY KEY (uid, scene, day)
+);
+CREATE INDEX IF NOT EXISTS idx_usage_scene ON usage (scene);
+
 -- 同意の上で送信される匿名エラーログ
 CREATE TABLE IF NOT EXISTS errlogs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

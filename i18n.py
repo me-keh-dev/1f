@@ -70,6 +70,8 @@ TEXTS = {
         # エラー報告
         "errlog_title": "エラー報告",
         "errlog_ask": "前回の実行でエラーが記録されました。\n改善のため、エラーログを匿名で開発者に送信しますか？\n\n送信されるのはエラーの記録とアプリのバージョンだけで、\n個人情報は含まれません（パス中のユーザー名は伏せられます）。",
+        "stats_src_fav": "お気に入り（投票）",
+        "stats_src_usage": "使われたモード",
         "stats_loading": "みんなのお気に入りを取得中...",
         "stats_failed": "集計を取得できませんでした",
         "stats_p_today": "今日",
@@ -262,6 +264,8 @@ TEXTS = {
         # Error report
         "errlog_title": "Error Report",
         "errlog_ask": "An error was recorded during the last run.\nSend the error log anonymously to the developer to help improve the app?\n\nOnly the error record and the app version are sent.\nNo personal information is included (your user name in paths is masked).",
+        "stats_src_fav": "Favorites (votes)",
+        "stats_src_usage": "Scenes in use",
         "stats_loading": "Loading everyone's favorites...",
         "stats_failed": "Could not load the results",
         "stats_p_today": "Today",
