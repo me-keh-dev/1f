@@ -58,11 +58,12 @@ def ensure_topmost(hwnd):
     )
 
 HWND_NOTOPMOST = -2
+HWND_BOTTOM = 1
 
 def set_behind_windows(hwnd):
-    """ウィンドウを他のウィンドウの下に配置する（富士山用）"""
+    """ウィンドウを全ウィンドウの最背面に配置する（背景レイヤー用）"""
     ctypes.windll.user32.SetWindowPos(
-        hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+        hwnd, HWND_BOTTOM, 0, 0, 0, 0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
     )
 

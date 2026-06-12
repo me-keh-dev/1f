@@ -25,7 +25,7 @@ from version import CODE_VERSION  # noqa: E402
 CODE_FILES = [
     "main.py", "i18n.py", "weather.py", "weather_fx.py",
     "platform_win.py", "platform_mac.py", "audio_level.py",
-    "version.py", "updater.py",
+    "version.py", "updater.py", "stats.py",
 ]
 CODE_DIRS = ["scenes"]
 

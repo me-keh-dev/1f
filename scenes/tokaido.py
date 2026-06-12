@@ -151,6 +151,48 @@ TRAVELER_TYPES = [
 ]
 
 
+# --- 雨具（和傘・三度笠） ---
+WAGASA_COLORS = [
+    (225, 40, 45),    # 緋色（蛇の目）
+    (235, 75, 30),    # 朱色
+    (225, 40, 45),    # 緋色（赤多め）
+    (250, 170, 30),   # 山吹
+    (170, 60, 190),   # 京紫
+    (50, 110, 200),   # 瑠璃
+]
+WAGASA_POLE = (90, 60, 35)
+SANDOGASA = (190, 165, 105)
+SANDOGASA_DARK = (155, 130, 80)
+
+
+def _rest_umbrella_pixels(style, color):
+    """使った後の和傘（軒下に先端を上へ向けて逆さに立て掛ける）。
+    (dx, dy, RGB) dyは地面から上向き。style: 'closed' / 'half'"""
+    base = color
+    dark = tuple(max(0, v - 45) for v in base)
+    px = []
+    if style == 'closed':
+        # 閉じた傘: 石突が上、すぼめた傘布、柄が下
+        px.append((0, 8, WAGASA_POLE))            # 石突（先端）
+        for y in range(5, 8):
+            px.append((0, y, base))
+        px.append((-1, 5, dark))
+        px.append((1, 5, dark))
+        for y in range(0, 5):
+            px.append((0, y, WAGASA_POLE))        # 柄（手元が下）
+    else:
+        # 半開き: 先端を上に、傘布が下へ広がる
+        px.append((0, 8, WAGASA_POLE))            # 石突（先端）
+        px.append((0, 7, base))
+        for ddx in (-1, 0, 1):
+            px.append((ddx, 6, base))
+        for ddx in (-2, -1, 0, 1, 2):
+            px.append((ddx, 5, dark if abs(ddx) == 2 else base))
+        for y in range(0, 5):
+            px.append((0, y, WAGASA_POLE))        # 柄（手元が下）
+    return px
+
+
 # --- Pine tree ---
 class PineTree:
     def __init__(self, base_x, pixels, trunk_h, max_dy, sway_base):
@@ -625,7 +667,7 @@ class StaticBuilding:
 
 # --- Traveler ---
 class Traveler:
-    def __init__(self, x, y, traveler_type, direction, speed):
+    def __init__(self, x, y, traveler_type, direction, speed, rng=None):
         self.x = float(x)
         self.y = y
         self.frames = traveler_type['frames']
@@ -635,11 +677,25 @@ class Traveler:
         self.is_runner = traveler_type['name'] == 'hikyaku'
         self.frame = 0
         self.frame_counter = 0
+        # 雨具: 和傘 / 三度笠 / なし（なしの人は雨の日は小走り）
+        self.raining = False
+        self.rain_gear = None
+        self.umb_color = None
+        if rng is not None and not self.is_runner:
+            r = rng.random()
+            if r < 0.40:
+                self.rain_gear = 'wagasa'
+                self.umb_color = QColor(*rng.choice(WAGASA_COLORS))
+            elif r < 0.75:
+                self.rain_gear = 'sandogasa'
 
     def update(self, screen_width):
-        self.x += self.speed * self.direction
+        # 雨具を持たない人は雨の日は小走りで急ぐ
+        hurrying = self.raining and self.rain_gear is None and not self.is_runner
+        speed = self.speed * (2.0 if hurrying else 1.0)
+        self.x += speed * self.direction
         self.frame_counter += 1
-        frame_rate = 8 if self.is_runner else 18  # runners animate faster
+        frame_rate = 8 if (self.is_runner or hurrying) else 18
         if self.frame_counter >= frame_rate:
             self.frame_counter = 0
             self.frame = 1 - self.frame
@@ -648,6 +704,34 @@ class Traveler:
             self.x = -margin
         elif self.x < -margin:
             self.x = screen_width + margin
+
+    def _gear_pixels(self, shape):
+        """雨の日の装備（dx, dy, RGBタプル）。dxは向き反転前"""
+        top = min(dy for _, dy, _ in shape)
+        px = []
+        if self.rain_gear == 'sandogasa':
+            # 三度笠: 頭上の幅広で浅い笠
+            y = top - 1
+            for ddx in range(-2, 3):
+                px.append((ddx, y,
+                           SANDOGASA_DARK if abs(ddx) == 2 else SANDOGASA))
+            for ddx in range(-1, 2):
+                px.append((ddx, y - 1, SANDOGASA))
+        elif self.rain_gear == 'wagasa':
+            # 和傘: 前方の手にさす。傘布2段＋頂点＋柄
+            base = (self.umb_color.red(), self.umb_color.green(),
+                    self.umb_color.blue())
+            dark = tuple(max(0, v - 45) for v in base)
+            hx = 1          # 持ち手（前方の腕）のx
+            cy = top - 3    # 傘布の下段y
+            for ddx in range(-3, 4):
+                px.append((hx + ddx, cy, dark if abs(ddx) >= 2 else base))
+            for ddx in range(-2, 3):
+                px.append((hx + ddx, cy - 1, base))
+            px.append((hx, cy - 2, dark))            # 頂点
+            for yy in range(cy + 1, -2):             # 柄: 傘布の下〜手元
+                px.append((hx, yy, WAGASA_POLE))
+        return px
 
     def draw(self, painter, alpha=255, tint=None, ps=None):
         ps = ps or PIXEL_SIZE
@@ -662,6 +746,14 @@ class Traveler:
             c = apply_tint(c, tint) if tint else QColor(c)
             c.setAlpha(alpha)
             painter.fillRect(sx, sy, ps, ps, c)
+        # 雨の日の装備
+        if self.raining and self.rain_gear:
+            for dx, dy, rgb in self._gear_pixels(shape):
+                sx = int(self.x + dx * self.direction * ps)
+                sy = int(self.y + dy * ps)
+                c = apply_tint(QColor(*rgb), tint) if tint else QColor(*rgb)
+                c.setAlpha(alpha)
+                painter.fillRect(sx, sy, ps, ps, c)
 
 
 # --- Pine tree generation (Japanese-style curved pine) ---
@@ -898,6 +990,7 @@ class TokaidoScene(BaseScene):
         self.front_trees = []
         self.front_willows = []
         self.buildings = []
+        self.rest_umbrellas = []  # 軒下の休憩和傘（雨の日のみ描画）
 
         # Object counts from config (with ratio scaling)
         counts = {
@@ -1002,6 +1095,16 @@ class TokaidoScene(BaseScene):
                 # Place center at x + half-width so buildings touch
                 cx = x + hw * PIXEL_SIZE
                 self.buildings.append(StaticBuilding(cx, px_data, has_noren=has_noren))
+                # 軒下に使った後の和傘（先端を上に逆さ置き）を立て掛ける
+                if item != 'torii' and rng.random() < 0.5:
+                    side = rng.choice([-1, 1])
+                    self.rest_umbrellas.append({
+                        'base_x': cx,
+                        'edge_dx': side * (hw - 2),
+                        'pixels': _rest_umbrella_pixels(
+                            rng.choice(['closed', 'half']),
+                            rng.choice(WAGASA_COLORS)),
+                    })
                 x = cx + hw * PIXEL_SIZE  # next building starts right at the edge
 
     def _generate_fuji(self, rng, width, config):
@@ -1089,7 +1192,7 @@ class TokaidoScene(BaseScene):
             if t_type['name'] == 'hikyaku':
                 speed = rng.uniform(0.5, 0.9)
             self.travelers.append(
-                Traveler(x, road_y, t_type, direction, speed))
+                Traveler(x, road_y, t_type, direction, speed, rng))
 
     def update(self, wind_sim, mouse_pos=None):
         for tree in self.back_trees + self.front_trees:
@@ -1103,7 +1206,9 @@ class TokaidoScene(BaseScene):
         for bld in self.buildings:
             wave = wind_sim.get_wave_at(bld.base_x)
             bld.update(wave)
+        raining = self.is_raining
         for trav in self.travelers:
+            trav.raining = raining
             trav.update(self.widget_width)
 
     def has_background_layer(self):
@@ -1151,6 +1256,17 @@ class TokaidoScene(BaseScene):
         for bld in self.buildings:
             alpha = get_alpha(bld.base_x) if get_alpha else 255
             bld.draw(painter, ground_y, alpha, tint, ps)
+
+        # 軒下の休憩和傘（雨の日のみ）
+        if self.is_raining:
+            for u in self.rest_umbrellas:
+                ux = u['base_x'] + u['edge_dx'] * ps
+                alpha = get_alpha(ux) if get_alpha else 255
+                for ddx, dy, rgb in u['pixels']:
+                    c = apply_tint(QColor(*rgb), tint) if tint else QColor(*rgb)
+                    c.setAlpha(alpha)
+                    painter.fillRect(ux + ddx * ps,
+                                     ground_y - (dy + 1) * ps, ps, ps, c)
 
         # Roadside grass
         road_top_y = ground_y - road_h

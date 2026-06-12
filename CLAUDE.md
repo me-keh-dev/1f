@@ -11,6 +11,15 @@
 - 更新の仕組み: 起動4秒後に version.json を確認。コード差分は自動DL→SHA256検証→`%APPDATA%/1f/code` へ展開（bootstrapが優先ロード）→再起動提案。コア更新は同意ダイアログ→DL→バッチで自己置換・再起動。MSIX（ストア）版はストア案内のみ（Store Policy 10.2 / 2.5.2 準拠）
 - 開発実行（非frozen）では更新チェックをスキップ。テストは環境変数 `ONEF_DEV_UPDATE=1`
 
+## 人気投票（みんなのお気に入りモード）の集計サーバ
+
+- URL: `https://1f-stats.pages.dev`（stats.py の DEFAULT_STATS_URL、config の `stats_url` で上書き可）
+- 実体: Cloudflare Pages の `_worker.js`（`stats_worker/`、Workerと同等）＋ D1 `1f-stats`（id 414fd24f-6faa-48e4-ace7-5ee3aa8be386）。workers.dev サブドメイン未登録のため Pages 方式を採用
+- API: `POST /favorites {uid, scenes:[...]}` → upsert して最新集計を返す / `GET /stats` → `{users, counts}`。uid は uuid4 hex（32桁）必須、scenes は既知モード名のみ受理
+- デプロイ: `cd stats_worker && npx wrangler pages deploy`。スキーマ変更は `npx wrangler d1 execute 1f-stats --remote --file schema.sql`
+- クライアント: オプトイン（`stats_optin`、デフォルトOFF）。ONで匿名ID（`stats_uid`）＋お気に入りモードのみ送信、個人情報なし。失敗は黙殺
+- 注意: Cloudflare は `Python-urllib` の User-Agent を 403 で弾く → stats.py は UA `1f-app` を送る
+
 ## 対応ログ
 
 ### 2026-06-10 セッション1
@@ -111,3 +120,15 @@
 | スマホゲーム式の自動更新（起動時にサーバへ差分確認→自動DL、コア変更時は同意の上インストーラーDL→更新。ストア審査に準拠した方式のみ） | `updater.py` 新設: 起動4秒後に version.json を確認、コード差分は自動DL→SHA256検証→%APPDATA%/1f/code へアトミック展開→再起動提案。コア更新（SKELETON_VERSION差分）は同意ダイアログ→進捗付きDL→検証→バッチで自己置換・自動再起動。MSIX判定時はストア案内のみ。`version.py`（CODE_VERSION）・bootstrap.py に SKELETON_VERSION=1・設定に「起動時に更新を自動確認する」・i18n日英・両specへ追加。 |
 | ConoHaの情報はメインにある→配信は claudfrea（Cloudflare）で検討 | VPSではなく Cloudflare Pages（無料・HTTPS・CDN）で配信に決定。プロジェクト `1f-updates` を作成し https://1f-updates.pages.dev/ で version.json + code.zip を配信。`tools/publish_update.py` 新設（code.zip生成→SHA256→version.json生成→wranglerでデプロイ）。CDN経由のDL→検証→適用のE2Eテスト合格。 |
 | はい（commit→push→release実行の承認） | コミット f94f19b を push。新骨格（SKELETON_VERSION=1, updater同梱）で 1f.exe を再ビルド・起動確認し、GitHub Release v2.9.0 を作成して添付。version.json に installer_url/sha256 を含めて Cloudflare へ配信（v2.9.0 以降のexeは自動更新が有効）。 |
+
+### 2026-06-12 セッション3
+
+| プロンプト | 対応内容 |
+|---|---|
+| お気に入りモードの利用統計をサーバで集計（人気投票）。オプトインONでみんなのお気に入りが見られる | 集計サーバを Cloudflare Pages `_worker.js`＋D1 で新設（`stats_worker/`、https://1f-stats.pages.dev ※workers.devサブドメイン未登録のためPages方式）。POST /favorites（匿名uid＋お気に入りをupsert、最新集計を返す）/ GET /stats。クライアント `stats.py` 新設（別スレッド送受信・失敗黙殺・UA `1f-app`=Cloudflareの urllib UA 403対策）。設定の「起動時のモード」グループにオプトイン「人気投票に参加する（みんなのお気に入りモードが見られます）」を追加: ONで uuid4 匿名ID（stats_uid）生成→投票し、参加人数＋モード別順位ラベルを表示。ダイアログを閉じる時にも最新お気に入りを再投票。i18n日英・両spec・publish_update.py に stats.py 追加（標準ライブラリのみ＝骨格再ビルド不要）。E2E（投票・上書き・集計・オフスクリーンUI）合格。 |
+| 人気投票は新しいタブに。数字は出さずグラフだけ表示 | 設定に「人気投票」タブを新設（保存タブの後）: オプトインチェック＋プライバシー注記＋`PollGraph` ウィジェット。PollGraph は票数・人数など数字を一切出さず、モード名＋横棒（最大票=満幅、得票順、0票は空バー）のみ描画。環境タブからは投票UIを撤去。i18n の stats_users/stats_line を削除し tab_poll/stats_privacy を追加。 |
+| 集計は累計だけでなく期間別に（今日/1週間/1ヶ月/3ヶ月/半年/1年、それより前は累計） | Worker の集計を期間別に拡張: votes.updated_at（再投票で更新）を使い、1クエリで today/week/month/month3/month6/year/total を返す（`periods` フィールド）。クライアントは人気投票タブに期間コンボを追加し、データのある期間だけ表示（累計は常時）。選択期間のグラフに切替。i18n に期間ラベル日英追加。 |
+| 雨の日、東海道で三度笠や和傘をさして歩く。全員ではなく、ささない人は小走り。家の外には使った後の和傘（軒下に先端を上へ逆さ置き） | 天気をシーンに伝える仕組みを新設: scenes/base.py に RAINY_STATES と BaseScene.set_weather()/is_raining、main.py の update_scene で weather_fx.current_state を毎tick伝達（天気連動OFF時は clear）。東海道: 旅人に雨具をシードで割当（40%和傘・35%三度笠・25%なし、飛脚は除外）。雨天時、和傘は前方の手に傘布2段＋頂点＋柄、三度笠は頭上の幅広笠を描画。雨具なしの人は小走り（速度2倍・足の回転8フレーム）。建物ごとに50%で軒下の休憩和傘（閉じ/半開き、先端=石突を上に柄を下にした逆さ置き、和傘4色）を配置し雨天時のみ描画。オフスクリーン描画テスト合格。 |
+| 傘はもっと目立つ色で（赤い傘とか） | WAGASA_COLORS を鮮やかなパレットに変更: 緋色（蛇の目、2枠で出現率高め）・朱色・山吹・京紫・瑠璃の6枠。くすんだ旧4色（暗赤/藍/紫/黄土）を置き換え。 |
+| たまに落ちて安定しないというクレーム | 原因調査と安定化: PyQt5.5以降はスロット/タイマー内の未捕捉Python例外で即プロセスabortする仕様が最有力（過去の草randintバグと同類のまれな例外1つで落ちる）。`_setup_crash_logging()` を main() 冒頭に追加: sys.excepthook＋threading.excepthook で未捕捉例外を `%APPDATA%/1f/error.log` に記録しアプリは落とさず続行、ネイティブクラッシュは faulthandler で `%APPDATA%/1f/crash.log` にスタック記録（512KB超で自動リセット）。全7シーン×40通りの極端設定ファズテストはエラーゼロ。標準ライブラリのみ＝コード配信で更新可。 |
+| 「このエラーログを報告しますか？」でエラーログを収集する | 同意ベースの匿名エラー報告を実装。クライアント: 起動7秒後、前回までの error.log / crash.log に内容があれば「エラー報告」ダイアログで送信可否を確認（i18n日英）。送信内容はログ＋CODE_VERSION＋スケルトン版＋platform＋OS版のみで、パス中のホームディレクトリ（ユーザー名）は `~` にマスク、60KBに切り詰め。送信・辞退どちらでもログをクリアし同じ内容で再度聞かない（faulthandlerが開いたままのcrash.logも r+ でtruncate）。サーバ: `_worker.js` に POST /errlog を追加し D1 の errlogs テーブル（id/created_at/ver/skeleton/platform/os/log、ログ64KB上限）へ保存、デプロイ済み。確認は `npx wrangler d1 execute 1f-stats --remote --command "SELECT ..."`。E2E（収集→マスク→送信→D1保存→クリア）合格、テスト行は削除済み。 |

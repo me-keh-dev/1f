@@ -445,6 +445,7 @@ class Fish:
         self.vx = rng.uniform(-0.4, 0.4)
         self.vy = rng.uniform(-0.15, 0.15)
         self.phase = rng.uniform(0, math.tau)
+        self.g = 1.0   # 群れの「呼吸」係数（散開0.2〜密集2.0）のキャッシュ
 
 
 class FishSchools:
@@ -476,11 +477,16 @@ class FishSchools:
             if size <= 0:
                 break
             total += size
-            ax = rng.uniform(width * 0.15, width * 0.85)
+            # 魚礁（最大の沈没物）の周辺に発生
+            cx = reef_x if reef_x is not None else width * 0.5
+            ax = cx + rng.uniform(-width * 0.15, width * 0.15)
+            ax = min(max(ax, width * 0.08), width * 0.92)
             ay = rng.uniform(area_h * 0.30, area_h * 0.65)
             self.anchors.append([ax, ay, PinkNoiseGenerator(),
                                  rng.uniform(-0.3, 0.3),
-                                 rng.uniform(0, math.tau)])
+                                 rng.uniform(0, math.tau),
+                                 rng.uniform(0, math.tau),   # 呼吸の位相
+                                 PinkNoiseGenerator()])      # 呼吸のゆらぎ
             for _ in range(size):
                 self.fish.append(Fish(rng, ax + rng.uniform(-45, 45),
                                       ay + rng.uniform(-28, 28)))
@@ -493,8 +499,9 @@ class FishSchools:
         # アンカー: 1/fゆらぎで横に大きく回遊。時々魚礁の上空に戻ってくる
         for a in self.anchors:
             a[3] += a[2].next() * 0.03
+            # 魚礁が行動圏の中心: 離れるほど強く引き戻される
             if self.reef_x is not None:
-                a[3] += (self.reef_x - a[0]) * 0.00002
+                a[3] += (self.reef_x - a[0]) * 0.00004
             a[3] = max(-0.7, min(0.7, a[3]))
             a[0] += a[3]
             if a[0] < self.width * 0.06:
@@ -505,6 +512,11 @@ class FishSchools:
                 a[3] = -abs(a[3])
             a[1] += math.sin(self.t * 0.004 + a[4]) * 0.06
             a[1] = min(max(a[1], self.area_h * 0.2), self.area_h * 0.75)
+        # 群れの「呼吸」: 1/fゆらぎでゆっくり散開⇄密集を繰り返す
+        gathers = []
+        for a in self.anchors:
+            b = 0.5 + 0.5 * math.sin(self.t * 0.005 + a[5]) + a[6].next() * 0.4
+            gathers.append(0.2 + min(max(b, 0.0), 1.0) * 1.8)
         # 局所ボイド: 視界内の仲間とだけ結束・整列・分離
         sight = self.SIGHT
         r2 = sight * sight
@@ -519,18 +531,22 @@ class FishSchools:
                 dy = fi.y - fj.y
                 d2 = dx * dx + dy * dy
                 if d2 < r2:
-                    # 結束（弱いので群れは伸び広がれる）
-                    fi.vx -= dx * 0.0005
-                    fi.vy -= dy * 0.0005
-                    fj.vx += dx * 0.0005
-                    fj.vy += dy * 0.0005
+                    # 結束（呼吸係数で強弱: 散開時はゼロまで落ちて広がれる）
+                    gavg = (fi.g + fj.g) * 0.5
+                    co = max(0.0, gavg - 0.5) * 0.0005
+                    fi.vx -= dx * co
+                    fi.vy -= dy * co
+                    fj.vx += dx * co
+                    fj.vy += dy * co
                     # 整列: 速度をならす → 群れ全体のうねる動き
+                    # （散開時は同調を弱め、各自ばらばらに泳いで広がる）
+                    al = 0.003 + 0.017 * min(1.0, max(0.0, gavg - 0.5))
                     mvx = (fi.vx + fj.vx) * 0.5
                     mvy = (fi.vy + fj.vy) * 0.5
-                    fi.vx += (mvx - fi.vx) * 0.02
-                    fi.vy += (mvy - fi.vy) * 0.02
-                    fj.vx += (mvx - fj.vx) * 0.02
-                    fj.vy += (mvy - fj.vy) * 0.02
+                    fi.vx += (mvx - fi.vx) * al
+                    fi.vy += (mvy - fi.vy) * al
+                    fj.vx += (mvx - fj.vx) * al
+                    fj.vy += (mvy - fj.vy) * al
                     if 0 < d2 < 64:
                         push = 0.03 / max(1.0, d2 / 16.0)
                         fi.vx += dx * push
@@ -541,15 +557,23 @@ class FishSchools:
         for f in fs:
             best = None
             bd = 1e18
-            for a in self.anchors:
+            bg = 1.0
+            for a, g in zip(self.anchors, gathers):
                 dx = a[0] - f.x
                 dy = a[1] - f.y
                 d2 = dx * dx + dy * dy
                 if d2 < bd:
                     bd = d2
                     best = a
-            f.vx += (best[0] - f.x) * 0.0005
-            f.vy += (best[1] - f.y) * 0.0008
+                    bg = g
+            f.g = bg
+            f.vx += (best[0] - f.x) * 0.0005 * bg
+            f.vy += (best[1] - f.y) * 0.0008 * bg
+            # 散開フェーズ（bg小）はアンカーから外向きにふわっと広がる
+            if bg < 0.8 and bd < 32400:   # 半径180px まで
+                out = (0.8 - bg) * (1.0 - bd / 32400.0)
+                f.vx += (f.x - best[0]) * 0.0011 * out
+                f.vy += (f.y - best[1]) * 0.0007 * out
             f.vx += math.sin(self.t * 0.03 + f.phase) * 0.012
             f.vy += math.sin(self.t * 0.025 + f.phase * 1.7) * 0.006
         # 天敵（サメ）から逃げる → 群れが割れる
@@ -566,7 +590,13 @@ class FishSchools:
                     fl = (1.0 - d / r) * 0.25
                     f.vx += dx / d * fl
                     f.vy += dy / d * fl
+        margin = (max_y - min_y) * 0.18
         for f in fs:
+            # 上下の境界手前からソフトに押し返す（張り付いて線にならない）
+            if f.y < min_y + margin:
+                f.vy += (min_y + margin - f.y) * 0.004
+            elif f.y > max_y - margin:
+                f.vy -= (f.y - (max_y - margin)) * 0.004
             sp = math.hypot(f.vx, f.vy)
             if sp > 1.8:
                 f.vx *= 1.8 / sp
@@ -575,7 +605,12 @@ class FishSchools:
             f.vy *= 0.985
             f.x += f.vx
             f.y += f.vy
-            f.y = min(max(f.y, min_y), max_y)
+            if f.y < min_y:
+                f.y = min_y
+                f.vy = abs(f.vy) * 0.5
+            elif f.y > max_y:
+                f.y = max_y
+                f.vy = -abs(f.vy) * 0.5
             if f.x < 2:
                 f.x = 2
                 f.vx = abs(f.vx)
@@ -876,12 +911,20 @@ class SharkScene(BaseScene):
         srng = random.Random(1234)
         for i, h in enumerate(self.terrain):
             x = i * ps
+            # マウス接近フェード（列ごと）
+            k = (get_alpha(x) / 255.0) if get_alpha else 1.0
+            shade = h >= 3 and srng.random() < 0.35
+            row = srng.randint(1, h - 1) if shade else 0
+            if k <= 0.01:
+                continue
+            sand.setAlpha(int(150 * k))
+            crest.setAlpha(int(160 * k))
             painter.fillRect(x, ground_y - h * ps, ps, h * ps, sand)
             painter.fillRect(x, ground_y - h * ps, ps, ps, crest)  # 上縁の光
             # 斜面・岩肌の陰影
-            if h >= 3 and srng.random() < 0.35:
-                painter.fillRect(x, ground_y - srng.randint(1, h - 1) * ps,
-                                 ps, ps, dark)
+            if shade:
+                dark.setAlpha(int(140 * k))
+                painter.fillRect(x, ground_y - row * ps, ps, ps, dark)
 
     def draw(self, painter, ground_y, tint=None, get_alpha=None):
         ps = self.ps

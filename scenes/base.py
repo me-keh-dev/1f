@@ -44,8 +44,25 @@ def apply_tint(color, tint):
     )
 
 
+# 雨の天気状態（weather_fx の state 名と同期）
+RAINY_STATES = frozenset({
+    "drizzle", "rain", "heavy_rain", "rain_showers",
+    "freezing_rain", "thunderstorm",
+})
+
+
 class BaseScene:
     """All scenes implement these methods"""
+
+    weather_state = "clear"
+
+    def set_weather(self, state):
+        """現在の天気を伝える（毎tick、ScreenOverlayから）"""
+        self.weather_state = state or "clear"
+
+    @property
+    def is_raining(self):
+        return self.weather_state in RAINY_STATES
 
     def get_area_height(self, config):
         """Return overlay area height in screen pixels"""

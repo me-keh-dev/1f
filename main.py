@@ -9,13 +9,14 @@ import json
 import math
 import random
 import time
+import uuid
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QSystemTrayIcon, QMenu, QAction,
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QPushButton,
     QGroupBox, QComboBox,
 )
-from PyQt5.QtCore import Qt, QTimer, QPoint
+from PyQt5.QtCore import Qt, QTimer, QPoint, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor, QIcon, QPixmap, QFont, QPainterPath
 
 # プラットフォーム固有モジュールの読み込み
@@ -36,6 +37,7 @@ from scenes import get_scene_class, SCENE_MODES
 from scenes.base import PinkNoiseGenerator, PIXEL_SIZE, HAMBURGER_BASE
 from scenes.grass import PALETTE_PRESETS, FLOWER_COLORS_ALL, FLOWER_COLORS, get_active_flower_colors
 import updater
+import stats
 
 def _app_dir():
     """設定・セーブの保存先。
@@ -56,6 +58,127 @@ def _resource_dir():
     if getattr(sys, 'frozen', False):
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def _log_dir():
+    """クラッシュログの保存先（%APPDATA%/1f ほか、updaterの外部コードと同じ場所）"""
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support/1f")
+    else:
+        base = os.path.join(os.environ.get("APPDATA", _app_dir()), "1f")
+    os.makedirs(base, exist_ok=True)
+    return base
+
+
+def _setup_crash_logging():
+    """安定性対策。
+    - PyQt5.5以降はスロット内の未捕捉Python例外で qFatal → 即クラッシュする。
+      excepthook を入れてログに記録し、アプリは落とさず続行する。
+    - ネイティブクラッシュ（Cレベル）は faulthandler でスタックをファイルに残す。
+    """
+    import faulthandler
+    import traceback
+    import threading as _th
+    import datetime as _dt
+    try:
+        from version import CODE_VERSION as _ver
+    except Exception:
+        _ver = "?"
+    log_path = os.path.join(_log_dir(), "error.log")
+    fault_path = os.path.join(_log_dir(), "crash.log")
+    try:
+        # 古いログの肥大化防止
+        if os.path.isfile(log_path) and os.path.getsize(log_path) > 512 * 1024:
+            os.remove(log_path)
+        # faulthandler用ファイルは開きっぱなしにする必要がある
+        _setup_crash_logging._fh = open(fault_path, "a", encoding="utf-8")
+        faulthandler.enable(file=_setup_crash_logging._fh)
+    except Exception:
+        pass
+
+    def _log_exc(prefix, exc_type, exc, tb):
+        try:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("\n[{} v{} {}]\n".format(
+                    _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    _ver, prefix))
+                traceback.print_exception(exc_type, exc, tb, file=f)
+        except Exception:
+            pass
+
+    def _hook(exc_type, exc, tb):
+        _log_exc("uncaught", exc_type, exc, tb)
+        # 落とさず続行（KeyboardInterruptのみ既定動作）
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _hook
+
+    def _thread_hook(args):
+        _log_exc("thread:" + (args.thread.name if args.thread else "?"),
+                 args.exc_type, args.exc_value, args.exc_traceback)
+
+    _th.excepthook = _thread_hook
+
+
+def _collect_error_logs():
+    """前回までに記録されたエラーログを読み、匿名化して返す（なければ None）。
+    crash.log は起動時に faulthandler が開くため、今読める内容＝前回以前の分。
+    """
+    parts = []
+    for name in ("error.log", "crash.log"):
+        path = os.path.join(_log_dir(), name)
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read().strip()
+            if text:
+                parts.append("===== {} =====\n{}".format(name, text))
+        except OSError:
+            pass
+    if not parts:
+        return None
+    log = "\n\n".join(parts)[-60000:]
+    # 匿名化: パス中のホームディレクトリ（ユーザー名）を伏せる
+    home = os.path.expanduser("~")
+    log = log.replace(home, "~").replace(home.replace("\\", "/"), "~")
+    return log
+
+
+def _clear_error_logs():
+    """報告（または辞退）済みのログを空にする。次回は新しいエラーだけ対象になる"""
+    for name in ("error.log", "crash.log"):
+        try:
+            # faulthandler が開いたままでも Windows で truncate できるよう r+ で
+            with open(os.path.join(_log_dir(), name), "r+", encoding="utf-8") as f:
+                f.truncate(0)
+        except OSError:
+            pass
+
+
+def _maybe_offer_error_report(config):
+    """前回エラーが記録されていたら、同意の上で匿名送信する（起動数秒後に呼ぶ）"""
+    log = _collect_error_logs()
+    if not log:
+        return
+    from PyQt5.QtWidgets import QMessageBox
+    ret = QMessageBox.question(
+        None, t("errlog_title"), t("errlog_ask"),
+        QMessageBox.Yes | QMessageBox.No)
+    if ret == QMessageBox.Yes:
+        try:
+            from version import CODE_VERSION as ver
+        except Exception:
+            ver = "?"
+        import platform as _pf
+        stats.submit_errlog({
+            "ver": ver,
+            "skeleton": os.environ.get("ONEF_SKELETON_VERSION", "0"),
+            "platform": sys.platform,
+            "os": _pf.platform(),
+            "log": log,
+        }, base_url=config.get("stats_url"))
+    # 送信・辞退どちらでも消す（同じログで何度も聞かない）
+    _clear_error_logs()
 
 APP_DIR = _app_dir()
 SAVE_DIR = os.path.join(APP_DIR, "saves")
@@ -173,7 +296,60 @@ class NoWheelSlider(QSlider):
 # --- 設定ダイアログ ---
 from PyQt5.QtWidgets import QTabWidget, QCheckBox, QScrollArea
 
+class PollGraph(QWidget):
+    """人気投票の横棒グラフ。数字は出さず、棒の長さだけで表す"""
+    BAR_H = 20
+    GAP = 9
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = []   # [(ラベル, 最大票に対する割合 0..1)]
+
+    def set_counts(self, counts):
+        labels = dict(SCENE_MODES)
+        mx = max(counts.values(), default=0)
+        rows = sorted(((k, n) for k, n in counts.items() if k in labels),
+                      key=lambda kv: -kv[1])
+        self.data = [(t(labels[k]), n / mx if mx else 0.0) for k, n in rows]
+        voted = {k for k, _ in rows}
+        for k, lk in SCENE_MODES:   # 票のないモードは末尾に空バー
+            if k not in voted:
+                self.data.append((t(lk), 0.0))
+        self.setMinimumHeight(len(self.data) * (self.BAR_H + self.GAP))
+        self.update()
+
+    def clear(self):
+        self.data = []
+        self.setMinimumHeight(0)
+        self.update()
+
+    def paintEvent(self, event):
+        if not self.data:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        fm = p.fontMetrics()
+        label_w = max(fm.boundingRect(lbl).width() for lbl, _ in self.data) + 14
+        bar_max = max(10, self.width() - label_w - 10)
+        y = 0
+        for lbl, ratio in self.data:
+            p.setPen(QColor(70, 70, 70))
+            p.drawText(0, y, label_w - 8, self.BAR_H,
+                       Qt.AlignRight | Qt.AlignVCenter, lbl)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(232, 232, 232))
+            p.drawRoundedRect(label_w, y + 3, bar_max, self.BAR_H - 6, 4, 4)
+            if ratio > 0:
+                p.setBrush(QColor(110, 160, 210))
+                p.drawRoundedRect(label_w, y + 3, max(int(bar_max * ratio), 10),
+                                  self.BAR_H - 6, 4, 4)
+            y += self.BAR_H + self.GAP
+        p.end()
+
+
 class SettingsDialog(QDialog):
+    stats_received = pyqtSignal(object)   # 人気投票の集計（別スレッド→UI）
+
     def __init__(self, config, on_apply, on_save, on_load, on_language_change=None, parent=None):
         super().__init__(parent)
         self.config = config.copy()
@@ -576,6 +752,27 @@ class SettingsDialog(QDialog):
         gml.addWidget(fade_desc)
         tel.addWidget(gm)
 
+        # 起動時のモード抽選（お気に入り登録）
+        g_boot = QGroupBox(t("startup_mode"))
+        g_bl = QVBoxLayout(g_boot)
+        self.startup_random_check = QCheckBox(t("startup_random"))
+        self.startup_random_check.setChecked(self.config.get("startup_random", True))
+        self.startup_random_check.toggled.connect(self._on_slider_changed)
+        g_bl.addWidget(self.startup_random_check)
+        boot_desc = QLabel(t("startup_random_desc"))
+        boot_desc.setStyleSheet("color: #666; font-size: 10px;")
+        boot_desc.setWordWrap(True)
+        g_bl.addWidget(boot_desc)
+        saved_pool = self.config.get("startup_scenes") or [k for k, _ in SCENE_MODES]
+        self.startup_scene_checks = []
+        for key, label_key in SCENE_MODES:
+            cb = QCheckBox(t(label_key))
+            cb.setChecked(key in saved_pool)
+            cb.toggled.connect(self._on_slider_changed)
+            g_bl.addWidget(cb)
+            self.startup_scene_checks.append((key, cb))
+        tel.addWidget(g_boot)
+
         g_startup = QGroupBox(t("system"))
         g_sl = QVBoxLayout(g_startup)
         self.startup_check = QCheckBox(t("auto_startup"))
@@ -740,6 +937,36 @@ class SettingsDialog(QDialog):
         tsl.addStretch()
         tabs.addTab(tab_save, t("tab_save"))
 
+        # === タブ: 人気投票 ===
+        tab_poll = QWidget()
+        tpl = QVBoxLayout(tab_poll)
+        self.stats_optin_check = QCheckBox(t("stats_optin"))
+        self.stats_optin_check.setChecked(self.config.get("stats_optin", False))
+        self.stats_optin_check.toggled.connect(self._on_stats_optin_toggled)
+        tpl.addWidget(self.stats_optin_check)
+        poll_desc = QLabel(t("stats_privacy"))
+        poll_desc.setStyleSheet("color: #666; font-size: 10px;")
+        poll_desc.setWordWrap(True)
+        tpl.addWidget(poll_desc)
+        self.poll_status = QLabel("")
+        self.poll_status.setStyleSheet("color: #666; font-size: 10px;")
+        tpl.addWidget(self.poll_status)
+        self._poll_periods = {}
+        self.poll_period_combo = QComboBox()
+        self.poll_period_combo.currentIndexChanged.connect(
+            self._on_poll_period_changed)
+        self.poll_period_combo.hide()
+        tpl.addWidget(self.poll_period_combo)
+        self.poll_graph = PollGraph()
+        tpl.addWidget(self.poll_graph)
+        tpl.addStretch()
+        self.stats_received.connect(self._on_stats_received)
+        if self.config.get("stats_optin", False):
+            self.poll_status.setText(t("stats_loading"))
+            stats.fetch_stats(self.config.get("stats_url"),
+                              self.stats_received.emit)
+        tabs.addTab(tab_poll, t("tab_poll"))
+
         # === 2段目: グラフィックテスト ===
         tab_test = QWidget()
         ttl = QVBoxLayout(tab_test)
@@ -852,6 +1079,83 @@ class SettingsDialog(QDialog):
         cfg = self._gather_config()
         self.on_apply(cfg)
 
+    # --- 人気投票（みんなのお気に入りモード） ---
+    def _stats_uid(self):
+        """匿名ID（uuid4 hex）。初回オプトイン時に生成して保存"""
+        uid = self.config.get("stats_uid")
+        if not uid:
+            uid = uuid.uuid4().hex
+            self.config["stats_uid"] = uid
+        return uid
+
+    def _favorite_scenes(self):
+        return [k for k, cb in self.startup_scene_checks if cb.isChecked()]
+
+    def _on_stats_optin_toggled(self, checked):
+        if checked:
+            self._stats_uid()
+        self._on_slider_changed()
+        if checked:
+            self.poll_status.setText(t("stats_loading"))
+            scenes = self._favorite_scenes()
+            if scenes:
+                stats.submit_favorites(self._stats_uid(), scenes,
+                                       self.config.get("stats_url"),
+                                       self.stats_received.emit)
+            else:
+                stats.fetch_stats(self.config.get("stats_url"),
+                                  self.stats_received.emit)
+        else:
+            self.poll_status.setText("")
+            self.poll_period_combo.hide()
+            self.poll_graph.clear()
+
+    # 期間（データのある期間だけコンボに出す。累計は常時）
+    POLL_PERIODS = [
+        ("today", "stats_p_today"), ("week", "stats_p_week"),
+        ("month", "stats_p_month"), ("month3", "stats_p_month3"),
+        ("month6", "stats_p_month6"), ("year", "stats_p_year"),
+        ("total", "stats_p_total"),
+    ]
+
+    def _on_stats_received(self, data):
+        if not self.stats_optin_check.isChecked():
+            return
+        if not data:
+            self.poll_status.setText(t("stats_failed"))
+            self.poll_period_combo.hide()
+            self.poll_graph.clear()
+            return
+        self.poll_status.setText("")
+        self._poll_periods = data.get("periods") or \
+            {"total": data.get("counts", {})}
+        cur = self.poll_period_combo.currentData()
+        self.poll_period_combo.blockSignals(True)
+        self.poll_period_combo.clear()
+        for key, label_key in self.POLL_PERIODS:
+            if key == "total" or self._poll_periods.get(key):
+                self.poll_period_combo.addItem(t(label_key), key)
+        idx = self.poll_period_combo.findData(cur)
+        self.poll_period_combo.setCurrentIndex(max(idx, 0))
+        self.poll_period_combo.blockSignals(False)
+        self.poll_period_combo.show()
+        self._on_poll_period_changed()
+
+    def _on_poll_period_changed(self):
+        key = self.poll_period_combo.currentData()
+        if key:
+            self.poll_graph.set_counts(self._poll_periods.get(key, {}))
+
+    def done(self, r):
+        # 閉じるときに最新のお気に入りを投票（オプトイン時のみ・失敗は無視）
+        if getattr(self, "stats_optin_check", None) and \
+                self.stats_optin_check.isChecked():
+            scenes = self._favorite_scenes()
+            if scenes:
+                stats.submit_favorites(self._stats_uid(), scenes,
+                                       self.config.get("stats_url"))
+        super().done(r)
+
     def _gather_config(self):
         indices = self.config.get("palette_indices", [0])
         cfg = {
@@ -871,6 +1175,10 @@ class SettingsDialog(QDialog):
             "palette_indices": indices,
             "flower_colors_enabled": [i for i, btn in enumerate(self.flower_color_checks) if btn.isChecked()],
             "auto_update": self.auto_update_check.isChecked(),
+            "startup_random": self.startup_random_check.isChecked(),
+            "startup_scenes": [k for k, cb in self.startup_scene_checks
+                               if cb.isChecked()],
+            "stats_optin": self.stats_optin_check.isChecked(),
             "mouse_fade_enabled": self.mouse_fade_btn.isChecked(),
             "mouse_fade_inner": self.fade_inner_slider.value(),
             "mouse_fade_range": self.fade_range_slider.value(),
@@ -962,6 +1270,9 @@ class SettingsDialog(QDialog):
             cfg["sound_sync_enabled"] = self.sound_sync_btn.isChecked()
             cfg["sound_sync_gain"] = self.sound_gain_slider.value()
             cfg["sound_bass_gain"] = self.sound_bass_slider.value()
+        # 人気投票の匿名ID（初回オプトイン時に生成済みなら永続化）
+        if self.config.get("stats_uid"):
+            cfg["stats_uid"] = self.config["stats_uid"]
         return cfg
 
     def _on_scene_changed(self):
@@ -1045,6 +1356,7 @@ class SettingsDialog(QDialog):
         "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
         "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
         "sound_sync_enabled", "sound_sync_gain", "sound_bass_gain",
+        "startup_random", "startup_scenes",
     ]
 
     def _on_save_scene(self):
@@ -1201,6 +1513,10 @@ class ScreenOverlay(QWidget):
 
     def update_scene(self):
         if self.scene:
+            # 天気をシーンに伝える（雨なら旅人が傘をさす等）
+            state = (self.weather_fx.current_state
+                     if self.config.get("weather_enabled", True) else "clear")
+            self.scene.set_weather(state)
             # Pass mouse position for interactive physics
             mx, my = get_cursor_pos()
             wx, wy = self.x(), self.y()
@@ -1269,6 +1585,13 @@ class OverlayManager:
         saved_lang = self.config.get("language")
         if saved_lang:
             set_language(saved_lang)
+        # 起動時のモード抽選: お気に入り（未設定なら全モード）からランダムに選ぶ
+        if self.config.get("startup_random", True):
+            valid = [k for k, _ in SCENE_MODES]
+            pool = [k for k in (self.config.get("startup_scenes") or valid)
+                    if k in valid]
+            if pool:
+                self.config["scene_mode"] = random.choice(pool)
         self.wind_sim = WindSimulator()
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self.last_time = time.monotonic()
@@ -1600,6 +1923,7 @@ def _make_rounded_pixmap(icon_path, size=44, radius_ratio=0.22):
 
 
 def main():
+    _setup_crash_logging()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
@@ -1625,6 +1949,8 @@ def main():
 
     # 起動数秒後に更新確認（オフライン等の失敗はサイレント）
     QTimer.singleShot(4000, lambda: updater.start_update_check(manager.config))
+    # 前回のエラーログがあれば、同意の上で匿名報告を提案
+    QTimer.singleShot(7000, lambda: _maybe_offer_error_report(manager.config))
 
     icon_path = os.path.join(_resource_dir(), "icon.png")
     if os.path.exists(icon_path):

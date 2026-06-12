@@ -59,6 +59,26 @@ TEXTS = {
         "system": "システム",
         "auto_startup": "PC起動時に自動で起動する",
         "auto_update": "起動時に更新を自動確認する",
+        "startup_mode": "起動時のモード",
+        "startup_random": "起動時にお気に入りからランダムに選ぶ",
+        "startup_random_desc": "チェックしたモードの中から起動のたびに抽選されます。"
+                               "1つだけチェックすれば、常にそのモードで起動します。",
+        # 人気投票（みんなのお気に入りモード）
+        "tab_poll": "人気投票",
+        "stats_optin": "人気投票に参加する（みんなのお気に入りモードが見られます）",
+        "stats_privacy": "送信されるのは匿名IDとお気に入りモードだけです。",
+        # エラー報告
+        "errlog_title": "エラー報告",
+        "errlog_ask": "前回の実行でエラーが記録されました。\n改善のため、エラーログを匿名で開発者に送信しますか？\n\n送信されるのはエラーの記録とアプリのバージョンだけで、\n個人情報は含まれません（パス中のユーザー名は伏せられます）。",
+        "stats_loading": "みんなのお気に入りを取得中...",
+        "stats_failed": "集計を取得できませんでした",
+        "stats_p_today": "今日",
+        "stats_p_week": "過去1週間",
+        "stats_p_month": "過去1ヶ月",
+        "stats_p_month3": "過去3ヶ月",
+        "stats_p_month6": "過去半年",
+        "stats_p_year": "過去1年",
+        "stats_p_total": "全期間（累計）",
         # 自動更新
         "update_title": "1/f 更新",
         "update_code_applied": "バージョン {ver} に更新しました。\n今すぐ再起動して適用しますか？",
@@ -230,6 +250,27 @@ TEXTS = {
         "system": "System",
         "auto_startup": "Start on PC boot",
         "auto_update": "Check for updates on startup",
+        "startup_mode": "Startup Scene",
+        "startup_random": "Pick a random favorite at startup",
+        "startup_random_desc": "One of the checked scenes is chosen each time "
+                               "the app starts. Check only one to always "
+                               "start with that scene.",
+        # Popularity poll (everyone's favorite scenes)
+        "tab_poll": "Poll",
+        "stats_optin": "Join the poll (see everyone's favorite scenes)",
+        "stats_privacy": "Only an anonymous ID and your favorite scenes are sent.",
+        # Error report
+        "errlog_title": "Error Report",
+        "errlog_ask": "An error was recorded during the last run.\nSend the error log anonymously to the developer to help improve the app?\n\nOnly the error record and the app version are sent.\nNo personal information is included (your user name in paths is masked).",
+        "stats_loading": "Loading everyone's favorites...",
+        "stats_failed": "Could not load the results",
+        "stats_p_today": "Today",
+        "stats_p_week": "Past week",
+        "stats_p_month": "Past month",
+        "stats_p_month3": "Past 3 months",
+        "stats_p_month6": "Past 6 months",
+        "stats_p_year": "Past year",
+        "stats_p_total": "All time",
         # Auto update
         "update_title": "1/f Update",
         "update_code_applied": "Updated to version {ver}.\nRestart now to apply?",
