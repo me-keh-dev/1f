@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """モードプラグインの検証ツール（クリエイター向け / liplico store 提出前チェック）。
 
-usage: python tools/validate_plugin.py <your_mode.py>
+usage: python tools/validate_plugin.py <your_mode.py> [--preview out.png]
 
 チェック内容:
   1. SCENE 契約の必須フィールドと型
@@ -11,6 +11,10 @@ usage: python tools/validate_plugin.py <your_mode.py>
   5. config キーが既存モードと衝突しないこと
   6. rebuild / update / draw がオフスクリーンで例外なく動くこと
   7. ストア用 meta（author / version / description / license）の有無（警告のみ）
+
+--preview out.png を付けると描画結果（昼・夜ティント・少し時間が進んだ3コマ）を
+1枚のPNGに並べて保存する。AIコーディング環境（Claude Code / Codex 等）で
+開発するときは、これをエージェントに読ませて見た目を確認・反復させるとよい。
 """
 import os
 import sys
@@ -38,10 +42,16 @@ def warn(msg):
 
 
 def main():
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    preview_path = None
+    if "--preview" in args:
+        i = args.index("--preview")
+        preview_path = args[i + 1] if i + 1 < len(args) else "preview.png"
+        del args[i:i + 2]
+    if not args:
         print(__doc__)
         sys.exit(2)
-    path = os.path.abspath(sys.argv[1])
+    path = os.path.abspath(args[0])
     if not os.path.isfile(path):
         print("file not found:", path)
         sys.exit(2)
@@ -148,6 +158,7 @@ def main():
 
     print("== 6. rebuild / update / draw（オフスクリーン） ==")
     try:
+        from PyQt5.QtGui import QColor
         scene = info["class"]()
         conf = dict(base_cfg)
         conf.update(gathered)
@@ -157,18 +168,39 @@ def main():
             err(f"get_area_height は正の int を返してください（{h!r}）")
         scene.rebuild(conf, 1920, 1920)
         wind = app_main.WindSimulator()
-        for _ in range(60):
+
+        def render(tint, get_alpha, w=960):
+            pix = QPixmap(w, max(h, 1))
+            pix.fill(QColor(16, 18, 24))  # 暗背景＝デスクトップ想定
+            p = QPainter(pix)
+            if scene.has_background_layer():
+                scene.draw_background(p, h, tint, get_alpha)
+            scene.draw(p, h, tint, get_alpha)
+            p.end()
+            return pix
+
+        frames = []
+        for _ in range(60):           # 1秒ぶん動かす
             wind.update(1 / 60.0)
             scene.update(wind, mouse_pos=(400, 50))
-        pix = QPixmap(1920, max(h, 1))
-        pix.fill()
-        p = QPainter(pix)
-        if scene.has_background_layer():
-            scene.draw_background(p, h, (0.9, 0.6, 0.5), None)
-        scene.draw(p, h, (0.9, 0.6, 0.5), lambda x: 200)  # tint+fade も通す
-        scene.draw(p, h, None, None)
-        p.end()
+        frames.append(render(None, None))                       # 昼
+        for _ in range(120):          # さらに2秒（動きの差が見える）
+            wind.update(1 / 60.0)
+            scene.update(wind, mouse_pos=(400, 50))
+        frames.append(render(None, lambda x: 200))              # フェードあり
+        frames.append(render((0.30, 0.32, 0.55), None))         # 夜ティント
         ok(f"描画OK（高さ {h}px）")
+
+        if preview_path:
+            sheet = QPixmap(960, (max(h, 1) + 4) * len(frames))
+            sheet.fill(QColor(40, 40, 40))
+            p = QPainter(sheet)
+            for i, f in enumerate(frames):
+                p.drawPixmap(0, i * (max(h, 1) + 4), f)
+            p.end()
+            sheet.save(preview_path)
+            ok(f"プレビュー保存: {preview_path}"
+               "（上=昼 / 中=マウスフェード / 下=夜ライティング）")
     except Exception as e:
         import traceback
         traceback.print_exc()

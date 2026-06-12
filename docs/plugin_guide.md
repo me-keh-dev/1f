@@ -25,6 +25,30 @@
 > LINEスタンプ型の流通になります。DRM はかけない方針のため、ストア配布物も
 > この同じ `.py` パッケージです。`SCENE["meta"]` がストア掲載情報になります。
 
+## AI コーディング環境で作る（推奨）
+
+モード制作は **Claude Code / Codex 等のコーディングエージェント**との相性が抜群です。
+リポジトリ直下の [`AGENTS.md`](../AGENTS.md) にエージェント向けの作業手順が書いてあるので、
+clone したリポジトリでエージェントを起動すれば、あとは作りたいものを伝えるだけです。
+
+コピペ用プロンプト例:
+
+```
+1/f のモードプラグインを作ってください。AGENTS.md と docs/plugin_guide.md の
+手順に従うこと。作りたいモード: 夜の港。停泊した漁船が波で上下に揺れ、
+灯台の光が回り、ウミネコが時々横切る。船の数と波の強さを設定できるように。
+完成条件: tools/validate_plugin.py が PASS し、--preview の画像（昼・フェード・夜）
+が自然に見えること。
+```
+
+ポイントは検証ループです。`validate_plugin.py --preview` が描画結果を PNG に
+書き出すので、**エージェントが自分の作ったモードの見た目を画像で確認して反復**できます:
+
+```bash
+python tools/validate_plugin.py plugins/mymode.py --preview build/preview.png
+# → PNG は3段組: 上=昼 / 中=マウスフェード / 下=夜ライティング
+```
+
 ## クイックスタート（5分）
 
 1. このリポジトリを clone して依存を入れる:
@@ -154,7 +178,8 @@ def _build_settings(dialog):
 ## 検証とテスト
 
 ```
-python tools/validate_plugin.py plugins/mymode.py   # 契約チェック（提出前に必須）
+python tools/validate_plugin.py plugins/mymode.py --preview build/preview.png
+                                                     # 契約チェック＋見た目の確認（提出前に必須）
 python tools/test_scenes.py                          # 全モードの回帰テスト
 python main.py                                       # 実機確認
 ```

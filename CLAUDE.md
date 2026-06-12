@@ -23,7 +23,10 @@
   `docs/plugin_guide.md`、提出前チェックは `python tools/validate_plugin.py <file.py>`（契約・日英ラベル・
   configキー衝突・オフスクリーン描画・ストア用 meta を検査）。`SCENE["meta"]`（author/version/description/license）
   が将来のストア掲載情報。安定APIの境界は plugin_guide.md に明記（SCENE契約・BaseScene・scenes.base・
-  wind_sim・dialog._add_slider・i18n.t）。
+  wind_sim・dialog._add_slider・i18n.t）。クリエイターの開発環境は各自の Claude Code / Codex 等の
+  AIコーディングエージェント前提: リポジトリ直下 `AGENTS.md` がエージェント向け作業手順
+  （エンジン側変更禁止・検証ループ）、`validate_plugin.py --preview out.png` が描画3コマ
+  （昼/フェード/夜）をPNG出力し、エージェントが見た目を自己確認して反復できる。
 - 回帰テスト: `python tools/test_scenes.py`（オフスクリーン。private・ユーザープラグインのモードも自動でテスト対象）。
 
 ## リリースの振り分けルール（tools/release.py が自動判定）
@@ -183,5 +186,6 @@
 
 | プロンプト | 対応内容 |
 |---|---|
+| クリエイターの開発環境は各自の Claude Code / Codex 等のAIコーディング環境 | エージェント前提の制作導線を追加。リポジトリ直下に `AGENTS.md`（モード制作タスクの手順・「エンジン側は変更しない」等のルール・検証ループ）を新設し、`validate_plugin.py` に `--preview out.png` を追加（昼/マウスフェード/夜ライティングの3コマを1枚のPNGに出力→エージェントが画像を読んで見た目を自己確認・反復できる。チューリップ雛形で動作確認済み）。plugin_guide.md に「AIコーディング環境で作る」セクションとコピペ用プロンプト例を追記。 |
 | プラグインを一般ユーザーがLINEスタンプの様に開発できるようパッケージ化＋ドキュメント化（liplico storeで販売予定） | パッケージ仕様を「1ファイル=1モード=1パッケージ（.py）」に決定し、第3のスキャン場所としてユーザープラグインフォルダ（`%APPDATA%/1f/plugins` ほか・開発用は repo の `plugins/`）を scenes/__init__.py に追加（`register_plugin_file()` API、キー衝突は同梱優先で黙殺）。公開雛形 `plugins/_template.py`（風に揺れるチューリップ＝動く見本、ストア用 meta 付き）、クリエイター向け完全ガイド `docs/plugin_guide.md`（SCENE契約・BaseScene・設定タブAPI・お約束・安定API境界・配布/ストア提出）、提出前チェッカー `tools/validate_plugin.py`（契約/日英ラベル/configキー衝突/オフスクリーン描画/meta を検査）を新設。README に導線追加。検証: テンプレートが validate で PASS、APPDATA プラグインフォルダからの自動登録・キー衝突拒否・設定タブ表示を実機テスト済み。 |
 | メモリの plugin-refactor-plan に従いプラグイン化フル改修を実施 | モードのプラグイン化を完了（「書き直さず移設」方針）。(1) `scenes/__init__.py` を動的レジストリ化: scenes/ と private_scenes/ をスキャンし `SCENE` 辞書を自動登録、壊れたモジュールは黙殺、`get_scene_class`/`SCENE_MODES` は後方互換維持。(2) i18n.py に `register_texts()` を追加し、シーン別ラベル（scene_*, tk_*, aq_*, pooh_*, takibi_*, skate_*, shark_*, fc_* 等）を各シーンモジュールの `SCENE["texts"]` へ移設。(3) main.py のシーン別タブ構築（約320行）・_gather_config のシーン別スライス・SCENE_KEYS・SCENE_SCALE_KEYS・プリセットラベルをすべて各シーンの `build_settings`/`gather`/`preset_keys`/`scale_key` へ移設し、main.py はレジストリ駆動に。(4) `private_scenes/` を新設（.gitignore 除外・独立 git リポジトリ・契約雛形 `_template.py`）。publish_update.py と両 spec は private_scenes 存在時のみ .py を自動同梱（.git 混入なし、zip 検査済み）。(5) `tools/release.py`（変更パスでルートA/B/C を自動判定、確認プロンプト付き）と `tools/test_scenes.py`（回帰テスト）を新設。検証: 改修前後のゴールデン比較（モード一覧・日英ラベル・タブ構成・プリセットキー・gather出力・get_area_height）が**全項目一致**、全7シーンのオフスクリーン描画・private モードの動的登録・壊れたモジュール耐性・private_scenes 無し構成の起動を確認。新ライブラリなし＝骨格再ビルド不要。GitHub への push と private リポジトリ（1f-modes-private）のリモート作成は、この環境に gh / 資格情報が無いため保留（ローカルコミットまで完了）。 |
