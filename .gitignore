@@ -21,3 +21,6 @@ _MEI*/
 # 非公開モード（別 private リポジトリ 1f-modes-private で管理）
 private_scenes/
 .stfolder/
+# ローカル開発中のユーザープラグイン（コミットするのは雛形だけ）
+plugins/*
+!plugins/_template.py
