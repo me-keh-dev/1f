@@ -451,7 +451,8 @@ class Hill:
         self.color = QColor(160, 195, 130, 100)
         self.color_dark = QColor(130, 170, 105, 80)
 
-    def draw(self, painter, ground_y, tint=None, get_alpha=None, ps=None):
+    def draw(self, painter, ground_y, tint=None, get_alpha=None, ps=None,
+             snow=False):
         ps = ps or PIXEL_SIZE
         cx = self.base_x
         for dx in range(-self.width, self.width + 1):
@@ -463,8 +464,13 @@ class Hill:
             a = get_alpha(draw_x) if get_alpha else 255
             if a <= 0:
                 continue
+            # 雪の日: 丘の上部を雪化粧（上から数px を白く）
+            snow_px = int(h * 0.35) + 1 if snow else 0
             for dy in range(h):
-                base_c = self.color if dy > h * 0.3 else self.color_dark
+                if snow and dy >= h - snow_px:
+                    base_c = QColor(242, 248, 255, 150)
+                else:
+                    base_c = self.color if dy > h * 0.3 else self.color_dark
                 c = apply_tint(base_c, tint) if tint else QColor(base_c)
                 c.setAlpha(int(c.alpha() * a / 255))
                 draw_y = int(ground_y - (dy + 1) * ps)
@@ -1296,9 +1302,10 @@ class TokaidoScene(BaseScene):
 
         ps = self.ps
 
-        # Background hills
+        # Background hills（雪の日は丘も雪化粧）
+        snowing = self.is_snowing
         for hill in self.hills:
-            hill.draw(painter, ground_y, tint, get_alpha, ps)
+            hill.draw(painter, ground_y, tint, get_alpha, ps, snow=snowing)
 
         # Road surface
         road_h = 3 * ps
