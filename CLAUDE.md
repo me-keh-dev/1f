@@ -47,6 +47,14 @@
   「提供を終了しました」通知＋使用中はフォールバック。`_collab.fetch_and_apply_revocations`、
   ツール `tools/sign_revocation.py --revoke key...`。オフラインは次回オンライン時に適用。同梱無料モードは対象外。
   E2E（対象のみ削除・存続維持・リスト改ざん拒否・オフライン安全）PASS。
+- **シーン商品管理（ローカル台帳→配信物の自動生成）**: private `_store/products.json`（商品台帳:
+  key/name/desc/price/available/max_days/creator_id/status(draft|published|discontinued)/source/pubkey_id）
+  と `_store/creators.json`（クリエイター台帳: id/name/contact/revenue_share/agreed_terms/status）。
+  `_store/sources/<key>.py` に商品本体（**配信されない場所**＝有料ソースが code.zip に乗らない）。
+  `tools/build_store.py`: published→sign_scene で .1fmode＋catalog.json、discontinued→sign_revocation で
+  revoked.json、draft=無視。**クリエイター検証**: published の creator_id が未登録/非activeならビルド拒否。
+  署名は運営鍵（LINE型）。売上分配・支払い・KYC・審査・購入発行はサーバ後段。
+  E2E（台帳→生成→install/revoke 通る、active公開可/suspended・未登録は拒否）PASS。
 - **期間限定（コラボ）モード**: `SCENE["available"] = {"from": "YYYY-MM-DD", "until": "YYYY-MM-DD"}`
   （両端含む・端末ローカル日付・サーバ不要）。期間外は一覧から自動で消え、`get_scene_info` がデフォルトへ
   フォールバック、OverlayManager の5秒チェックが使用中モードの期限切れをお気に入りへ自動切替
