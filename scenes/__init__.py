@@ -115,21 +115,44 @@ def register_plugin_file(path, overwrite=False):
     except Exception as e:
         sys.modules.pop(mod_name, None)
         raise ValueError("failed to load {}: {!r}".format(path, e))
+    return _register_scene_obj(mod, mod_name, where=path, overwrite=overwrite)
+
+
+def _register_scene_obj(mod, module_name, where, overwrite=False, extra=None):
+    """モジュールオブジェクトの SCENE を検証して _REGISTRY に登録する共通処理"""
     info = getattr(mod, "SCENE", None)
     if not isinstance(info, dict):
-        raise ValueError("SCENE dict not found in " + path)
+        raise ValueError("SCENE dict not found in " + where)
     missing = [f for f in ("key", "label_key", "class") if f not in info]
     if missing:
-        raise ValueError("SCENE is missing {} in {}".format(missing, path))
+        raise ValueError("SCENE is missing {} in {}".format(missing, where))
     info = dict(info)
-    info["module"] = mod_name
+    info["module"] = module_name
+    if extra:
+        info.update(extra)
     if info["key"] in _REGISTRY and not overwrite:
         raise ValueError("scene key {!r} already exists (skipped {})"
-                         .format(info["key"], path))
+                         .format(info["key"], where))
     _REGISTRY[info["key"]] = info
     if info.get("texts"):
         register_texts(info["texts"])
     return info
+
+
+def register_plugin_source(source, name, where, overwrite=False, extra=None):
+    """ファイルではなくソース文字列（.1fmode の zip 内 mode.py など）から登録する。
+    署名付きコラボシーンのローダーが使う。"""
+    import types
+    mod_name = "onef_collab_" + name
+    mod = types.ModuleType(mod_name)
+    mod.__dict__["__file__"] = where
+    try:
+        exec(compile(source, "<collab:%s>" % name, "exec"), mod.__dict__)
+    except Exception as e:
+        raise ValueError("failed to exec {}: {!r}".format(where, e))
+    sys.modules[mod_name] = mod
+    return _register_scene_obj(mod, mod_name, where, overwrite=overwrite,
+                               extra=extra)
 
 
 def _register_plugin_dir(dirpath):
@@ -147,12 +170,58 @@ def _register_plugin_dir(dirpath):
             print("[scenes] plugin skipped:", e, file=sys.stderr)
 
 
+# 直近のスキャンで期限切れ削除されたコラボシーンの表示名（main が通知に使う）
+_last_expired = []
+
+
+def _register_installed_collabs():
+    """installed/ の署名付きコラボシーン（.1fmode）を検証して登録。
+    期限切れは自動削除し、その表示名を _last_expired に積む（通知用）。"""
+    from scenes import _collab
+    try:
+        entries, expired = _collab.scan_installed()
+    except Exception:
+        # コラボ機構の不具合で同梱モードを道連れにしない
+        traceback.print_exc()
+        return
+    _last_expired.extend(expired)
+    for manifest, src, expiry in entries:
+        key = manifest.get("key", "?")
+        try:
+            # コラボは同梱モードを乗っ取れない（overwrite=False）。
+            # 終了日を SCENE.available にも反映して一覧ラベル/期限判定を共通化
+            extra = {}
+            av = manifest.get("available")
+            if av:
+                extra["available"] = av
+            register_plugin_source(src, key, where="<collab:%s>" % key,
+                                   overwrite=False, extra=extra)
+        except ValueError as e:
+            print("[scenes] collab skipped:", e, file=sys.stderr)
+
+
 def _scan():
     _REGISTRY.clear()
+    del _last_expired[:]
     _register_package(__name__)        # scenes/（OSS同梱モード）
     _register_package("private_scenes")  # 非公開モード（存在すれば）
     for d in _plugin_dirs():           # ユーザープラグイン（最後＝同梱優先）
         _register_plugin_dir(d)
+    _register_installed_collabs()      # 署名付きコラボ（一般ユーザー向け）
+
+
+def rescan():
+    """日付変更・新規インストール後にモード一覧を作り直し、
+    今回新たに期限切れ削除されたコラボの表示名を返す。"""
+    _scan()
+    return consume_expired()
+
+
+def consume_expired():
+    """前回スキャン以降に期限切れ削除されたコラボの表示名を返してクリアする"""
+    names = list(_last_expired)
+    _last_expired.clear()
+    return names
 
 
 _scan()

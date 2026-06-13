@@ -32,6 +32,7 @@ from i18n import t, set_language, get_language, detect_language
 from weather import WeatherMonitor
 from audio_level import AudioLevelMonitor, is_supported as audio_supported
 from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
+import scenes as scenes_registry
 from scenes import (
     get_scene_class, get_scene_info, get_scale_key, get_preset_keys,
     scene_registry, scene_modes, limited_until, SCENE_MODES,
@@ -1185,6 +1186,9 @@ class OverlayManager:
             if pool:
                 self.config["scene_mode"] = random.choice(pool)
                 self._scene_designated = False
+        # 署名付きコラボシーンは import 時にスキャン済み。今日はもう再スキャン不要
+        self._last_collab_date = time.strftime("%Y-%m-%d")
+        self.collab_notifier = None  # main() がトレイ通知を差す
         self.wind_sim = WindSimulator()
         self.wind_sim.set_wind(self.config.get("wind", 50))
         self.last_time = time.monotonic()
@@ -1272,11 +1276,32 @@ class OverlayManager:
         else:
             for o in self.overlays:
                 o._position_window()
+        # 署名付きコラボシーンの期限チェック（日付が変わったときだけ再スキャン）。
+        # 期限切れは _collab が自動削除し、ここで通知＋一覧更新する
+        self._check_collab_expiry()
         # 期間限定モードの終了チェック（5秒ごと）。実行中に日付をまたいで
         # 期限が切れたら、お気に入り（無ければ草原）へ自動フォールバック
         self._check_scene_expiry()
         # 日付が変わった・モードが変わったときの利用記録（5秒ごとの軽いチェック）
         self._report_usage()
+
+    def _check_collab_expiry(self):
+        today = time.strftime("%Y-%m-%d")
+        if getattr(self, "_last_collab_date", None) == today:
+            return
+        self._last_collab_date = today
+        try:
+            expired = scenes_registry.rescan()
+        except Exception:
+            return
+        for name in expired:
+            self._notify_collab_expired(name)
+
+    def _notify_collab_expired(self, name):
+        """『○○』のコラボ期間が終了しました（トレイ通知）。main がコールバックを差す"""
+        cb = getattr(self, "collab_notifier", None)
+        if cb:
+            cb(name)
 
     def _check_scene_expiry(self):
         current = self.config.get("scene_mode", "grass")
@@ -1654,6 +1679,16 @@ def main():
     tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
+
+    # 署名付きコラボシーンの期限終了をトレイ通知（LINEスタンプの期限切れと同様）
+    def _notify_collab_expired(name):
+        tray.showMessage(t("collab_ended_title"),
+                         t("collab_ended_body").format(name=name),
+                         QSystemTrayIcon.Information, 8000)
+    manager.collab_notifier = _notify_collab_expired
+    # 起動時スキャンで既に期限切れだったコラボがあれば通知（少し遅らせて確実に表示）
+    QTimer.singleShot(6000, lambda: [
+        _notify_collab_expired(n) for n in scenes_registry.consume_expired()])
 
     # 画面左下のハンバーガーメニューボタン（トレイと同じメニューを展開）
     hamburger = HamburgerButton(manager, menu)

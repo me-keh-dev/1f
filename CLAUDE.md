@@ -23,6 +23,16 @@
   （契約・日英ラベル・configキー衝突・オフスクリーン描画・ストア用 meta を検査。--preview は昼/フェード/夜の
   3コマPNGを出力し、AIエージェントが見た目を自己確認して反復できる）。`SCENE["meta"]`
   （author/version/description/license）が将来のストア掲載情報。
+- **署名付きコラボシーンの自動インストール（一般ユーザーはファイルを触らない）**: 一般ユーザーは
+  アプリの「入手」だけ。アプリが署名付きパッケージ `.1fmode`（zip: mode.py＋manifest.json＋manifest.sig）を
+  `%APPDATA%/1f/installed/` に管理し、起動時/日付変更時に検証して読み込み、期限切れは自動削除＋
+  トレイ通知「『○○』のコラボ期間が終了しました」＋使用中ならお気に入りへ自動切替。
+  署名=RSA-2048/PKCS#1v1.5/SHA-256、秘密鍵は private `_keys/collab_priv.pem`、公開鍵は
+  `scenes/_collab.py` に埋め込み。**検証は純標準ライブラリ（hashlib+pow）＝骨格再ビルド不要**。
+  本体改ざん（sha256）・期限延長改ざん（署名）を拒否。署名ツール `tools/sign_scene.py`（openssl）。
+  有効期限=min(until, 初回インストール+max_days)。`plugins/` 手置きは開発者専用、一般ユーザーは installed/。
+  設計と配信順序は private `_design/scene_distribution.md`（初コラボ前に _collab.py 入りの code.zip を1回配信）。
+  E2E（署名・インストール・改ざん拒否・期限自動削除・通知・install_scene）全 PASS。ストアUI/課金は後段。
 - **期間限定（コラボ）モード**: `SCENE["available"] = {"from": "YYYY-MM-DD", "until": "YYYY-MM-DD"}`
   （両端含む・端末ローカル日付・サーバ不要）。期間外は一覧から自動で消え、`get_scene_info` がデフォルトへ
   フォールバック、OverlayManager の5秒チェックが使用中モードの期限切れをお気に入りへ自動切替
@@ -193,6 +203,7 @@
 
 | プロンプト | 対応内容 |
 |---|---|
+| シーン追加は一般ユーザーにファイルを触らせない（LINE型・期限が来たら自動で消える）／設計優先→設計できたら実装 | まず設計を private `_design/scene_distribution.md` に確定（2層モデル: 開発者=plugins手置き / 一般ユーザー=アプリ自動。.1fmode署名パッケージ・期限・自動削除・改ざん耐性の限界・ロードマップ）。純標準ライブラリでRSA署名検証が成立することをPoC実証（骨格再ビルド不要）。実装: `scenes/_collab.py`（公開鍵埋め込み・検証・installed/管理・期限=min(until,DL+max_days)・自動削除）、`scenes/__init__.py`（installed スキャン＋register_plugin_source＋rescan/consume_expired）、`main.py`（日付変更で再スキャン・トレイ通知・使用中の自動切替）、署名ツール `tools/sign_scene.py`（openssl）、鍵生成（private `_keys/`、秘密鍵はgit除外）、i18n通知文。E2E（署名検証・インストール・本体改ざん拒否・期限延長改ざん拒否・期限切れ自動削除・通知名・install_scene file://）全PASS、回帰PASS。ストアUI/liplico storeサーバは後段。**未配信**（初コラボ前に _collab.py 入りで1回コード配信が必要）。 |
 | 期間限定コラボ発信が安定してできる基盤（LINEの期間限定スタンプのように） | SCENE 契約に `available`（from/until、両端含む・ローカル日付判定）を追加。scenes/__init__.py に is_scene_available / scene_modes()（動的一覧）/ limited_until を実装し、期間外モードは一覧非表示＋get_scene_info がデフォルトへフォールバック。main.py は設定コンボ・お気に入りチェックを動的一覧化し期限ラベル「〜7/31」を自動付加、OverlayManager._check_scene_expiry（5秒毎）が実行中の期限切れをお気に入りへ自動切替（非指名扱い）。validate_plugin.py に available 検査を追加、creator_kit のガイド・雛形にも記載。テスト: 期間中/開始前/終了後の3プラグインで表示・非表示・フォールバック・ラベル・タブ/gather 非干渉を確認、全回帰 PASS。運用は「事前配信→開始日に自動出現→終了日に自動消滅」でデプロイのタイミング合わせ不要。 |
 | クリエイター向け資料はまだ出さない（ベースを作っただけ。時が来たらリリース） | 公開リポジトリから AGENTS.md・docs/plugin_guide.md・plugins/_template.py・README の案内セクションを削除し、private リポジトリの `private_scenes/creator_kit/` へ退避（戻し先の対応表を creator_kit/README.md に記載）。エンジンのプラグイン読み込み機能と tools/validate_plugin.py は公開側に残置（アプリUIに案内なし＝ユーザーには見えない）。git 履歴には残る点はユーザー了承済み。 |
 | 起動確認をしましょう | 実機で起動確認を完了。G-Master の隠れセッションで python main.py のコールドスタート・40秒稼働・error.log/crash.log クリーンを確認後、ユーザーの実画面でオーバーレイ表示・設定画面・プラグイン（チューリップ）のモード一覧表示まで目視確認（1〜3 ALL OK）。途中で発見した問題: サウンド連動の WASAPI ループバックが 0x80070490 で失敗する環境では同じエラーが2秒ごとにコンソールへ出続ける → audio_level.py を「同じエラーは1回だけ表示（リトライと復帰検知は継続）」に修正。プラグイン化とは無関係の既存挙動で、アプリ本体は正常動作。 |

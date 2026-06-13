@@ -52,6 +52,9 @@ TEXTS = {
         "tab_poll": "人気投票",
         "stats_optin": "人気投票に参加する（みんなのお気に入りモードが見られます）",
         "stats_privacy": "送信されるのは匿名IDとお気に入りモードだけです。",
+        # コラボシーンの期限終了通知
+        "collab_ended_title": "コラボ期間が終了しました",
+        "collab_ended_body": "「{name}」のコラボ期間が終了しました。ご利用ありがとうございました。",
         # エラー報告
         "errlog_title": "エラー報告",
         "errlog_ask": "前回の実行でエラーが記録されました。\n改善のため、エラーログを匿名で開発者に送信しますか？\n\n送信されるのはエラーの記録とアプリのバージョンだけで、\n個人情報は含まれません（パス中のユーザー名は伏せられます）。",
@@ -162,6 +165,9 @@ TEXTS = {
         "tab_poll": "Poll",
         "stats_optin": "Join the poll (see everyone's favorite scenes)",
         "stats_privacy": "Only an anonymous ID and your favorite scenes are sent.",
+        # Collab scene expiry notice
+        "collab_ended_title": "Collaboration ended",
+        "collab_ended_body": "The \"{name}\" collaboration period has ended. Thank you for enjoying it!",
         # Error report
         "errlog_title": "Error Report",
         "errlog_ask": "An error was recorded during the last run.\nSend the error log anonymously to the developer to help improve the app?\n\nOnly the error record and the app version are sent.\nNo personal information is included (your user name in paths is masked).",
