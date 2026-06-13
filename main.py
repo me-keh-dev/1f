@@ -34,8 +34,20 @@ from audio_level import AudioLevelMonitor, is_supported as audio_supported
 from weather_fx import WeatherEffect, WIND_SPEED_CALM, WIND_SPEED_MAX
 from scenes import (
     get_scene_class, get_scene_info, get_scale_key, get_preset_keys,
-    scene_registry, SCENE_MODES,
+    scene_registry, scene_modes, limited_until, SCENE_MODES,
 )
+
+
+def _scene_label(mode_key, label_key):
+    """モード名ラベル。期間限定モードは終了日を添える（例: 〜7/31）"""
+    label = t(label_key)
+    until = limited_until(mode_key)
+    if until:
+        if get_language() == "ja":
+            label += "（〜{}/{}）".format(until.month, until.day)
+        else:
+            label += " (until {}/{})".format(until.month, until.day)
+    return label
 from scenes.base import PinkNoiseGenerator, PIXEL_SIZE, HAMBURGER_BASE
 import updater
 import stats
@@ -374,8 +386,9 @@ class SettingsDialog(QDialog):
         scene_label = QLabel(t("scene_mode"))
         scene_label.setFont(QFont("Meiryo", 10, QFont.Bold))
         self.scene_combo = QComboBox()
-        for mode_key, label_key in SCENE_MODES:
-            self.scene_combo.addItem(t(label_key), mode_key)
+        # 期間限定モードの自動出現/消滅に追従するため都度 scene_modes() を呼ぶ
+        for mode_key, label_key in scene_modes():
+            self.scene_combo.addItem(_scene_label(mode_key, label_key), mode_key)
         current_scene = self.config.get("scene_mode", "grass")
         for i in range(self.scene_combo.count()):
             if self.scene_combo.itemData(i) == current_scene:
@@ -455,10 +468,10 @@ class SettingsDialog(QDialog):
         boot_desc.setStyleSheet("color: #666; font-size: 10px;")
         boot_desc.setWordWrap(True)
         g_bl.addWidget(boot_desc)
-        saved_pool = self.config.get("startup_scenes") or [k for k, _ in SCENE_MODES]
+        saved_pool = self.config.get("startup_scenes") or [k for k, _ in scene_modes()]
         self.startup_scene_checks = []
-        for key, label_key in SCENE_MODES:
-            cb = QCheckBox(t(label_key))
+        for key, label_key in scene_modes():
+            cb = QCheckBox(_scene_label(key, label_key))
             cb.setChecked(key in saved_pool)
             cb.toggled.connect(self._on_slider_changed)
             g_bl.addWidget(cb)
@@ -1259,8 +1272,29 @@ class OverlayManager:
         else:
             for o in self.overlays:
                 o._position_window()
+        # 期間限定モードの終了チェック（5秒ごと）。実行中に日付をまたいで
+        # 期限が切れたら、お気に入り（無ければ草原）へ自動フォールバック
+        self._check_scene_expiry()
         # 日付が変わった・モードが変わったときの利用記録（5秒ごとの軽いチェック）
         self._report_usage()
+
+    def _check_scene_expiry(self):
+        current = self.config.get("scene_mode", "grass")
+        # 期間外なら get_scene_info はデフォルトへフォールバックした辞書を返す
+        if get_scene_info(current)["key"] == current:
+            return
+        valid = [k for k, _ in scene_modes()]
+        pool = [k for k in (self.config.get("startup_scenes") or valid)
+                if k in valid]
+        new_mode = random.choice(pool) if pool else "grass"
+        self.config["scene_mode"] = new_mode
+        # 自動切替は「指名」ではない（利用統計に数えない）
+        self._scene_designated = False
+        self._save_config()
+        for o in self.overlays:
+            o.config = self.config
+            o._position_window()
+            o._rebuild_scene()
 
     def _load_config(self):
         if os.path.exists(CONFIG_FILE):

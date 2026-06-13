@@ -68,15 +68,29 @@ def main():
     from i18n import t, set_language
 
     print("== 1. SCENE 契約 ==")
-    builtin_keys = {i["key"] for i in scenes.scene_registry()}
     try:
         info = scenes.register_plugin_file(path)
     except ValueError as e:
-        err(str(e))
-        if "already exists" in str(e):
-            err("key が既存モードと衝突しています。別の名前にしてください")
-        _finish()
-        return
+        if "already exists" not in str(e):
+            err(str(e))
+            _finish()
+            return
+        # キー衝突。相手が同梱モードならエラー、ユーザープラグインなら
+        # 「インストール済みの自分」とみなして上書きで検証を続行
+        import re
+        m = re.search(r"scene key '([^']+)'", str(e))
+        key0 = m.group(1) if m else ""
+        prior = next((i for i in scenes.scene_registry(include_unavailable=True)
+                      if i["key"] == key0), {})
+        if str(prior.get("module", "")).startswith("onef_plugin_"):
+            warn(f"key {key0!r} は既にプラグインフォルダにインストール済み"
+                 "（同じモードとみなして検証を続行）")
+            info = scenes.register_plugin_file(path, overwrite=True)
+        else:
+            err(str(e))
+            err("key が同梱モードと衝突しています。別の名前にしてください")
+            _finish()
+            return
     key = info["key"]
     ok(f"loaded: key={key!r}")
     if not isinstance(key, str) or not key or not key.islower():
@@ -88,6 +102,22 @@ def main():
     for f in ("build_settings", "gather"):
         if not callable(info.get(f)):
             err(f"{f} が callable ではありません（設定タブが出せません）")
+    # 期間限定（コラボ）モードの available 窓
+    av = info.get("available")
+    if av is not None:
+        import datetime
+        try:
+            frm = scenes._parse_date(av["from"]) if av.get("from") else None
+            unt = scenes._parse_date(av["until"]) if av.get("until") else None
+            if frm and unt and frm > unt:
+                err(f"available: from({frm}) が until({unt}) より後です")
+            else:
+                ok(f"available: {av.get('from', '...')} 〜 {av.get('until', '...')}")
+            if not scenes.is_scene_available(info):
+                warn("今日の日付では期間外のため、モード一覧に表示されません"
+                     "（動作確認は期間内の日付で）")
+        except (ValueError, TypeError, KeyError) as e:
+            err(f"available の日付が不正です（YYYY-MM-DD 形式で）: {e!r}")
 
     print("== 2. ラベル（日英） ==")
     for lang in ("ja", "en"):

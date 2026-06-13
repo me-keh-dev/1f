@@ -25,6 +25,7 @@
 "_" で始まるモジュール名と base.py はスキャン対象外。
 壊れたモジュールが1つあっても他のモードは起動する（読み込み失敗は黙殺・記録のみ）。
 """
+import datetime
 import importlib
 import os
 import sys
@@ -157,15 +158,55 @@ def _scan():
 _scan()
 
 
-def scene_registry():
-    """登録済みシーンの SCENE 辞書を表示順で返す"""
-    return sorted(_REGISTRY.values(),
-                  key=lambda i: (i.get("order", 999), i["key"]))
+# --- 期間限定モード（コラボ用） -------------------------------------------
+# SCENE に "available": {"from": "2026-07-01", "until": "2026-07-31"} を
+# 持たせると、その期間だけモード一覧に出る（両端とも当日を含む・ローカル日付）。
+# 事前に配信しておけば開始日に全ユーザーで自動出現し、終了日の翌日に自動消滅する。
+# 期限切れモードを使用中の場合は get_scene_info がデフォルトへフォールバックし、
+# main.py 側の定期チェックが config を実際に切り替える。
+
+def _parse_date(s):
+    return datetime.date(*[int(x) for x in str(s).split("-")])
+
+
+def is_scene_available(info, today=None):
+    """期間限定モードが今日有効か（available が無ければ常に有効）"""
+    av = info.get("available")
+    if not av:
+        return True
+    today = today or datetime.date.today()
+    try:
+        if av.get("from") and today < _parse_date(av["from"]):
+            return False
+        if av.get("until") and today > _parse_date(av["until"]):
+            return False
+    except (ValueError, TypeError):
+        return False  # 日付が壊れているモードは出さない
+    return True
+
+
+def scene_registry(include_unavailable=False):
+    """登録済みシーンの SCENE 辞書を表示順で返す（期間外のモードは除く）"""
+    infos = sorted(_REGISTRY.values(),
+                   key=lambda i: (i.get("order", 999), i["key"]))
+    if include_unavailable:
+        return infos
+    return [i for i in infos if is_scene_available(i)]
+
+
+def scene_modes():
+    """[(キー, ラベルのi18nキー), ...] を現時点の有効モードで返す。
+    期間限定モードの自動出現/消滅に追従するため、UI構築時は
+    モジュール定数 SCENE_MODES ではなくこちらを呼ぶ"""
+    return [(i["key"], i["label_key"]) for i in scene_registry()]
 
 
 def get_scene_info(scene_mode):
-    """SCENE 辞書を返す（未知のモードはデフォルトの草原）"""
-    return _REGISTRY.get(scene_mode) or _REGISTRY[DEFAULT_SCENE]
+    """SCENE 辞書を返す（未知・期間外のモードはデフォルトの草原）"""
+    info = _REGISTRY.get(scene_mode)
+    if info is None or not is_scene_available(info):
+        return _REGISTRY[DEFAULT_SCENE]
+    return info
 
 
 def get_scene_class(scene_mode):
@@ -182,5 +223,20 @@ def get_preset_keys(scene_mode):
     return list(get_scene_info(scene_mode).get("preset_keys", ()))
 
 
-# 後方互換: [(キー, ラベルのi18nキー), ...] を表示順で
-SCENE_MODES = [(i["key"], i["label_key"]) for i in scene_registry()]
+def limited_until(scene_mode):
+    """期間限定モードの終了日（datetime.date）。無期限なら None。
+    モード一覧に「〜7/31」等を添えるのに使う"""
+    info = _REGISTRY.get(scene_mode) or {}
+    av = info.get("available") or {}
+    if not av.get("until"):
+        return None
+    try:
+        return _parse_date(av["until"])
+    except (ValueError, TypeError):
+        return None
+
+
+# 後方互換: 起動時点の有効モードのスナップショット。
+# 期間限定モードに追従する箇所（設定画面・起動抽選・定期チェック）は
+# scene_modes() / scene_registry() を都度呼ぶこと
+SCENE_MODES = scene_modes()

@@ -23,6 +23,12 @@
   （契約・日英ラベル・configキー衝突・オフスクリーン描画・ストア用 meta を検査。--preview は昼/フェード/夜の
   3コマPNGを出力し、AIエージェントが見た目を自己確認して反復できる）。`SCENE["meta"]`
   （author/version/description/license）が将来のストア掲載情報。
+- **期間限定（コラボ）モード**: `SCENE["available"] = {"from": "YYYY-MM-DD", "until": "YYYY-MM-DD"}`
+  （両端含む・端末ローカル日付・サーバ不要）。期間外は一覧から自動で消え、`get_scene_info` がデフォルトへ
+  フォールバック、OverlayManager の5秒チェックが使用中モードの期限切れをお気に入りへ自動切替
+  （指名扱いにせず利用統計を汚さない）。一覧ラベルには「〜7/31」を自動付加（`main._scene_label`）。
+  **運用**: コラボ開始前に code.zip で配信しておけば開始日0時に全ユーザーで自動出現・終了日翌日に自動消滅
+  ＝デプロイ作業のタイミング合わせが不要。validate_plugin.py が日付の妥当性と期間外警告を検査。
 - **クリエイター向け資料は未公開（2026-06-13判断: 時が来たらリリース）**: ガイド `plugin_guide.md`・
   エージェント手順 `AGENTS.md`・雛形 `plugin_template.py`（チューリップの動く見本）は
   **private リポジトリの `private_scenes/creator_kit/` に退避**。公開時の戻し先は同フォルダの README に記載
@@ -187,6 +193,7 @@
 
 | プロンプト | 対応内容 |
 |---|---|
+| 期間限定コラボ発信が安定してできる基盤（LINEの期間限定スタンプのように） | SCENE 契約に `available`（from/until、両端含む・ローカル日付判定）を追加。scenes/__init__.py に is_scene_available / scene_modes()（動的一覧）/ limited_until を実装し、期間外モードは一覧非表示＋get_scene_info がデフォルトへフォールバック。main.py は設定コンボ・お気に入りチェックを動的一覧化し期限ラベル「〜7/31」を自動付加、OverlayManager._check_scene_expiry（5秒毎）が実行中の期限切れをお気に入りへ自動切替（非指名扱い）。validate_plugin.py に available 検査を追加、creator_kit のガイド・雛形にも記載。テスト: 期間中/開始前/終了後の3プラグインで表示・非表示・フォールバック・ラベル・タブ/gather 非干渉を確認、全回帰 PASS。運用は「事前配信→開始日に自動出現→終了日に自動消滅」でデプロイのタイミング合わせ不要。 |
 | クリエイター向け資料はまだ出さない（ベースを作っただけ。時が来たらリリース） | 公開リポジトリから AGENTS.md・docs/plugin_guide.md・plugins/_template.py・README の案内セクションを削除し、private リポジトリの `private_scenes/creator_kit/` へ退避（戻し先の対応表を creator_kit/README.md に記載）。エンジンのプラグイン読み込み機能と tools/validate_plugin.py は公開側に残置（アプリUIに案内なし＝ユーザーには見えない）。git 履歴には残る点はユーザー了承済み。 |
 | 起動確認をしましょう | 実機で起動確認を完了。G-Master の隠れセッションで python main.py のコールドスタート・40秒稼働・error.log/crash.log クリーンを確認後、ユーザーの実画面でオーバーレイ表示・設定画面・プラグイン（チューリップ）のモード一覧表示まで目視確認（1〜3 ALL OK）。途中で発見した問題: サウンド連動の WASAPI ループバックが 0x80070490 で失敗する環境では同じエラーが2秒ごとにコンソールへ出続ける → audio_level.py を「同じエラーは1回だけ表示（リトライと復帰検知は継続）」に修正。プラグイン化とは無関係の既存挙動で、アプリ本体は正常動作。 |
 | クリエイターの開発環境は各自の Claude Code / Codex 等のAIコーディング環境 | エージェント前提の制作導線を追加。リポジトリ直下に `AGENTS.md`（モード制作タスクの手順・「エンジン側は変更しない」等のルール・検証ループ）を新設し、`validate_plugin.py` に `--preview out.png` を追加（昼/マウスフェード/夜ライティングの3コマを1枚のPNGに出力→エージェントが画像を読んで見た目を自己確認・反復できる。チューリップ雛形で動作確認済み）。plugin_guide.md に「AIコーディング環境で作る」セクションとコピペ用プロンプト例を追記。 |
