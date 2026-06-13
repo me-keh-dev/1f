@@ -32,7 +32,12 @@
   本体改ざん（sha256）・期限延長改ざん（署名）を拒否。署名ツール `tools/sign_scene.py`（openssl）。
   有効期限=min(until, 初回インストール+max_days)。`plugins/` 手置きは開発者専用、一般ユーザーは installed/。
   設計と配信順序は private `_design/scene_distribution.md`（初コラボ前に _collab.py 入りの code.zip を1回配信）。
-  E2E（署名・インストール・改ざん拒否・期限自動削除・通知・install_scene）全 PASS。ストアUI/課金は後段。
+  E2E（署名・インストール・改ざん拒否・期限自動削除・通知・install_scene）全 PASS。
+- **シーンストアUI（設定内タブ「シーン」）**: 入手できるシーン（カタログ `store_catalog_url` から取得・
+  デフォルト空でも壊れない）＋入手済み管理（残り日数表示・削除）。「入手」→ install_scene→
+  `apply_config({"_rescan":True})` で再スキャン＋オーバーレイ再構築＋シーンコンボ動的更新。
+  `_collab.list_installed/fetch_catalog/uninstall`、`_refresh_scene_combo()`。E2E（入手・コンボ反映・
+  入手済み移動・削除・復帰）PASS。課金/購入トークンは liplico store の差込口のみ（後段）。
 - **期間限定（コラボ）モード**: `SCENE["available"] = {"from": "YYYY-MM-DD", "until": "YYYY-MM-DD"}`
   （両端含む・端末ローカル日付・サーバ不要）。期間外は一覧から自動で消え、`get_scene_info` がデフォルトへ
   フォールバック、OverlayManager の5秒チェックが使用中モードの期限切れをお気に入りへ自動切替

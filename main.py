@@ -387,20 +387,13 @@ class SettingsDialog(QDialog):
         scene_label = QLabel(t("scene_mode"))
         scene_label.setFont(QFont("Meiryo", 10, QFont.Bold))
         self.scene_combo = QComboBox()
-        # 期間限定モードの自動出現/消滅に追従するため都度 scene_modes() を呼ぶ
-        for mode_key, label_key in scene_modes():
-            self.scene_combo.addItem(_scene_label(mode_key, label_key), mode_key)
-        current_scene = self.config.get("scene_mode", "grass")
-        for i in range(self.scene_combo.count()):
-            if self.scene_combo.itemData(i) == current_scene:
-                self.scene_combo.setCurrentIndex(i)
-                break
+        self._refresh_scene_combo(self.config.get("scene_mode", "grass"))
         self.scene_combo.currentIndexChanged.connect(self._on_scene_changed)
         scene_row.addWidget(scene_label)
         scene_row.addWidget(self.scene_combo, 1)
         layout.addLayout(scene_row)
 
-        self._initial_scene = current_scene
+        self._initial_scene = self.config.get("scene_mode", "grass")
 
         # 左右レイアウト
         hbox = QHBoxLayout()
@@ -684,6 +677,9 @@ class SettingsDialog(QDialog):
                               self.stats_received.emit)
         tabs.addTab(tab_poll, t("tab_poll"))
 
+        # === タブ: シーンストア（入手・入手済み管理） ===
+        self._build_store_tab(tabs)
+
         # === 2段目: グラフィックテスト ===
         tab_test = QWidget()
         ttl = QVBoxLayout(tab_test)
@@ -909,6 +905,19 @@ class SettingsDialog(QDialog):
             cfg["stats_uid"] = self.config["stats_uid"]
         return cfg
 
+    def _refresh_scene_combo(self, select_key=None):
+        """シーン一覧コンボを作り直す（入手・期限切れでモードが増減したとき）。
+        期間限定モードの自動出現/消滅に追従するため都度 scene_modes() を呼ぶ"""
+        if select_key is None:
+            select_key = self.scene_combo.currentData()
+        self.scene_combo.blockSignals(True)
+        self.scene_combo.clear()
+        for mode_key, label_key in scene_modes():
+            self.scene_combo.addItem(_scene_label(mode_key, label_key), mode_key)
+        idx = self.scene_combo.findData(select_key)
+        self.scene_combo.setCurrentIndex(max(idx, 0))
+        self.scene_combo.blockSignals(False)
+
     def _on_scene_changed(self):
         scene = self.scene_combo.currentData()
         self._update_tabs_for_scene(scene)
@@ -972,6 +981,109 @@ class SettingsDialog(QDialog):
         name = self.env_combo.currentText()
         if name:
             self.on_load("env", name)
+
+    # --- シーンストア（入手・入手済み管理） ---
+    def _build_store_tab(self, tabs):
+        from PyQt5.QtWidgets import QScrollArea
+        tab = QWidget()
+        outer = QVBoxLayout(tab)
+        desc = QLabel(t("store_desc"))
+        desc.setStyleSheet("color: #666; font-size: 10px;")
+        desc.setWordWrap(True)
+        outer.addWidget(desc)
+
+        # 入手できるシーン
+        self.store_avail_group = QGroupBox(t("store_available"))
+        self.store_avail_layout = QVBoxLayout(self.store_avail_group)
+        outer.addWidget(self.store_avail_group)
+        # 入手済みシーン
+        self.store_owned_group = QGroupBox(t("store_owned"))
+        self.store_owned_layout = QVBoxLayout(self.store_owned_group)
+        outer.addWidget(self.store_owned_group)
+
+        refresh = QPushButton(t("store_refresh"))
+        refresh.clicked.connect(self._reload_store)
+        outer.addWidget(refresh)
+        outer.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(tab)
+        holder = QWidget()
+        hl = QVBoxLayout(holder)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.addWidget(scroll)
+        tabs.addTab(holder, t("tab_store"))
+        self._reload_store()
+
+    def _clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+    def _reload_store(self):
+        from scenes import _collab
+        lang = get_language()
+        # --- 入手済み ---
+        self._clear_layout(self.store_owned_layout)
+        owned = _collab.list_installed()
+        owned_keys = {o["key"] for o in owned}
+        if not owned:
+            self.store_owned_layout.addWidget(QLabel(t("store_none_owned")))
+        for o in owned:
+            row = QHBoxLayout()
+            nm = (o["name"].get(lang) or o["name"].get("ja")
+                  or o["name"].get("en") or o["key"])
+            if o["days_left"] is not None:
+                nm += "（{}）".format(t("store_days_left").format(d=o["days_left"]))
+            row.addWidget(QLabel(nm), 1)
+            btn = QPushButton(t("store_remove"))
+            btn.clicked.connect(lambda _, k=o["key"]: self._on_uninstall(k))
+            row.addWidget(btn)
+            self.store_owned_layout.addLayout(row)
+        # --- 入手できる（カタログ。未取得・未所持のみ） ---
+        self._clear_layout(self.store_avail_layout)
+        catalog = _collab.fetch_catalog(self.config.get("store_catalog_url"))
+        avail = [c for c in catalog if c.get("key") not in owned_keys]
+        if not avail:
+            self.store_avail_layout.addWidget(QLabel(t("store_none_available")))
+        for c in avail:
+            row = QHBoxLayout()
+            name = (c.get("name") or {})
+            nm = name.get(lang) or name.get("ja") or name.get("en") or c.get("key", "?")
+            av = c.get("available") or {}
+            if av.get("until"):
+                nm += "（〜{}）".format(av["until"])
+            row.addWidget(QLabel(nm), 1)
+            btn = QPushButton(t("store_get"))
+            btn.clicked.connect(lambda _, u=c.get("url"): self._on_install(u))
+            row.addWidget(btn)
+            self.store_avail_layout.addLayout(row)
+
+    def _on_install(self, url):
+        from PyQt5.QtWidgets import QMessageBox
+        from scenes import _collab
+        if not url:
+            return
+        try:
+            _collab.install_scene(url)
+        except Exception as e:
+            QMessageBox.warning(self, t("tab_store"),
+                                t("store_get_failed").format(err=str(e)))
+            return
+        # 入手後: 一覧を作り直し、シーンコンボにも反映、ストアタブも更新
+        self.on_apply({"_rescan": True})
+        self._refresh_scene_combo()
+        self._reload_store()
+
+    def _on_uninstall(self, key):
+        from scenes import _collab
+        _collab.uninstall(key)
+        self.on_apply({"_rescan": True})
+        self._refresh_scene_combo()
+        self._reload_store()
 
     def _refresh_scene_saves(self):
         self.scene_preset_combo.clear()
@@ -1338,6 +1450,15 @@ class OverlayManager:
             json.dump(self.config, f, ensure_ascii=False, indent=2)
 
     def apply_config(self, new_config):
+        # シーンの入手/削除でモード一覧が変わった → 再スキャンして反映
+        if new_config.get("_rescan"):
+            expired = scenes_registry.rescan()
+            for name in expired:
+                self._notify_collab_expired(name)
+            for o in self.overlays:
+                o._rebuild_scene()
+            return
+
         # テストモード（他の処理をスキップ）
         test_weather = new_config.get("_weather_test")
         if test_weather:

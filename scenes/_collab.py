@@ -193,6 +193,58 @@ def scan_installed(today=None):
     return entries, expired
 
 
+def list_installed(today=None):
+    """インストール済みコラボシーンの一覧（入手済み管理UI用）。
+    returns [{key, name, expiry(date|None), days_left(int|None), valid(bool)}]"""
+    today = today or datetime.date.today()
+    d = installed_dir()
+    out = []
+    if not os.path.isdir(d):
+        return out
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".1fmode"):
+            continue
+        path = os.path.join(d, fn)
+        try:
+            manifest, _ = load_and_verify(path)
+        except CollabError:
+            continue
+        key = manifest.get("key") or fn[:-7]
+        name = (manifest.get("name") or {})
+        first_seen = _read_first_seen(key, today)
+        exp = effective_expiry(manifest, first_seen)
+        days_left = (exp - today).days if exp else None
+        out.append({
+            "key": key,
+            "name": name,
+            "expiry": exp,
+            "days_left": days_left,
+            "valid": exp is None or today <= exp,
+        })
+    return out
+
+
+def uninstall(key):
+    """ユーザーが入手済みシーンを手動で削除する"""
+    _delete_package(key)
+
+
+def fetch_catalog(url):
+    """配布カタログ（JSON 配列）を取得する。各要素:
+      {key, name:{ja,en}, desc:{ja,en}, available:{from,until}, url, price?}
+    取得失敗・未設定は空リスト（ストア未稼働でも UI が壊れない）。"""
+    if not url:
+        return []
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "1f-app"})
+        data = urllib.request.urlopen(req, timeout=15).read()
+        cat = json.loads(data.decode("utf-8"))
+        return cat if isinstance(cat, list) else cat.get("scenes", [])
+    except Exception:
+        return []
+
+
 def install_scene(url, dest_name=None):
     """URL（http/https/file）から .1fmode を取得し、検証して installed/ に保存。
     成功すれば manifest を返す。ユーザー操作は「入手」ボタン1つの想定。"""
