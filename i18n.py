@@ -68,6 +68,10 @@ TEXTS = {
         "store_perpetual": "無期限",
         "store_basic": "基本",
         "tile_trial_hint": "クリックで10秒お試し",
+        "skin": "設定画面のスキン",
+        "skin_natural": "ナチュラル",
+        "skin_dark": "ダーク",
+        "skin_sakura": "さくら",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -208,6 +212,10 @@ TEXTS = {
         "store_perpetual": "no expiry",
         "store_basic": "basic",
         "tile_trial_hint": "Click for a 10s trial",
+        "skin": "Settings skin",
+        "skin_natural": "Natural",
+        "skin_dark": "Dark",
+        "skin_sakura": "Sakura",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice

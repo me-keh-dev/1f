@@ -307,6 +307,61 @@ class NoWheelSlider(QSlider):
     def wheelEvent(self, event):
         event.ignore()
 
+# --- 設定画面のスキン（QSSテーマ） ---
+def _make_qss(c):
+    """色セット c から設定ダイアログ用の QSS を生成する"""
+    return """
+    QDialog {{ background: {bg}; }}
+    QLabel {{ color: {text}; background: transparent; }}
+    QTabWidget::pane {{ border: 1px solid {border}; border-radius: 8px;
+        background: {panel}; top: -1px; }}
+    QTabBar::tab {{ background: {bg}; color: {text}; padding: 6px 12px;
+        border-top-left-radius: 8px; border-top-right-radius: 8px;
+        margin-right: 2px; }}
+    QTabBar::tab:selected {{ background: {panel}; color: {text};
+        border: 1px solid {border}; border-bottom: 2px solid {accent}; }}
+    QTabBar::tab:hover {{ background: {panel}; }}
+    QGroupBox {{ background: {panel}; border: 1px solid {border};
+        border-radius: 8px; margin-top: 10px; padding-top: 10px;
+        font-weight: 600; color: {text}; }}
+    QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+    QPushButton {{ background: {accent}; color: {on_accent}; border: none;
+        border-radius: 6px; padding: 6px 12px; }}
+    QPushButton:hover {{ background: {accent_hover}; }}
+    QPushButton:pressed, QPushButton:checked {{ background: {accent_hover}; }}
+    QComboBox {{ background: {field}; color: {text}; border: 1px solid {border};
+        border-radius: 6px; padding: 3px 8px; }}
+    QComboBox:hover {{ border-color: {accent}; }}
+    QComboBox QAbstractItemView {{ background: {field}; color: {text};
+        selection-background-color: {accent}; selection-color: {on_accent}; }}
+    QCheckBox {{ color: {text}; spacing: 6px; background: transparent; }}
+    QScrollArea {{ border: none; background: transparent; }}
+    QScrollArea > QWidget > QWidget {{ background: {panel}; }}
+    QSlider::groove:horizontal {{ height: 4px; background: {groove};
+        border-radius: 2px; }}
+    QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 2px; }}
+    QSlider::handle:horizontal {{ background: {field}; border: 2px solid {accent};
+        width: 14px; height: 14px; margin: -6px 0; border-radius: 9px; }}
+    """.format(**c)
+
+
+UI_SKINS = {
+    "natural": _make_qss(dict(
+        bg="#eef2ef", panel="#fbfcfb", field="#ffffff", text="#36413a",
+        border="#dde3df", groove="#d8dfda", accent="#6bb758",
+        accent_hover="#5aa648", on_accent="#ffffff")),
+    "dark": _make_qss(dict(
+        bg="#2b2f33", panel="#363b40", field="#3f464c", text="#e6ebe8",
+        border="#474e54", groove="#4a5258", accent="#6bb758",
+        accent_hover="#7cc869", on_accent="#10140f")),
+    "sakura": _make_qss(dict(
+        bg="#fbeef2", panel="#fffafc", field="#ffffff", text="#5a4750",
+        border="#f0d9e1", groove="#f2dde4", accent="#e58aa6",
+        accent_hover="#d97a98", on_accent="#ffffff")),
+}
+DEFAULT_SKIN = "natural"
+
+
 # --- 設定ダイアログ ---
 from PyQt5.QtWidgets import QTabWidget, QCheckBox, QScrollArea
 
@@ -569,8 +624,13 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("1/f - 設定")
         self._build_ui()
 
+    def _apply_skin(self, skin=None):
+        skin = skin or self.config.get("ui_skin", DEFAULT_SKIN)
+        self.setStyleSheet(UI_SKINS.get(skin, UI_SKINS[DEFAULT_SKIN]))
+
     def _build_ui(self):
         from PyQt5.QtWidgets import QSplitter
+        self._apply_skin()   # 設定画面のスキン（テーマ）を適用
         layout = QVBoxLayout(self)
         title = QLabel(t("settings_title"))
         title.setFont(QFont("Meiryo", 12, QFont.Bold))
@@ -722,6 +782,21 @@ class SettingsDialog(QDialog):
         self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
         g_lang_l.addWidget(self.lang_combo)
         g_lang.setLayout(g_lang_l)
+
+        # 設定画面のスキン（テーマ）
+        g_skin = QGroupBox(t("skin"))
+        g_skin_l = QVBoxLayout(g_skin)
+        self.skin_combo = QComboBox()
+        for skin_key, skin_label in (("natural", t("skin_natural")),
+                                     ("dark", t("skin_dark")),
+                                     ("sakura", t("skin_sakura"))):
+            self.skin_combo.addItem(skin_label, skin_key)
+        cur_skin = self.config.get("ui_skin", DEFAULT_SKIN)
+        idx = self.skin_combo.findData(cur_skin)
+        self.skin_combo.setCurrentIndex(max(idx, 0))
+        self.skin_combo.currentIndexChanged.connect(self._on_skin_changed)
+        g_skin_l.addWidget(self.skin_combo)
+
         # 天気エフェクト
         g_weather = QGroupBox(t("weather"))
         g_wl = QVBoxLayout(g_weather)
@@ -779,6 +854,7 @@ class SettingsDialog(QDialog):
         if audio_supported():
             tol.addWidget(g_ssync)
         tol.addWidget(g_lang)
+        tol.addWidget(g_skin)
 
         tol.addStretch()
         tabs2.addTab(tab_opt, t("tab_option"))
@@ -951,6 +1027,12 @@ class SettingsDialog(QDialog):
         # 言語を即時反映: ダイアログとトレイメニューを作り直す
         if self.on_language_change:
             self.on_language_change()
+
+    def _on_skin_changed(self):
+        skin = self.skin_combo.currentData()
+        self.config["ui_skin"] = skin
+        self._apply_skin(skin)               # 即時反映
+        self.on_apply({"ui_skin": skin})     # 保存のみ（再構築なし）
 
     def _add_slider(self, layout, label, min_val, max_val, current):
         row = QHBoxLayout()
@@ -1759,6 +1841,12 @@ class OverlayManager:
         # お気に入り（ハート）の保存のみ。シーン再構築はしない
         if "_favorite" in new_config:
             self.config["scene_favorites"] = new_config["_favorite"]
+            self._save_config()
+            return
+
+        # 設定画面のスキン: 保存のみ（オーバーレイには影響しない）
+        if "ui_skin" in new_config and len(new_config) == 1:
+            self.config["ui_skin"] = new_config["ui_skin"]
             self._save_config()
             return
 

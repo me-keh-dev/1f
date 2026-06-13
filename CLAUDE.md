@@ -94,6 +94,14 @@
 
 注意: モードだけの変更でも公開側 version.py の極小コミットは発生する（現行更新方式の都合）。
 
+## 設定画面のスキン（QSSテーマ）
+
+- `main.py` の `_make_qss(色セット)` ＋ `UI_SKINS`（natural/dark/sakura）。`SettingsDialog._apply_skin()` が
+  `config["ui_skin"]`（既定 natural）の QSS を `setStyleSheet` で適用。タブ・グループ枠・ボタン・スライダー・
+  コンボを角丸＆アクセント色でスタイル。スクロール内背景も `QScrollArea > QWidget > QWidget` でテーマ色に。
+- オプションタブの「設定画面のスキン」コンボで切替（`_on_skin_changed` が即時適用＋保存のみ）。
+  カスタム描画の SceneTile / PollGraph は QSS非依存（自前描画）。オーバーレイ本体には影響しない。
+
 ## 天気演出（雷・雪）
 
 - **雷（thunderstorm）**: `weather_fx.py` の `Lightning`。雷雨のときだけ 1/f 的にランダム間隔で
