@@ -368,8 +368,10 @@ class SceneTile(QWidget):
     THUMB_W = 128
     THUMB_H = 128   # 正方形
 
+    HEART_R = 13   # ハートボタンの当たり半径
+
     def __init__(self, key, label, owned, price, url, on_play, on_trial,
-                 parent=None):
+                 favorited=False, on_favorite=None, parent=None):
         super().__init__(parent)
         self.key = key
         self.label = label
@@ -378,6 +380,8 @@ class SceneTile(QWidget):
         self.url = url
         self.on_play = on_play
         self.on_trial = on_trial
+        self.favorited = favorited
+        self.on_favorite = on_favorite
         self._hover = False
         self.scene = None
         self._wind = WindSimulator()
@@ -386,20 +390,42 @@ class SceneTile(QWidget):
         # ツールチップは出さない（ホバー中の動きを隠さないため）
         if owned:
             self._build_scene()
+        elif url:
+            self._build_preview()   # 未購入もプレビュー描画（中身は所有しない）
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
 
+    def _heart_center(self):
+        return self.THUMB_W - 20, self.THUMB_H - 20  # 右下（メルカリ風）
+
     def _build_scene(self):
         try:
-            cfg = {"seed": 7, get_scale_key(self.key): 70}
-            self.scene = get_scene_class(self.key)()
-            self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
-            self._wind.set_wind(80)   # プレビューは少し強めの風で動きを見せる
-            for _ in range(15):
-                self._wind.update(1 / 60.0)
-                self.scene.update(self._wind)
+            self._spin_up(get_scene_class(self.key)())
         except Exception:
             self.scene = None
+
+    def _build_preview(self):
+        """未購入シーンのプレビュー: カタログ署名パッケージを取得・検証して
+        グローバル登録せずにクラスだけ得て描く（所有はしない）。失敗時は錠前表示。"""
+        try:
+            from scenes import _collab, load_scene_from_source
+            _key, src = _collab.fetch_trial(self.url)
+            info = load_scene_from_source(src, self.key)
+            if info and info.get("class"):
+                self._preview_scale_key = info.get("scale_key", "")
+                self._spin_up(info["class"]())
+        except Exception:
+            self.scene = None
+
+    def _spin_up(self, scene):
+        cfg = {"seed": 7, get_scale_key(self.key): 70,
+               getattr(self, "_preview_scale_key", "_") or "_": 70}
+        self.scene = scene
+        self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
+        self._wind.set_wind(80)   # プレビューは少し強めの風で動きを見せる
+        for _ in range(15):
+            self._wind.update(1 / 60.0)
+            self.scene.update(self._wind)
 
     def enterEvent(self, event):
         self._hover = True
@@ -424,6 +450,15 @@ class SceneTile(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() != Qt.LeftButton:
+            return
+        # ハート（お気に入り）の当たり判定が最優先
+        hx, hy = self._heart_center()
+        if (event.pos().x() - hx) ** 2 + (event.pos().y() - hy) ** 2 \
+                <= self.HEART_R ** 2:
+            self.favorited = not self.favorited
+            if self.on_favorite:
+                self.on_favorite(self.key, self.favorited)
+            self.update()
             return
         if self.owned:
             self.on_play(self.key)
@@ -474,8 +509,25 @@ class SceneTile(QWidget):
             p.setPen(pen)
             p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
         p.setPen(Qt.NoPen)
-        # 価格/お試しバッジ（未購入のみ・文字は最小限）
-        if not self.owned:
+        if self.owned:
+            # 購入済みの印: 左上の赤いコーナー＋白いチェック
+            tri = QPainterPath()
+            tri.moveTo(0, 0)
+            tri.lineTo(34, 0)
+            tri.lineTo(0, 34)
+            tri.closeSubpath()
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(218, 62, 80))   # メルカリ風の赤
+            p.drawPath(tri)
+            pen = p.pen()
+            pen.setColor(QColor(255, 255, 255))
+            pen.setWidth(2)
+            p.setPen(pen)
+            p.drawLine(6, 11, 10, 15)
+            p.drawLine(10, 15, 17, 7)
+            p.setPen(Qt.NoPen)
+        else:
+            # 価格/お試しバッジ（未購入のみ・文字は最小限）
             badge = ("¥{}".format(self.price) if self.price else t("store_get"))
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(40, 44, 52, 210))
@@ -484,7 +536,41 @@ class SceneTile(QWidget):
             p.setPen(QColor(255, 230, 140))
             f = p.font(); f.setPointSize(9); f.setBold(True); p.setFont(f)
             p.drawText(tw - bw - 6, 6, bw, 20, Qt.AlignCenter, badge)
+            p.setPen(Qt.NoPen)
+
+        # お気に入りハート（ホバー中 or お気に入り済みのとき表示・メルカリ風）
+        if self._hover or self.favorited:
+            hx, hy = self._heart_center()
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(34, 34, 34, 150))   # 背景の丸
+            p.drawEllipse(QPoint(hx, hy), self.HEART_R, self.HEART_R)
+            self._draw_heart(p, hx, hy, 7.5, self.favorited)
         p.end()
+
+    def _draw_heart(self, p, cx, cy, s, filled):
+        """小さなハート（2円＋三角の合成）。filled=赤塗り / それ以外=白枠"""
+        heart = QPainterPath()
+        heart.addEllipse(QPoint(int(cx - s * 0.5), int(cy - s * 0.35)),
+                         s * 0.6, s * 0.6)
+        heart.addEllipse(QPoint(int(cx + s * 0.5), int(cy - s * 0.35)),
+                         s * 0.6, s * 0.6)
+        tri = QPainterPath()
+        tri.moveTo(cx - s * 1.0, cy - s * 0.1)
+        tri.lineTo(cx + s * 1.0, cy - s * 0.1)
+        tri.lineTo(cx, cy + s * 1.05)
+        tri.closeSubpath()
+        heart = heart.united(tri)
+        if filled:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(255, 70, 100))
+        else:
+            pen = p.pen()
+            pen.setColor(QColor(255, 255, 255))
+            pen.setWidth(1)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+        p.drawPath(heart)
+        p.setPen(Qt.NoPen)
 
 
 class SettingsDialog(QDialog):
@@ -1156,6 +1242,7 @@ class SettingsDialog(QDialog):
         from scenes import _collab
         lang = get_language()
         self._clear_layout(self.store_grid)
+        favs = set(self.config.get("scene_favorites") or [])
         tiles = []
         # 所有: 基本シーン（同梱）＋入手済みコラボ → クリックで再生
         owned = _collab.list_installed()
@@ -1163,8 +1250,9 @@ class SettingsDialog(QDialog):
         for mode_key, label_key in scene_modes():
             tiles.append(SceneTile(
                 mode_key, t(label_key), True, 0, None,
-                self._on_tile_play, self._on_tile_trial))
-        # 未購入: カタログのうち未所持 → お試し（10秒）
+                self._on_tile_play, self._on_tile_trial,
+                favorited=(mode_key in favs), on_favorite=self._on_tile_favorite))
+        # 未購入: カタログのうち未所持 → プレビュー＋お試し（10秒）
         catalog = _collab.fetch_catalog(self.config.get("store_catalog_url"))
         for c in catalog:
             if c.get("key") in owned_keys or c.get("key") in dict(scene_modes()):
@@ -1173,11 +1261,24 @@ class SettingsDialog(QDialog):
             nm = name.get(lang) or name.get("ja") or name.get("en") or c.get("key", "?")
             tiles.append(SceneTile(
                 c.get("key"), nm, False, int(c.get("price") or 0), c.get("url"),
-                self._on_tile_play, self._on_tile_trial))
+                self._on_tile_play, self._on_tile_trial,
+                favorited=(c.get("key") in favs), on_favorite=self._on_tile_favorite))
+        # お気に入りを先頭に（メルカリのお気に入り上位表示風）
+        tiles.sort(key=lambda tl: not tl.favorited)
         # グリッド配置（3列）
         cols = 3
         for i, tile in enumerate(tiles):
             self.store_grid.addWidget(tile, i // cols, i % cols)
+
+    def _on_tile_favorite(self, key, on):
+        """ハートのトグル: お気に入りを config に保存（再描画はしない）"""
+        favs = list(self.config.get("scene_favorites") or [])
+        if on and key not in favs:
+            favs.append(key)
+        elif not on and key in favs:
+            favs.remove(key)
+        self.config["scene_favorites"] = favs
+        self.on_apply({"_favorite": favs})
 
     def _on_tile_play(self, key):
         """所有シーンのタイルをクリック → そのシーンを再生（適用）"""
@@ -1672,6 +1773,12 @@ class OverlayManager:
             json.dump(self.config, f, ensure_ascii=False, indent=2)
 
     def apply_config(self, new_config):
+        # お気に入り（ハート）の保存のみ。シーン再構築はしない
+        if "_favorite" in new_config:
+            self.config["scene_favorites"] = new_config["_favorite"]
+            self._save_config()
+            return
+
         # 未購入シーンのお試し（一時DL→10秒適用→自動復帰）
         if "_trial" in new_config:
             self.start_trial(new_config["_trial"])

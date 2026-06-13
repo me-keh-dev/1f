@@ -217,6 +217,21 @@ def rescan():
     return consume_expired()
 
 
+def load_scene_from_source(source, name):
+    """ソース文字列からシーンの SCENE 辞書を得る（グローバル登録はしない）。
+    ストアの未購入タイルのプレビュー描画用。texts だけはラベル解決のため登録する。"""
+    import types
+    mod = types.ModuleType("onef_preview_" + name)
+    try:
+        exec(compile(source, "<preview:%s>" % name, "exec"), mod.__dict__)
+    except Exception:
+        return None
+    info = getattr(mod, "SCENE", None)
+    if isinstance(info, dict) and info.get("texts"):
+        register_texts(info["texts"])
+    return info if isinstance(info, dict) else None
+
+
 def register_trial(key, source):
     """お試し用にシーンを一時登録する（保存しない・上書き可）。
     end_trial 相当で unregister すること。"""

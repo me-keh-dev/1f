@@ -40,7 +40,14 @@
   入手済み移動・削除・復帰）PASS。課金/購入トークンは liplico store の差込口のみ（後段）。
   **アイコングリッド化（iPhoneアプリ風）**: `SceneTile`（小さくライブ描画・**マウスオン中だけ**~25fpsで動く・
   クリックで再生）。所有=基本＋入手済みコラボはクリックで適用、未購入=錠前タイル＋価格バッジで
-  クリックすると**10秒お試し**。`_build_store_tab` は QGridLayout（3列）。右ペイン先頭・デフォルト表示。
+  クリックすると**10秒お試し**。`_build_store_tab` は QGridLayout（3列・正方形128px・文字/ツールチップなし・
+  右ペイン440px幅で3列スクロールなし）。右ペイン先頭・デフォルト表示。ホバーは明るい青の太枠＋外側グロー、
+  プレビューは風80＋速い時間進行で動きをはっきり見せる。
+  **メルカリ風のお気に入り♡＋購入済みバッジ**: 各タイルにホバー（orお気に入り時）右下にハート、
+  クリックで赤いハートにトグル＝`config["scene_favorites"]`に保存（`_favorite`はsave-only・再構築なし）、
+  お気に入りはグリッド先頭に並ぶ。所有(購入済み)タイルは左上に赤いコーナー＋白チェック。
+  **未購入タイルもプレビュー描画**: カタログURLから署名検証して登録せずにクラスだけ得て描く
+  （`scenes.load_scene_from_source`＋`_collab.fetch_trial`）。取得失敗時のみ錠前表示。
 - **お試し（trial）**: 未購入シーンを10秒だけ再生して元に戻す。`_collab.fetch_trial`（署名検証して
   installed には保存しない）→ `scenes.register_trial`/`unregister`（一時登録）→ `OverlayManager.start_trial`
   （現シーン退避→切替→`TRIAL_SECONDS=10`後 `end_trial` で復帰・保存しない）。トレイ通知（trial_start/end/failed）。
