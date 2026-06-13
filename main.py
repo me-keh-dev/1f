@@ -600,7 +600,7 @@ class SceneTile(QWidget):
         heart = heart.united(tri)
         if filled:
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(255, 150, 90))   # お気に入り＝あたたかい山吹/コーラル（赤ではない）
+            p.setBrush(QColor(255, 70, 95))   # お気に入り＝赤いハート
         else:
             pen = p.pen()
             pen.setColor(QColor(255, 255, 255))
@@ -710,7 +710,7 @@ class SettingsDialog(QDialog):
         gml.addWidget(fade_desc)
         tel.addWidget(gm)
 
-        # 起動時のモード抽選（お気に入り登録）
+        # 起動時のモード抽選（お気に入り＝シーンパネルのハート♡で登録）
         g_boot = QGroupBox(t("startup_mode"))
         g_bl = QVBoxLayout(g_boot)
         self.startup_random_check = QCheckBox(t("startup_random"))
@@ -721,14 +721,6 @@ class SettingsDialog(QDialog):
         boot_desc.setStyleSheet("color: #666; font-size: 10px;")
         boot_desc.setWordWrap(True)
         g_bl.addWidget(boot_desc)
-        saved_pool = self.config.get("startup_scenes") or [k for k, _ in scene_modes()]
-        self.startup_scene_checks = []
-        for key, label_key in scene_modes():
-            cb = QCheckBox(_scene_label(key, label_key))
-            cb.setChecked(key in saved_pool)
-            cb.toggled.connect(self._on_slider_changed)
-            g_bl.addWidget(cb)
-            self.startup_scene_checks.append((key, cb))
         tel.addWidget(g_boot)
 
         g_startup = QGroupBox(t("system"))
@@ -1070,7 +1062,9 @@ class SettingsDialog(QDialog):
         return uid
 
     def _favorite_scenes(self):
-        return [k for k, cb in self.startup_scene_checks if cb.isChecked()]
+        # お気に入り＝シーンパネルのハート♡（scene_favorites）。
+        # 起動抽選プールと人気投票の送信に共用する
+        return list(self.config.get("scene_favorites") or [])
 
     def _on_stats_optin_toggled(self, checked):
         if checked:
@@ -1152,8 +1146,6 @@ class SettingsDialog(QDialog):
             "wind": self.wind_slider.value(),
             "auto_update": self.auto_update_check.isChecked(),
             "startup_random": self.startup_random_check.isChecked(),
-            "startup_scenes": [k for k, cb in self.startup_scene_checks
-                               if cb.isChecked()],
             "stats_optin": self.stats_optin_check.isChecked(),
             "mouse_fade_enabled": self.mouse_fade_btn.isChecked(),
             "mouse_fade_inner": self.fade_inner_slider.value(),
@@ -1249,7 +1241,7 @@ class SettingsDialog(QDialog):
         "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
         "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
         "sound_sync_enabled", "sound_sync_gain", "sound_bass_gain",
-        "startup_random", "startup_scenes",
+        "startup_random", "scene_favorites",
     ]
 
     def _on_save_scene(self):
@@ -1606,16 +1598,19 @@ class OverlayManager:
 
     def __init__(self):
         self.config = self._load_config()
+        # 旧 startup_scenes（起動抽選プール）を scene_favorites（ハートお気に入り）へ移行
+        if "scene_favorites" not in self.config and "startup_scenes" in self.config:
+            self.config["scene_favorites"] = self.config.get("startup_scenes") or []
         # 保存済み言語設定を反映
         saved_lang = self.config.get("language")
         if saved_lang:
             set_language(saved_lang)
-        # 起動時のモード抽選: お気に入り（未設定なら全モード）からランダムに選ぶ
+        # 起動時のモード抽選: お気に入り（ハート♡。未設定なら全モード）からランダムに選ぶ
         # 抽選で選ばれたモードは「指名」ではないため利用記録の対象外
         self._scene_designated = True
         if self.config.get("startup_random", True):
             valid = [k for k, _ in SCENE_MODES]
-            pool = [k for k in (self.config.get("startup_scenes") or valid)
+            pool = [k for k in (self.config.get("scene_favorites") or valid)
                     if k in valid]
             if pool:
                 self.config["scene_mode"] = random.choice(pool)
@@ -1822,7 +1817,7 @@ class OverlayManager:
         if get_scene_info(current)["key"] == current:
             return
         valid = [k for k, _ in scene_modes()]
-        pool = [k for k in (self.config.get("startup_scenes") or valid)
+        pool = [k for k in (self.config.get("scene_favorites") or valid)
                 if k in valid]
         new_mode = random.choice(pool) if pool else "grass"
         self.config["scene_mode"] = new_mode
