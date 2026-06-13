@@ -48,6 +48,13 @@
   お気に入りはグリッド先頭に並ぶ。所有(購入済み)タイルは左上に赤いコーナー＋白チェック。
   **未購入タイルもプレビュー描画**: カタログURLから署名検証して登録せずにクラスだけ得て描く
   （`scenes.load_scene_from_source`＋`_collab.fetch_trial`）。取得失敗時のみ錠前表示。
+  **パネル表示の開発者フック**: SCENE 任意キー `preview_config`（タイル描画の config 上書き）/
+  `draw_icon`(fn(painter,w,h)＝完全カスタムアイコン)。未指定ならシーンを自動ミニ描画。
+- **お気に入り＝起動抽選プールに統一**: 起動時モードの個別チェックは廃止し、パネルのハート♡
+  （`scene_favorites`）を起動抽選プール＆人気投票送信に共用。旧 `startup_scenes` は起動時に移行。
+  ハートは未お気に入り=白線、お気に入り=赤塗り。
+- **シーンモードのプルダウン廃止**: 右パネルのタイルクリックで選択。combo は隠して内部保持
+  （現在シーンの管理・設定タブ切替・プリセット対象に使用）。上部に「現在のシーン: X」を控えめ表示。
 - **お試し（trial）**: 未購入シーンを10秒だけ再生して元に戻す。`_collab.fetch_trial`（署名検証して
   installed には保存しない）→ `scenes.register_trial`/`unregister`（一時登録）→ `OverlayManager.start_trial`
   （現シーン退避→切替→`TRIAL_SECONDS=10`後 `end_trial` で復帰・保存しない）。トレイ通知（trial_start/end/failed）。

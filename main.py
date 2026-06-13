@@ -439,6 +439,7 @@ class SceneTile(QWidget):
         self.on_favorite = on_favorite
         self._hover = False
         self.scene = None
+        self._info = None          # シーンの SCENE 辞書（preview_config/draw_icon 用）
         self._wind = WindSimulator()
         self.setFixedSize(self.THUMB_W, self.THUMB_H)
         self.setCursor(Qt.PointingHandCursor)
@@ -455,7 +456,10 @@ class SceneTile(QWidget):
 
     def _build_scene(self):
         try:
-            self._spin_up(get_scene_class(self.key)())
+            self._info = get_scene_info(self.key)
+            if self._info.get("draw_icon"):
+                return   # カスタムアイコン描画ならシーンは作らない
+            self._spin_up(self._info["class"]())
         except Exception:
             self.scene = None
 
@@ -467,14 +471,19 @@ class SceneTile(QWidget):
             _key, src = _collab.fetch_trial(self.url)
             info = load_scene_from_source(src, self.key)
             if info and info.get("class"):
+                self._info = info
                 self._preview_scale_key = info.get("scale_key", "")
+                if info.get("draw_icon"):
+                    return
                 self._spin_up(info["class"]())
         except Exception:
             self.scene = None
 
     def _spin_up(self, scene):
+        # 開発者が SCENE["preview_config"] でタイル描画の設定を上書きできる
         cfg = {"seed": 7, get_scale_key(self.key): 70,
                getattr(self, "_preview_scale_key", "_") or "_": 70}
+        cfg.update((self._info or {}).get("preview_config") or {})
         self.scene = scene
         self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
         self._wind.set_wind(80)   # プレビューは少し強めの風で動きを見せる
@@ -529,7 +538,14 @@ class SceneTile(QWidget):
         path.addRoundedRect(0, 0, tw, th, 10, 10)
         p.setClipPath(path)
         p.fillRect(0, 0, tw, th, QColor(150, 175, 200))  # 空
-        if self.scene:
+        icon = (self._info or {}).get("draw_icon")
+        if icon:
+            # 開発者提供のカスタムアイコン描画
+            try:
+                icon(p, tw, th)
+            except Exception:
+                pass
+        elif self.scene:
             p.setRenderHint(QPainter.Antialiasing, False)
             try:
                 if self.scene.has_background_layer():
