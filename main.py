@@ -637,16 +637,19 @@ class SettingsDialog(QDialog):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        # シーンモード選択
-        scene_row = QHBoxLayout()
-        scene_label = QLabel(t("scene_mode"))
-        scene_label.setFont(QFont("Meiryo", 10, QFont.Bold))
+        # シーン選択は右の「シーン」パネル（グリッド）で行うため、選択用の
+        # プルダウンは表示しない。ただし現在シーンの管理・設定タブ切替・プリセット
+        # 対象の判定に使うので、ウィジェットは隠したまま保持する。
         self.scene_combo = QComboBox()
+        self.scene_combo.hide()
         self._refresh_scene_combo(self.config.get("scene_mode", "grass"))
         self.scene_combo.currentIndexChanged.connect(self._on_scene_changed)
-        scene_row.addWidget(scene_label)
-        scene_row.addWidget(self.scene_combo, 1)
-        layout.addLayout(scene_row)
+        # 現在のシーン名だけ控えめに表示
+        self.current_scene_label = QLabel()
+        self.current_scene_label.setAlignment(Qt.AlignCenter)
+        self.current_scene_label.setStyleSheet("color:#888; font-size:11px;")
+        layout.addWidget(self.current_scene_label)
+        self._update_current_scene_label()
 
         self._initial_scene = self.config.get("scene_mode", "grass")
 
@@ -1197,11 +1200,21 @@ class SettingsDialog(QDialog):
         idx = self.scene_combo.findData(select_key)
         self.scene_combo.setCurrentIndex(max(idx, 0))
         self.scene_combo.blockSignals(False)
+        self._update_current_scene_label()
+
+    def _update_current_scene_label(self):
+        if getattr(self, "current_scene_label", None) is None:
+            return
+        key = self.scene_combo.currentData()
+        name = next((_scene_label(k, lk) for k, lk in scene_modes() if k == key),
+                    key or "")
+        self.current_scene_label.setText(t("current_scene").format(name=name))
 
     def _on_scene_changed(self):
         scene = self.scene_combo.currentData()
         self._update_tabs_for_scene(scene)
         self._refresh_scene_saves()
+        self._update_current_scene_label()
         self.on_apply({"scene_mode": scene})
 
     def _update_tabs_for_scene(self, scene):
