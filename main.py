@@ -677,8 +677,8 @@ class SettingsDialog(QDialog):
                               self.stats_received.emit)
         tabs.addTab(tab_poll, t("tab_poll"))
 
-        # === タブ: シーンストア（入手・入手済み管理） ===
-        self._build_store_tab(tabs)
+        # === タブ: シーンストア（右ペインの先頭・デフォルト表示） ===
+        self._build_store_tab(tabs2)
 
         # === 2段目: グラフィックテスト ===
         tab_test = QWidget()
@@ -992,14 +992,14 @@ class SettingsDialog(QDialog):
         desc.setWordWrap(True)
         outer.addWidget(desc)
 
+        # 入手済みシーン（基本シーンも購入済みとして表示）
+        self.store_owned_group = QGroupBox(t("store_owned"))
+        self.store_owned_layout = QVBoxLayout(self.store_owned_group)
+        outer.addWidget(self.store_owned_group)
         # 入手できるシーン
         self.store_avail_group = QGroupBox(t("store_available"))
         self.store_avail_layout = QVBoxLayout(self.store_avail_group)
         outer.addWidget(self.store_avail_group)
-        # 入手済みシーン
-        self.store_owned_group = QGroupBox(t("store_owned"))
-        self.store_owned_layout = QVBoxLayout(self.store_owned_group)
-        outer.addWidget(self.store_owned_group)
 
         refresh = QPushButton(t("store_refresh"))
         refresh.clicked.connect(self._reload_store)
@@ -1013,7 +1013,9 @@ class SettingsDialog(QDialog):
         hl = QVBoxLayout(holder)
         hl.setContentsMargins(0, 0, 0, 0)
         hl.addWidget(scroll)
-        tabs.addTab(holder, t("tab_store"))
+        # 右ペインの先頭に置き、設定を開いたとき最初にショップが見える
+        tabs.insertTab(0, holder, t("tab_store"))
+        tabs.setCurrentIndex(0)
         self._reload_store()
 
     def _clear_layout(self, layout):
@@ -1030,8 +1032,13 @@ class SettingsDialog(QDialog):
         self._clear_layout(self.store_owned_layout)
         owned = _collab.list_installed()
         owned_keys = {o["key"] for o in owned}
-        if not owned:
-            self.store_owned_layout.addWidget(QLabel(t("store_none_owned")))
+        # 基本シーン（同梱・購入不要）も「購入済み・無期限」として表示（削除不可）
+        for mode_key, label_key in scene_modes():
+            if mode_key in owned_keys:
+                continue
+            nm = "{}（{}・{}）".format(t(label_key), t("store_basic"),
+                                      t("store_perpetual"))
+            self.store_owned_layout.addWidget(QLabel(nm))
         for o in owned:
             row = QHBoxLayout()
             nm = (o["name"].get(lang) or o["name"].get("ja")

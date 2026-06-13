@@ -66,6 +66,7 @@ TEXTS = {
         "store_none_owned": "入手済みのシーンはありません。",
         "store_days_left": "残り{d}日",
         "store_perpetual": "無期限",
+        "store_basic": "基本",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -198,6 +199,7 @@ TEXTS = {
         "store_none_owned": "You have no acquired scenes.",
         "store_days_left": "{d} days left",
         "store_perpetual": "no expiry",
+        "store_basic": "basic",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice
