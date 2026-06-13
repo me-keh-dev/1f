@@ -80,6 +80,16 @@
 
 注意: モードだけの変更でも公開側 version.py の極小コミットは発生する（現行更新方式の都合）。
 
+## 天気演出（雷・雪）
+
+- **雷（thunderstorm）**: `weather_fx.py` の `Lightning`。雷雨のときだけ 1/f 的にランダム間隔で
+  画面フラッシュ（半透明白を全面・素早く減衰）＋空から走るジグザグの稲妻（グロー＋芯の二重線、約6フレーム）。
+  天気が thunderstorm 以外になると停止。全シーン共通（前面の weather_fx レイヤー）。テストタブの Thunderstorm で確認可。
+- **雪景色（snow/heavy_snow/snow_showers）**: `scenes/base.py` に `SNOWY_STATES`/`is_snowing`。
+  東海道 `tokaido.py` で雪の日のみ: 道路に雪の積層（白い層＋上端の明るい雪面）、建物の屋根・松の上に雪
+  （`_snow_cap`=各列最上段に白）、路傍に**雪だるま**（`Snowman`: 二段の体・石炭の目/ボタン・人参の鼻・
+  赤マフラー・枝の腕。日替わりseedで1〜2体・位置可変）。雪だるまは旅人と同じ前面レイヤー。
+
 ## 自動更新の配信（Cloudflare Pages）
 
 - 配信URL: `https://1f-updates.pages.dev/version.json`（updater.py の DEFAULT_UPDATE_URL）

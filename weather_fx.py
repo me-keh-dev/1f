@@ -191,6 +191,69 @@ class SnowFlake:
                 painter.fillRect(cx - half_w, cy + dy, half_w * 2, 1, color)
 
 
+class Lightning:
+    """雷: 画面全体の閃光＋空から走るジグザグの稲妻。
+    雷雨(thunderstorm)のときだけ 1/f 的にランダムな間隔で光る。"""
+    def __init__(self):
+        self.flash = 0.0          # 画面フラッシュの強さ 0..1（素早く減衰）
+        self.bolt = None          # 稲妻の折れ線 [(x,y),...]（描いている間だけ）
+        self.bolt_frame = 0
+        self._timer = random.uniform(1.5, 5.0)  # 次の落雷までの秒数
+
+    def update(self, dt, screen_width, ground_y):
+        if self.flash > 0:
+            self.flash *= 0.82     # 閃光の減衰
+            if self.flash < 0.03:
+                self.flash = 0.0
+        if self.bolt is not None:
+            self.bolt_frame += 1
+            if self.bolt_frame > 6:   # 稲妻は一瞬
+                self.bolt = None
+        self._timer -= dt
+        if self._timer <= 0:
+            self._strike(screen_width, ground_y)
+            # 次までの間隔（たまに連続でゴロゴロ、たいていは間が空く）
+            self._timer = random.choice(
+                [random.uniform(0.1, 0.4), random.uniform(2.5, 7.0),
+                 random.uniform(2.5, 7.0)])
+
+    def _strike(self, screen_width, ground_y):
+        self.flash = random.uniform(0.5, 1.0)
+        # 6〜7割は閃光のみ、たまに稲妻ボルトも描く
+        if random.random() < 0.45:
+            x = random.uniform(screen_width * 0.15, screen_width * 0.85)
+            pts = [(x, 0)]
+            y = 0
+            seg = max(6, int(ground_y / 7))
+            while y < ground_y * 0.95:
+                y += random.uniform(seg * 0.6, seg * 1.4)
+                x += random.uniform(-14, 14)
+                pts.append((x, min(y, ground_y)))
+            self.bolt = pts
+            self.bolt_frame = 0
+        else:
+            self.bolt = None
+
+    def draw(self, painter):
+        if self.flash > 0:
+            a = int(120 * self.flash)
+            painter.fillRect(painter.window(), QColor(220, 230, 255, a))
+        if self.bolt and len(self.bolt) > 1:
+            a = max(60, int(255 * (1 - self.bolt_frame / 6.0)))
+            # グロー（太い半透明）＋芯（細い明色）の二重線
+            for width, col in ((5, QColor(150, 180, 255, a // 3)),
+                               (2, QColor(245, 250, 255, a))):
+                pen = painter.pen()
+                pen.setColor(col)
+                pen.setWidth(width)
+                painter.setPen(pen)
+                for i in range(len(self.bolt) - 1):
+                    x1, y1 = self.bolt[i]
+                    x2, y2 = self.bolt[i + 1]
+                    painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+            painter.setPen(Qt.NoPen)
+
+
 class WeatherEffect:
     """天気エフェクトマネージャー（3レイヤー奥行き）"""
     def __init__(self):
@@ -199,6 +262,7 @@ class WeatherEffect:
         self.screen_width = 800
         self.ground_y = 60
         self.wind_speed = 0
+        self.lightning = Lightning()
 
     def set_geometry(self, screen_width, ground_y):
         self.screen_width = screen_width
@@ -255,6 +319,15 @@ class WeatherEffect:
         for drop in self.drops:
             drop.update(wind_drift)
 
+        # 雷雨のときだけ稲妻（約90fps想定で dt≈1/90）
+        if self.current_state == "thunderstorm":
+            self.lightning.update(1 / 90.0, self.screen_width, self.ground_y)
+        elif self.lightning.flash or self.lightning.bolt:
+            self.lightning.flash = 0.0
+            self.lightning.bolt = None
+
     def draw(self, painter):
         for drop in self.drops:
             drop.draw(painter)
+        if self.current_state == "thunderstorm":
+            self.lightning.draw(painter)

@@ -942,6 +942,72 @@ def _generate_willow(height, rng, config=None):
     return trunk_pixels, branch_data, trunk_h
 
 
+# --- 雪だるま（雪の日だけ路傍に現れる） ---
+SNOW_WHITE = (245, 248, 255)
+SNOW_SHADE = (205, 216, 234)
+SNOWMAN_COAL = (45, 45, 55)
+SNOWMAN_CARROT = (240, 140, 40)
+SNOWMAN_STICK = (120, 90, 55)
+SNOWMAN_SCARF = (210, 70, 70)
+
+
+class Snowman:
+    """まるい二段の雪だるま。石炭の目・人参の鼻・枝の腕・赤いマフラー。"""
+    def __init__(self, base_x, scarf=True):
+        self.base_x = base_x
+        self.pixels = self._build(scarf)
+
+    def _build(self, scarf):
+        px = {}  # (dx,dy) -> kind（重なりは後勝ち）
+        # 胴体（下の大きな玉）中心(0, 2.6) 半径3
+        for dy in range(0, 6):
+            for dx in range(-3, 4):
+                if dx * dx + (dy - 2.6) ** 2 <= 9.2:
+                    px[(dx, dy)] = "snow"
+        # 頭（上の玉）中心(0, 8) 半径2.2
+        for dy in range(6, 11):
+            for dx in range(-3, 4):
+                if dx * dx + (dy - 8) ** 2 <= 5.2:
+                    px[(dx, dy)] = "snow"
+        # 右側にうっすら陰
+        for (dx, dy), k in list(px.items()):
+            if k == "snow" and dx >= 2:
+                px[(dx, dy)] = "shade"
+        # マフラー（首元 dy=6）
+        if scarf:
+            for dx in range(-2, 3):
+                px[(dx, 6)] = "scarf"
+            px[(2, 5)] = "scarf"  # 垂れ
+        # 顔: 目（dy=9）・鼻（dy=8 中央やや右）
+        px[(-1, 9)] = "coal"
+        px[(1, 9)] = "coal"
+        px[(0, 8)] = "carrot"
+        # 腕（枝）: 両側に伸びる dy=3〜4
+        for dx in (-4, -5):
+            px[(dx, 4)] = "stick"
+        px[(-6, 5)] = "stick"
+        for dx in (4, 5):
+            px[(dx, 3)] = "stick"
+        px[(6, 4)] = "stick"
+        # ボタン（石炭）
+        px[(0, 3)] = "coal"
+        px[(0, 1)] = "coal"
+        return px
+
+    _COLORS = {
+        "snow": SNOW_WHITE, "shade": SNOW_SHADE, "coal": SNOWMAN_COAL,
+        "carrot": SNOWMAN_CARROT, "stick": SNOWMAN_STICK, "scarf": SNOWMAN_SCARF,
+    }
+
+    def draw(self, painter, ground_y, alpha=255, tint=None, ps=None):
+        ps = ps or PIXEL_SIZE
+        for (dx, dy), kind in self.pixels.items():
+            c = apply_tint(QColor(*self._COLORS[kind]), tint)
+            c.setAlpha(alpha)
+            painter.fillRect(int(self.base_x + dx * ps),
+                             int(ground_y - (dy + 1) * ps), ps, ps, c)
+
+
 # --- TokaidoScene ---
 class TokaidoScene(BaseScene):
     BASE_WIDTH = 2400
@@ -980,6 +1046,18 @@ class TokaidoScene(BaseScene):
         self._generate_fuji(rng, widget_width, config)
         self._generate_roadside_grass(rng, widget_width, wind, config)
         self._generate_travelers(rng, widget_width, ratio, config)
+        self._generate_snowmen(rng, widget_width)
+
+    def _generate_snowmen(self, rng, width):
+        """雪だるまを路傍に1〜2体（雪の日だけ描画）。日替わりseedで位置が変わる"""
+        self.snowmen = []
+        n = rng.choice([1, 1, 2])
+        x0 = self._avoid + 20
+        if width <= x0 + 40:
+            return
+        for _ in range(n):
+            x = rng.randint(x0, width - 30)
+            self.snowmen.append(Snowman(x, scarf=(rng.random() < 0.7)))
 
     def _generate_scene(self, rng, width, wind, ratio, config):
         self.hills = []
@@ -1237,12 +1315,24 @@ class TokaidoScene(BaseScene):
         # Road surface
         road_h = 3 * ps
         step = ps * 2
+        snowing = self.is_snowing
         for rx in range(0, self.widget_width, step):
             a = get_alpha(rx) if get_alpha else 255
             rc = QColor(185, 165, 120, int(160 * a / 255))
             painter.fillRect(rx, ground_y - road_h, step, road_h, rc)
             ec = QColor(140, 120, 80, int(120 * a / 255))
             painter.fillRect(rx, ground_y - road_h, step, ps // 2, ec)
+
+        # 雪の日: 道に雪が積もる（白い層＋上端の明るい雪面）
+        if snowing:
+            for rx in range(0, self.widget_width, step):
+                a = get_alpha(rx) if get_alpha else 255
+                blanket = apply_tint(QColor(238, 244, 255), tint)
+                blanket.setAlpha(int(205 * a / 255))
+                painter.fillRect(rx, ground_y - road_h, step, road_h, blanket)
+                crest = apply_tint(QColor(252, 254, 255), tint)
+                crest.setAlpha(int(235 * a / 255))
+                painter.fillRect(rx, ground_y - road_h, step, ps, crest)
 
         # Back trees
         road_top_y = ground_y - road_h
@@ -1256,6 +1346,9 @@ class TokaidoScene(BaseScene):
         for bld in self.buildings:
             alpha = get_alpha(bld.base_x) if get_alpha else 255
             bld.draw(painter, ground_y, alpha, tint, ps)
+            if snowing:
+                self._snow_cap(painter, bld.base_x, bld.pixels, ground_y, ps,
+                               get_alpha, tint)
 
         # 軒下の休憩和傘（雨の日のみ）
         if self.is_raining:
@@ -1280,12 +1373,34 @@ class TokaidoScene(BaseScene):
             alpha = get_alpha(int(trav.x)) if get_alpha else 255
             trav.draw(painter, alpha, tint, ps)
 
+        # 雪だるま（雪の日だけ・旅人と同じ前面レイヤー）
+        if snowing:
+            for sm in getattr(self, "snowmen", []):
+                alpha = get_alpha(sm.base_x) if get_alpha else 255
+                sm.draw(painter, ground_y, alpha, tint, ps)
+
         # Front trees
         for tree in self.front_trees:
             alpha = get_alpha(tree.base_x) if get_alpha else 255
             tree.draw(painter, ground_y, alpha, tint, ps)
+            if snowing:
+                self._snow_cap(painter, tree.base_x, tree.pixels, ground_y, ps,
+                               get_alpha, tint)
         for willow in self.front_willows:
             willow.draw(painter, ground_y, 255, tint, get_alpha, ps)
+
+    def _snow_cap(self, painter, base_x, pixels, ground_y, ps, get_alpha, tint):
+        """オブジェクトの各列の最上段に雪をのせる（屋根・松の積雪）"""
+        top = {}
+        for dx, dy, _part in pixels:
+            if dy > top.get(dx, -1):
+                top[dx] = dy
+        a = get_alpha(base_x) if get_alpha else 255
+        c = apply_tint(QColor(248, 251, 255), tint)
+        c.setAlpha(int(235 * a / 255))
+        for dx, dy in top.items():
+            painter.fillRect(int(base_x + dx * ps),
+                             int(ground_y - (dy + 1) * ps), ps, ps, c)
 
 
 # ---------------------------------------------------------------------------

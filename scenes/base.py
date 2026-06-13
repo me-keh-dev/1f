@@ -50,6 +50,9 @@ RAINY_STATES = frozenset({
     "freezing_rain", "thunderstorm",
 })
 
+# 雪の天気状態（積雪・雪だるま等のシーン演出に使う）
+SNOWY_STATES = frozenset({"snow", "heavy_snow", "snow_showers"})
+
 
 class BaseScene:
     """All scenes implement these methods"""
@@ -63,6 +66,10 @@ class BaseScene:
     @property
     def is_raining(self):
         return self.weather_state in RAINY_STATES
+
+    @property
+    def is_snowing(self):
+        return self.weather_state in SNOWY_STATES
 
     def get_area_height(self, config):
         """Return overlay area height in screen pixels"""
