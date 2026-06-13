@@ -509,25 +509,8 @@ class SceneTile(QWidget):
             p.setPen(pen)
             p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
         p.setPen(Qt.NoPen)
-        if self.owned:
-            # 購入済みの印: 左上の赤いコーナー＋白いチェック
-            tri = QPainterPath()
-            tri.moveTo(0, 0)
-            tri.lineTo(34, 0)
-            tri.lineTo(0, 34)
-            tri.closeSubpath()
-            p.setPen(Qt.NoPen)
-            p.setBrush(QColor(218, 62, 80))   # メルカリ風の赤
-            p.drawPath(tri)
-            pen = p.pen()
-            pen.setColor(QColor(255, 255, 255))
-            pen.setWidth(2)
-            p.setPen(pen)
-            p.drawLine(6, 11, 10, 15)
-            p.drawLine(10, 15, 17, 7)
-            p.setPen(Qt.NoPen)
-        else:
-            # 価格/お試しバッジ（未購入のみ・文字は最小限）
+        # 価格/お試しバッジ（未購入のみ・文字は最小限）
+        if not self.owned:
             badge = ("¥{}".format(self.price) if self.price else t("store_get"))
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(40, 44, 52, 210))
@@ -562,11 +545,11 @@ class SceneTile(QWidget):
         heart = heart.united(tri)
         if filled:
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(255, 70, 100))
+            p.setBrush(QColor(255, 150, 90))   # お気に入り＝あたたかい山吹/コーラル（赤ではない）
         else:
             pen = p.pen()
             pen.setColor(QColor(255, 255, 255))
-            pen.setWidth(1)
+            pen.setWidth(2)
             p.setPen(pen)
             p.setBrush(Qt.NoBrush)
         p.drawPath(heart)
