@@ -38,6 +38,15 @@
   `apply_config({"_rescan":True})` で再スキャン＋オーバーレイ再構築＋シーンコンボ動的更新。
   `_collab.list_installed/fetch_catalog/uninstall`、`_refresh_scene_combo()`。E2E（入手・コンボ反映・
   入手済み移動・削除・復帰）PASS。課金/購入トークンは liplico store の差込口のみ（後段）。
+- **シーン種別（価格×期限の4種）**: manifest に `price`（円・署名対象＝0円改ざん不可）。`available` 無し＝
+  恒常（永続・自動削除なし）。無料/有料 × 恒常/コラボ。ストアUIで「入手/¥N購入」「無期限/残りN日」表示分け、
+  有料は store_purchase_url 差込口（未設定は準備中）。sign_scene.py --price。
+- **失効（リボケーション）＝配布後の停止**: 買い切り永続を含め後から全ユーザーで停止可能（権利・規約・リコール）。
+  署名付き `revoked.json`（payload+sig、`DEFAULT_REVOKE_URL`=1f-updates.pages.dev/revoked.json、config
+  `store_revoke_url` で上書き）をアプリが起動9秒後＋日付変更時に取得→署名検証→該当 installed 削除＋
+  「提供を終了しました」通知＋使用中はフォールバック。`_collab.fetch_and_apply_revocations`、
+  ツール `tools/sign_revocation.py --revoke key...`。オフラインは次回オンライン時に適用。同梱無料モードは対象外。
+  E2E（対象のみ削除・存続維持・リスト改ざん拒否・オフライン安全）PASS。
 - **期間限定（コラボ）モード**: `SCENE["available"] = {"from": "YYYY-MM-DD", "until": "YYYY-MM-DD"}`
   （両端含む・端末ローカル日付・サーバ不要）。期間外は一覧から自動で消え、`get_scene_info` がデフォルトへ
   フォールバック、OverlayManager の5秒チェックが使用中モードの期限切れをお気に入りへ自動切替

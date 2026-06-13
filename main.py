@@ -1422,18 +1422,42 @@ class OverlayManager:
         if getattr(self, "_last_collab_date", None) == today:
             return
         self._last_collab_date = today
+        # 日付が変わったら失効リストも確認（権利停止・リコール）
+        self._check_revocations()
         try:
             expired = scenes_registry.rescan()
         except Exception:
             return
         for name in expired:
-            self._notify_collab_expired(name)
+            self._notify_scene_gone(name, "expired")
 
-    def _notify_collab_expired(self, name):
-        """『○○』のコラボ期間が終了しました（トレイ通知）。main がコールバックを差す"""
+    def _check_revocations(self):
+        """署名付き失効リストを取得し、停止対象のシーンを削除＋通知。
+        買い切り（永続）シーンも後から提供停止できる。オフラインは次回適用。"""
+        from scenes import _collab
+        try:
+            removed = _collab.fetch_and_apply_revocations(
+                self.config.get("store_revoke_url"))
+        except Exception:
+            return
+        if not removed:
+            return
+        try:
+            scenes_registry.rescan()
+        except Exception:
+            pass
+        for name in removed:
+            self._notify_scene_gone(name, "revoked")
+        # 使用中のシーンが停止された場合はお気に入りへ切替＋再描画
+        self._check_scene_expiry()
+        for o in self.overlays:
+            o._rebuild_scene()
+
+    def _notify_scene_gone(self, name, kind):
+        """シーンが消えたことをトレイ通知（kind: expired=期間終了 / revoked=提供終了）"""
         cb = getattr(self, "collab_notifier", None)
         if cb:
-            cb(name)
+            cb(name, kind)
 
     def _check_scene_expiry(self):
         current = self.config.get("scene_mode", "grass")
@@ -1474,7 +1498,7 @@ class OverlayManager:
         if new_config.get("_rescan"):
             expired = scenes_registry.rescan()
             for name in expired:
-                self._notify_collab_expired(name)
+                self._notify_scene_gone(name, "expired")
             for o in self.overlays:
                 o._rebuild_scene()
             return
@@ -1821,15 +1845,20 @@ def main():
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 
-    # 署名付きコラボシーンの期限終了をトレイ通知（LINEスタンプの期限切れと同様）
-    def _notify_collab_expired(name):
-        tray.showMessage(t("collab_ended_title"),
-                         t("collab_ended_body").format(name=name),
+    # シーンが消えたことをトレイ通知（期間終了 / 提供終了で文言を分ける）
+    def _notify_scene_gone(name, kind="expired"):
+        if kind == "revoked":
+            title, body = t("collab_revoked_title"), t("collab_revoked_body")
+        else:
+            title, body = t("collab_ended_title"), t("collab_ended_body")
+        tray.showMessage(title, body.format(name=name),
                          QSystemTrayIcon.Information, 8000)
-    manager.collab_notifier = _notify_collab_expired
+    manager.collab_notifier = _notify_scene_gone
     # 起動時スキャンで既に期限切れだったコラボがあれば通知（少し遅らせて確実に表示）
     QTimer.singleShot(6000, lambda: [
-        _notify_collab_expired(n) for n in scenes_registry.consume_expired()])
+        _notify_scene_gone(n, "expired") for n in scenes_registry.consume_expired()])
+    # 起動後に失効リストを確認（権利停止・リコール。updater と同様オフラインは黙殺）
+    QTimer.singleShot(9000, manager._check_revocations)
 
     # 画面左下のハンバーガーメニューボタン（トレイと同じメニューを展開）
     hamburger = HamburgerButton(manager, menu)

@@ -38,6 +38,10 @@ COLLAB_PUBKEYS = {
 _ASN1_SHA256 = bytes.fromhex("3031300d060960864801650304020105000420")
 MODE_FORMAT = 1
 
+# 失効リスト（権利問題・規約違反・リコール等で配布済みシーンを後から停止する）の
+# 既定取得先。version.json と同じ Cloudflare Pages。未配置(404)なら何もしない。
+DEFAULT_REVOKE_URL = "https://1f-updates.pages.dev/revoked.json"
+
 
 def _verify_rsa(msg, sig, pubkey):
     """RSA-PKCS#1 v1.5 / SHA-256 署名検証（純標準ライブラリ）"""
@@ -245,6 +249,57 @@ def fetch_catalog(url):
         return cat if isinstance(cat, list) else cat.get("scenes", [])
     except Exception:
         return []
+
+
+def _canon(payload):
+    """署名対象の正規化バイト列（ツールと完全一致させること）"""
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False).encode("utf-8")
+
+
+def fetch_and_apply_revocations(url=None):
+    """署名付き失効リストを取得・検証し、該当する installed シーンを削除する。
+
+    失効リスト形式（1ファイル）:
+      {"payload": {"format":1, "revoked":["key1",...], "issued":"YYYY-MM-DD",
+                   "pubkey_id":1}, "sig": "<base64>"}
+    returns 削除した表示名のリスト（通知用）。取得失敗・署名NG・未配置は []（安全側）。
+    オフライン時は何もしない（次にオンラインになったとき適用される）。
+    """
+    import base64
+    import urllib.request
+    url = url or DEFAULT_REVOKE_URL
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "1f-app"})
+        doc = json.loads(urllib.request.urlopen(req, timeout=15).read().decode("utf-8"))
+        payload = doc["payload"]
+        sig = base64.b64decode(doc["sig"])
+    except Exception:
+        return []  # オフライン・404・壊れ → 何もしない
+    pubkey = COLLAB_PUBKEYS.get(payload.get("pubkey_id"))
+    if not pubkey or not _verify_rsa(_canon(payload), sig, pubkey):
+        return []  # 署名NG（改ざん）→ 無視
+    revoked = set(payload.get("revoked") or [])
+    if not revoked:
+        return []
+    removed = []
+    d = installed_dir()
+    if not os.path.isdir(d):
+        return []
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".1fmode"):
+            continue
+        try:
+            manifest, _ = load_and_verify(os.path.join(d, fn))
+        except CollabError:
+            continue
+        key = manifest.get("key") or fn[:-7]
+        if key in revoked:
+            name = (manifest.get("name") or {}).get("ja") \
+                or (manifest.get("name") or {}).get("en") or key
+            _delete_package(key)
+            removed.append(name)
+    return removed
 
 
 def install_scene(url, dest_name=None):
