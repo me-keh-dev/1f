@@ -394,6 +394,7 @@ class SceneTile(QWidget):
             cfg = {"seed": 7, get_scale_key(self.key): 70}
             self.scene = get_scene_class(self.key)()
             self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
+            self._wind.set_wind(80)   # プレビューは少し強めの風で動きを見せる
             for _ in range(15):
                 self._wind.update(1 / 60.0)
                 self.scene.update(self._wind)
@@ -403,7 +404,7 @@ class SceneTile(QWidget):
     def enterEvent(self, event):
         self._hover = True
         if self.scene:
-            self._timer.start(40)   # ホバー中だけ ~25fps で動かす
+            self._timer.start(33)   # ホバー中だけ ~30fps で動かす
         self.update()
 
     def leaveEvent(self, event):
@@ -413,7 +414,8 @@ class SceneTile(QWidget):
 
     def _tick(self):
         if self.scene:
-            self._wind.update(1 / 25.0)
+            # 通常より速い時間進行でプレビューの動きをはっきり見せる
+            self._wind.update(1 / 14.0)
             try:
                 self.scene.update(self._wind)
             except Exception:
@@ -453,10 +455,25 @@ class SceneTile(QWidget):
             f = p.font(); f.setPointSize(20); p.setFont(f)
             p.drawText(0, 0, tw, th, Qt.AlignCenter, "🔒")
         p.setClipping(False)
-        # ホバー枠
-        p.setPen(QColor(90, 150, 230) if self._hover else QColor(90, 96, 108))
+        # 枠（ホバー時ははっきり明るい太枠＋外側のグロー）
         p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
+        if self._hover:
+            pen = p.pen()
+            pen.setColor(QColor(80, 175, 255, 90))   # 外側グロー
+            pen.setWidth(6)
+            p.setPen(pen)
+            p.drawRoundedRect(3, 3, tw - 6, th - 6, 11, 11)
+            pen.setColor(QColor(60, 160, 255))       # 芯の明るい青
+            pen.setWidth(3)
+            p.setPen(pen)
+            p.drawRoundedRect(2, 2, tw - 4, th - 4, 10, 10)
+        else:
+            pen = p.pen()
+            pen.setColor(QColor(110, 116, 128))
+            pen.setWidth(1)
+            p.setPen(pen)
+            p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
+        p.setPen(Qt.NoPen)
         # 価格/お試しバッジ（未購入のみ・文字は最小限）
         if not self.owned:
             badge = ("¥{}".format(self.price) if self.price else t("store_get"))
