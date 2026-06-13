@@ -365,9 +365,8 @@ class SceneTile(QWidget):
     """iPhoneアプリアイコン風のシーンタイル。
     所有シーンはライブのミニプレビューを描き、マウスオンの間だけ動く。
     クリックで再生（所有）/ お試し（未購入）。"""
-    THUMB_W = 150
-    THUMB_H = 84
-    LABEL_H = 30
+    THUMB_W = 128
+    THUMB_H = 128   # 正方形
 
     def __init__(self, key, label, owned, price, url, on_play, on_trial,
                  parent=None):
@@ -382,10 +381,9 @@ class SceneTile(QWidget):
         self._hover = False
         self.scene = None
         self._wind = WindSimulator()
-        self.setFixedSize(self.THUMB_W, self.THUMB_H + self.LABEL_H)
+        self.setFixedSize(self.THUMB_W, self.THUMB_H)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(label if owned else
-                        "{} — {}".format(label, t("tile_trial_hint")))
+        # ツールチップは出さない（ホバー中の動きを隠さないため）
         if owned:
             self._build_scene()
         self._timer = QTimer(self)
@@ -393,7 +391,7 @@ class SceneTile(QWidget):
 
     def _build_scene(self):
         try:
-            cfg = {"seed": 7, get_scale_key(self.key): 55}
+            cfg = {"seed": 7, get_scale_key(self.key): 70}
             self.scene = get_scene_class(self.key)()
             self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
             for _ in range(15):
@@ -459,21 +457,16 @@ class SceneTile(QWidget):
         p.setPen(QColor(90, 150, 230) if self._hover else QColor(90, 96, 108))
         p.setBrush(Qt.NoBrush)
         p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
-        # 価格/お試しバッジ（未購入のみ）
+        # 価格/お試しバッジ（未購入のみ・文字は最小限）
         if not self.owned:
             badge = ("¥{}".format(self.price) if self.price else t("store_get"))
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(40, 44, 52, 210))
-            bw = 54
-            p.drawRoundedRect(tw - bw - 6, 6, bw, 18, 6, 6)
+            bw = 56
+            p.drawRoundedRect(tw - bw - 6, 6, bw, 20, 7, 7)
             p.setPen(QColor(255, 230, 140))
-            f = p.font(); f.setPointSize(8); f.setBold(True); p.setFont(f)
-            p.drawText(tw - bw - 6, 6, bw, 18, Qt.AlignCenter, badge)
-        # ラベル
-        p.setPen(QColor(60, 64, 72))
-        f = p.font(); f.setPointSize(9); f.setBold(False); p.setFont(f)
-        p.drawText(0, th + 2, tw, self.LABEL_H - 2,
-                   Qt.AlignHCenter | Qt.AlignTop, self.label)
+            f = p.font(); f.setPointSize(9); f.setBold(True); p.setFont(f)
+            p.drawText(tw - bw - 6, 6, bw, 20, Qt.AlignCenter, badge)
         p.end()
 
 
@@ -520,9 +513,10 @@ class SettingsDialog(QDialog):
         tabs.setMinimumWidth(380)
         hbox.addWidget(tabs, 1)
 
-        # 右: オプション・テストタブ
+        # 右: オプション・テスト・シーン（アイコングリッド）タブ
+        # シーンタイル3つ＋余白がスクロールせず横に並ぶ幅を確保
         tabs2 = QTabWidget()
-        tabs2.setMinimumWidth(320)
+        tabs2.setMinimumWidth(440)
         hbox.addWidget(tabs2, 1)
 
         # === シーン別設定タブ（各シーンモジュールが build_settings で提供） ===
@@ -835,6 +829,8 @@ class SettingsDialog(QDialog):
 
         # 初期シーンに応じてタブ表示を調整
         self._update_tabs_for_scene(self._initial_scene)
+        # シーングリッド3列が見える初期サイズ
+        self.resize(900, 580)
 
     def _on_sound_sync_toggled(self, checked):
         self.sound_sync_btn.setText("ON" if checked else "OFF")
