@@ -361,6 +361,122 @@ class PollGraph(QWidget):
         p.end()
 
 
+class SceneTile(QWidget):
+    """iPhoneアプリアイコン風のシーンタイル。
+    所有シーンはライブのミニプレビューを描き、マウスオンの間だけ動く。
+    クリックで再生（所有）/ お試し（未購入）。"""
+    THUMB_W = 150
+    THUMB_H = 84
+    LABEL_H = 30
+
+    def __init__(self, key, label, owned, price, url, on_play, on_trial,
+                 parent=None):
+        super().__init__(parent)
+        self.key = key
+        self.label = label
+        self.owned = owned
+        self.price = price
+        self.url = url
+        self.on_play = on_play
+        self.on_trial = on_trial
+        self._hover = False
+        self.scene = None
+        self._wind = WindSimulator()
+        self.setFixedSize(self.THUMB_W, self.THUMB_H + self.LABEL_H)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip(label if owned else
+                        "{} — {}".format(label, t("tile_trial_hint")))
+        if owned:
+            self._build_scene()
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+
+    def _build_scene(self):
+        try:
+            cfg = {"seed": 7, get_scale_key(self.key): 55}
+            self.scene = get_scene_class(self.key)()
+            self.scene.rebuild(cfg, self.THUMB_W, self.THUMB_W)
+            for _ in range(15):
+                self._wind.update(1 / 60.0)
+                self.scene.update(self._wind)
+        except Exception:
+            self.scene = None
+
+    def enterEvent(self, event):
+        self._hover = True
+        if self.scene:
+            self._timer.start(40)   # ホバー中だけ ~25fps で動かす
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self._timer.stop()
+        self.update()
+
+    def _tick(self):
+        if self.scene:
+            self._wind.update(1 / 25.0)
+            try:
+                self.scene.update(self._wind)
+            except Exception:
+                self._timer.stop()
+        self.update()
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton:
+            return
+        if self.owned:
+            self.on_play(self.key)
+        else:
+            self.on_trial(self.key, self.url)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        tw, th = self.THUMB_W, self.THUMB_H
+        # サムネ枠（角丸クリップ）
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, tw, th, 10, 10)
+        p.setClipPath(path)
+        p.fillRect(0, 0, tw, th, QColor(150, 175, 200))  # 空
+        if self.scene:
+            p.setRenderHint(QPainter.Antialiasing, False)
+            try:
+                if self.scene.has_background_layer():
+                    self.scene.draw_background(p, th, None, None)
+                self.scene.draw(p, th, None, None)
+            except Exception:
+                pass
+            p.setRenderHint(QPainter.Antialiasing, True)
+        else:
+            # 未購入: 中身が無いので錠前風プレースホルダ
+            p.fillRect(0, 0, tw, th, QColor(70, 78, 92))
+            p.setPen(QColor(210, 215, 225))
+            f = p.font(); f.setPointSize(20); p.setFont(f)
+            p.drawText(0, 0, tw, th, Qt.AlignCenter, "🔒")
+        p.setClipping(False)
+        # ホバー枠
+        p.setPen(QColor(90, 150, 230) if self._hover else QColor(90, 96, 108))
+        p.setBrush(Qt.NoBrush)
+        p.drawRoundedRect(1, 1, tw - 2, th - 2, 10, 10)
+        # 価格/お試しバッジ（未購入のみ）
+        if not self.owned:
+            badge = ("¥{}".format(self.price) if self.price else t("store_get"))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(40, 44, 52, 210))
+            bw = 54
+            p.drawRoundedRect(tw - bw - 6, 6, bw, 18, 6, 6)
+            p.setPen(QColor(255, 230, 140))
+            f = p.font(); f.setPointSize(8); f.setBold(True); p.setFont(f)
+            p.drawText(tw - bw - 6, 6, bw, 18, Qt.AlignCenter, badge)
+        # ラベル
+        p.setPen(QColor(60, 64, 72))
+        f = p.font(); f.setPointSize(9); f.setBold(False); p.setFont(f)
+        p.drawText(0, th + 2, tw, self.LABEL_H - 2,
+                   Qt.AlignHCenter | Qt.AlignTop, self.label)
+        p.end()
+
+
 class SettingsDialog(QDialog):
     stats_received = pyqtSignal(object)   # 人気投票の集計（別スレッド→UI）
 
@@ -982,9 +1098,9 @@ class SettingsDialog(QDialog):
         if name:
             self.on_load("env", name)
 
-    # --- シーンストア（入手・入手済み管理） ---
+    # --- シーンストア（アイコングリッド: ライブプレビュー・クリック再生・お試し） ---
     def _build_store_tab(self, tabs):
-        from PyQt5.QtWidgets import QScrollArea
+        from PyQt5.QtWidgets import QScrollArea, QGridLayout
         tab = QWidget()
         outer = QVBoxLayout(tab)
         desc = QLabel(t("store_desc"))
@@ -992,14 +1108,10 @@ class SettingsDialog(QDialog):
         desc.setWordWrap(True)
         outer.addWidget(desc)
 
-        # 入手済みシーン（基本シーンも購入済みとして表示）
-        self.store_owned_group = QGroupBox(t("store_owned"))
-        self.store_owned_layout = QVBoxLayout(self.store_owned_group)
-        outer.addWidget(self.store_owned_group)
-        # 入手できるシーン
-        self.store_avail_group = QGroupBox(t("store_available"))
-        self.store_avail_layout = QVBoxLayout(self.store_avail_group)
-        outer.addWidget(self.store_avail_group)
+        self.store_grid_host = QWidget()
+        self.store_grid = QGridLayout(self.store_grid_host)
+        self.store_grid.setSpacing(8)
+        outer.addWidget(self.store_grid_host)
 
         refresh = QPushButton(t("store_refresh"))
         refresh.clicked.connect(self._reload_store)
@@ -1024,57 +1136,48 @@ class SettingsDialog(QDialog):
             w = item.widget()
             if w:
                 w.deleteLater()
+            elif item.layout():
+                self._clear_layout(item.layout())
 
     def _reload_store(self):
         from scenes import _collab
         lang = get_language()
-        # --- 入手済み ---
-        self._clear_layout(self.store_owned_layout)
+        self._clear_layout(self.store_grid)
+        tiles = []
+        # 所有: 基本シーン（同梱）＋入手済みコラボ → クリックで再生
         owned = _collab.list_installed()
         owned_keys = {o["key"] for o in owned}
-        # 基本シーン（同梱・購入不要）も「購入済み・無期限」として表示（削除不可）
         for mode_key, label_key in scene_modes():
-            if mode_key in owned_keys:
-                continue
-            nm = "{}（{}・{}）".format(t(label_key), t("store_basic"),
-                                      t("store_perpetual"))
-            self.store_owned_layout.addWidget(QLabel(nm))
-        for o in owned:
-            row = QHBoxLayout()
-            nm = (o["name"].get(lang) or o["name"].get("ja")
-                  or o["name"].get("en") or o["key"])
-            if o["perpetual"]:
-                nm += "（{}）".format(t("store_perpetual"))   # 恒常＝無期限
-            elif o["days_left"] is not None:
-                nm += "（{}）".format(t("store_days_left").format(d=o["days_left"]))
-            row.addWidget(QLabel(nm), 1)
-            btn = QPushButton(t("store_remove"))
-            btn.clicked.connect(lambda _, k=o["key"]: self._on_uninstall(k))
-            row.addWidget(btn)
-            self.store_owned_layout.addLayout(row)
-        # --- 入手できる（カタログ。未取得・未所持のみ） ---
-        self._clear_layout(self.store_avail_layout)
+            tiles.append(SceneTile(
+                mode_key, t(label_key), True, 0, None,
+                self._on_tile_play, self._on_tile_trial))
+        # 未購入: カタログのうち未所持 → お試し（10秒）
         catalog = _collab.fetch_catalog(self.config.get("store_catalog_url"))
-        avail = [c for c in catalog if c.get("key") not in owned_keys]
-        if not avail:
-            self.store_avail_layout.addWidget(QLabel(t("store_none_available")))
-        for c in avail:
-            row = QHBoxLayout()
+        for c in catalog:
+            if c.get("key") in owned_keys or c.get("key") in dict(scene_modes()):
+                continue
             name = (c.get("name") or {})
             nm = name.get(lang) or name.get("ja") or name.get("en") or c.get("key", "?")
-            av = c.get("available") or {}
-            if av.get("until"):
-                nm += "（〜{}）".format(av["until"])   # コラボ＝終了日
-            row.addWidget(QLabel(nm), 1)
-            price = int(c.get("price") or 0)
-            if price > 0:   # 有料 → 購入（決済は liplico store。差込口）
-                btn = QPushButton(t("store_buy").format(price=price))
-                btn.clicked.connect(lambda _, c=c: self._on_purchase(c))
-            else:           # 無料 → そのまま入手
-                btn = QPushButton(t("store_get"))
-                btn.clicked.connect(lambda _, u=c.get("url"): self._on_install(u))
-            row.addWidget(btn)
-            self.store_avail_layout.addLayout(row)
+            tiles.append(SceneTile(
+                c.get("key"), nm, False, int(c.get("price") or 0), c.get("url"),
+                self._on_tile_play, self._on_tile_trial))
+        # グリッド配置（3列）
+        cols = 3
+        for i, tile in enumerate(tiles):
+            self.store_grid.addWidget(tile, i // cols, i % cols)
+
+    def _on_tile_play(self, key):
+        """所有シーンのタイルをクリック → そのシーンを再生（適用）"""
+        idx = self.scene_combo.findData(key)
+        if idx >= 0:
+            self.scene_combo.setCurrentIndex(idx)  # コンボ経由で適用＋タブ更新
+        else:
+            self.on_apply({"scene_mode": key})
+
+    def _on_tile_trial(self, key, url):
+        """未購入シーンのタイルをクリック → 10秒お試し"""
+        if url:
+            self.on_apply({"_trial": {"key": key, "url": url}})
 
     def _on_install(self, url):
         from PyQt5.QtWidgets import QMessageBox
@@ -1438,6 +1541,61 @@ class OverlayManager:
         for name in expired:
             self._notify_scene_gone(name, "expired")
 
+    TRIAL_SECONDS = 10
+
+    def start_trial(self, info):
+        """未購入シーンを TRIAL_SECONDS 秒だけ試す。終了後は元のシーンへ戻す。
+        info = {"key":..., "url":...}（カタログの署名付きパッケージURL）。
+        保存はしない（config.json を書き換えない）。"""
+        from scenes import _collab
+        key, url = info.get("key"), info.get("url")
+        if not key or not url:
+            return
+        # 既に試用中なら一旦終了
+        if getattr(self, "_trial_key", None):
+            self.end_trial()
+        try:
+            tkey, src = _collab.fetch_trial(url)
+            scenes_registry.register_trial(tkey, src)
+        except Exception as e:
+            cb = getattr(self, "collab_notifier", None)
+            if cb:
+                cb(str(e), "trial_failed")
+            return
+        # 現在のシーンを退避して試用シーンへ切替（保存しない）
+        self._trial_prev_mode = self.config.get("scene_mode", "grass")
+        self._trial_key = tkey
+        self.config["scene_mode"] = tkey
+        for o in self.overlays:
+            o.config = self.config
+            o._position_window()
+            o._rebuild_scene()
+        cb = getattr(self, "collab_notifier", None)
+        if cb:
+            cb(str(self.TRIAL_SECONDS), "trial_start")
+        self._trial_timer = QTimer()
+        self._trial_timer.setSingleShot(True)
+        self._trial_timer.timeout.connect(self.end_trial)
+        self._trial_timer.start(self.TRIAL_SECONDS * 1000)
+
+    def end_trial(self):
+        """お試し終了: 元のシーンへ戻し、試用シーンを登録解除する"""
+        key = getattr(self, "_trial_key", None)
+        if not key:
+            return
+        self._trial_key = None
+        if getattr(self, "_trial_timer", None):
+            self._trial_timer.stop()
+        self.config["scene_mode"] = getattr(self, "_trial_prev_mode", "grass")
+        for o in self.overlays:
+            o.config = self.config
+            o._position_window()
+            o._rebuild_scene()
+        scenes_registry.unregister(key)
+        cb = getattr(self, "collab_notifier", None)
+        if cb:
+            cb("", "trial_end")
+
     def _check_revocations(self):
         """署名付き失効リストを取得し、停止対象のシーンを削除＋通知。
         買い切り（永続）シーンも後から提供停止できる。オフラインは次回適用。"""
@@ -1501,6 +1659,11 @@ class OverlayManager:
             json.dump(self.config, f, ensure_ascii=False, indent=2)
 
     def apply_config(self, new_config):
+        # 未購入シーンのお試し（一時DL→10秒適用→自動復帰）
+        if "_trial" in new_config:
+            self.start_trial(new_config["_trial"])
+            return
+
         # シーンの入手/削除でモード一覧が変わった → 再スキャンして反映
         if new_config.get("_rescan"):
             expired = scenes_registry.rescan()
@@ -1852,14 +2015,20 @@ def main():
     tray.activated.connect(lambda reason: open_settings() if reason == QSystemTrayIcon.DoubleClick else None)
     tray.show()
 
-    # シーンが消えたことをトレイ通知（期間終了 / 提供終了で文言を分ける）
+    # シーンの状態変化をトレイ通知（期間終了 / 提供終了 / お試し）
     def _notify_scene_gone(name, kind="expired"):
         if kind == "revoked":
             title, body = t("collab_revoked_title"), t("collab_revoked_body")
+        elif kind == "trial_start":
+            title, body = t("trial_start_title"), t("trial_start_body")
+        elif kind == "trial_end":
+            title, body = t("trial_end_title"), t("trial_end_body")
+        elif kind == "trial_failed":
+            title, body = t("trial_failed_title"), t("trial_failed_body")
         else:
             title, body = t("collab_ended_title"), t("collab_ended_body")
-        tray.showMessage(title, body.format(name=name),
-                         QSystemTrayIcon.Information, 8000)
+        tray.showMessage(title, body.format(name=name, sec=name),
+                         QSystemTrayIcon.Information, 5000)
     manager.collab_notifier = _notify_scene_gone
     # 起動時スキャンで既に期限切れだったコラボがあれば通知（少し遅らせて確実に表示）
     QTimer.singleShot(6000, lambda: [

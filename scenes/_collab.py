@@ -197,6 +197,35 @@ def scan_installed(today=None):
     return entries, expired
 
 
+def fetch_trial(url):
+    """お試し用にパッケージを取得して署名検証し、(key, mode_source) を返す。
+    installed/ には保存しない（試用は一時的）。検証NG/取得失敗は CollabError。"""
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "1f-app"})
+        data = urllib.request.urlopen(req, timeout=20).read()
+    except Exception as e:
+        raise CollabError("取得失敗: {!r}".format(e))
+    tmp = io.BytesIO(data)
+    try:
+        with zipfile.ZipFile(tmp) as z:
+            manifest_raw = z.read("manifest.json")
+            sig = z.read("manifest.sig")
+            mode_src = z.read("mode.py")
+    except (zipfile.BadZipFile, KeyError) as e:
+        raise CollabError("壊れたパッケージ: {!r}".format(e))
+    try:
+        manifest = json.loads(manifest_raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as e:
+        raise CollabError("manifest が不正: {!r}".format(e))
+    pubkey = COLLAB_PUBKEYS.get(manifest.get("pubkey_id"))
+    if not pubkey or not _verify_rsa(manifest_raw, sig, pubkey):
+        raise CollabError("署名が一致しません")
+    if hashlib.sha256(mode_src).hexdigest() != manifest.get("sha256"):
+        raise CollabError("mode.py のハッシュが一致しません")
+    return manifest.get("key"), mode_src.decode("utf-8")
+
+
 def list_installed(today=None):
     """インストール済みコラボシーンの一覧（入手済み管理UI用）。
     returns [{key, name, expiry(date|None), days_left(int|None), valid(bool)}]"""

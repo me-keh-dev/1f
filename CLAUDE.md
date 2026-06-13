@@ -38,6 +38,13 @@
   `apply_config({"_rescan":True})` で再スキャン＋オーバーレイ再構築＋シーンコンボ動的更新。
   `_collab.list_installed/fetch_catalog/uninstall`、`_refresh_scene_combo()`。E2E（入手・コンボ反映・
   入手済み移動・削除・復帰）PASS。課金/購入トークンは liplico store の差込口のみ（後段）。
+  **アイコングリッド化（iPhoneアプリ風）**: `SceneTile`（小さくライブ描画・**マウスオン中だけ**~25fpsで動く・
+  クリックで再生）。所有=基本＋入手済みコラボはクリックで適用、未購入=錠前タイル＋価格バッジで
+  クリックすると**10秒お試し**。`_build_store_tab` は QGridLayout（3列）。右ペイン先頭・デフォルト表示。
+- **お試し（trial）**: 未購入シーンを10秒だけ再生して元に戻す。`_collab.fetch_trial`（署名検証して
+  installed には保存しない）→ `scenes.register_trial`/`unregister`（一時登録）→ `OverlayManager.start_trial`
+  （現シーン退避→切替→`TRIAL_SECONDS=10`後 `end_trial` で復帰・保存しない）。トレイ通知（trial_start/end/failed）。
+  改ざんパッケージは試用拒否。E2E PASS。
 - **シーン種別（価格×期限の4種）**: manifest に `price`（円・署名対象＝0円改ざん不可）。`available` 無し＝
   恒常（永続・自動削除なし）。無料/有料 × 恒常/コラボ。ストアUIで「入手/¥N購入」「無期限/残りN日」表示分け、
   有料は store_purchase_url 差込口（未設定は準備中）。sign_scene.py --price。

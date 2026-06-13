@@ -67,6 +67,7 @@ TEXTS = {
         "store_days_left": "残り{d}日",
         "store_perpetual": "無期限",
         "store_basic": "基本",
+        "tile_trial_hint": "クリックで10秒お試し",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -74,6 +75,12 @@ TEXTS = {
         "collab_ended_body": "「{name}」のコラボ期間が終了しました。ご利用ありがとうございました。",
         "collab_revoked_title": "シーンの提供が終了しました",
         "collab_revoked_body": "「{name}」は提供を終了したため削除されました。ご利用ありがとうございました。",
+        "trial_start_title": "お試し再生中",
+        "trial_start_body": "{sec}秒後に元のシーンに戻ります。気に入ったら入手できます。",
+        "trial_end_title": "お試し終了",
+        "trial_end_body": "お試しが終了しました。元のシーンに戻しました。",
+        "trial_failed_title": "お試しを開始できません",
+        "trial_failed_body": "{name}",
         # エラー報告
         "errlog_title": "エラー報告",
         "errlog_ask": "前回の実行でエラーが記録されました。\n改善のため、エラーログを匿名で開発者に送信しますか？\n\n送信されるのはエラーの記録とアプリのバージョンだけで、\n個人情報は含まれません（パス中のユーザー名は伏せられます）。",
@@ -200,6 +207,7 @@ TEXTS = {
         "store_days_left": "{d} days left",
         "store_perpetual": "no expiry",
         "store_basic": "basic",
+        "tile_trial_hint": "Click for a 10s trial",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice
@@ -207,6 +215,12 @@ TEXTS = {
         "collab_ended_body": "The \"{name}\" collaboration period has ended. Thank you for enjoying it!",
         "collab_revoked_title": "Scene discontinued",
         "collab_revoked_body": "\"{name}\" has been discontinued and removed. Thank you for enjoying it!",
+        "trial_start_title": "Trial playing",
+        "trial_start_body": "Returns to your scene in {sec}s. Get it if you like it.",
+        "trial_end_title": "Trial ended",
+        "trial_end_body": "The trial ended and your scene is restored.",
+        "trial_failed_title": "Couldn't start the trial",
+        "trial_failed_body": "{name}",
         # Error report
         "errlog_title": "Error Report",
         "errlog_ask": "An error was recorded during the last run.\nSend the error log anonymously to the developer to help improve the app?\n\nOnly the error record and the app version are sent.\nNo personal information is included (your user name in paths is masked).",

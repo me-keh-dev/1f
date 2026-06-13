@@ -217,6 +217,20 @@ def rescan():
     return consume_expired()
 
 
+def register_trial(key, source):
+    """お試し用にシーンを一時登録する（保存しない・上書き可）。
+    end_trial 相当で unregister すること。"""
+    return register_plugin_source(source, key, where="<trial:%s>" % key,
+                                  overwrite=True)
+
+
+def unregister(key):
+    """一時登録したシーンを取り除く（お試し終了時）"""
+    info = _REGISTRY.pop(key, None)
+    if info:
+        sys.modules.pop(info.get("module", ""), None)
+
+
 def consume_expired():
     """前回スキャン以降に期限切れ削除されたコラボの表示名を返してクリアする"""
     names = list(_last_expired)
