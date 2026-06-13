@@ -219,6 +219,8 @@ def list_installed(today=None):
             "name": name,
             "expiry": exp,
             "days_left": days_left,
+            "perpetual": exp is None,       # 期限なし＝恒常（買い切り/無料恒常）
+            "price": manifest.get("price", 0),
             "valid": exp is None or today <= exp,
         })
     return out

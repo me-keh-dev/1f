@@ -1036,7 +1036,9 @@ class SettingsDialog(QDialog):
             row = QHBoxLayout()
             nm = (o["name"].get(lang) or o["name"].get("ja")
                   or o["name"].get("en") or o["key"])
-            if o["days_left"] is not None:
+            if o["perpetual"]:
+                nm += "（{}）".format(t("store_perpetual"))   # 恒常＝無期限
+            elif o["days_left"] is not None:
                 nm += "（{}）".format(t("store_days_left").format(d=o["days_left"]))
             row.addWidget(QLabel(nm), 1)
             btn = QPushButton(t("store_remove"))
@@ -1055,10 +1057,15 @@ class SettingsDialog(QDialog):
             nm = name.get(lang) or name.get("ja") or name.get("en") or c.get("key", "?")
             av = c.get("available") or {}
             if av.get("until"):
-                nm += "（〜{}）".format(av["until"])
+                nm += "（〜{}）".format(av["until"])   # コラボ＝終了日
             row.addWidget(QLabel(nm), 1)
-            btn = QPushButton(t("store_get"))
-            btn.clicked.connect(lambda _, u=c.get("url"): self._on_install(u))
+            price = int(c.get("price") or 0)
+            if price > 0:   # 有料 → 購入（決済は liplico store。差込口）
+                btn = QPushButton(t("store_buy").format(price=price))
+                btn.clicked.connect(lambda _, c=c: self._on_purchase(c))
+            else:           # 無料 → そのまま入手
+                btn = QPushButton(t("store_get"))
+                btn.clicked.connect(lambda _, u=c.get("url"): self._on_install(u))
             row.addWidget(btn)
             self.store_avail_layout.addLayout(row)
 
@@ -1077,6 +1084,19 @@ class SettingsDialog(QDialog):
         self.on_apply({"_rescan": True})
         self._refresh_scene_combo()
         self._reload_store()
+
+    def _on_purchase(self, c):
+        """有料シーンの購入。決済は liplico store（後段）。
+        store_purchase_url が設定されていれば購入トークン経由で入手する想定。
+        未稼働なら「準備中」を案内する。"""
+        from PyQt5.QtWidgets import QMessageBox
+        purchase_url = self.config.get("store_purchase_url")
+        if not purchase_url:
+            QMessageBox.information(self, t("tab_store"), t("store_not_ready"))
+            return
+        # 後段: purchase_url に key/購入トークンを渡して DL URL を得て install。
+        # liplico store 実装まではここに到達しない（差込口）。
+        QMessageBox.information(self, t("tab_store"), t("store_not_ready"))
 
     def _on_uninstall(self, key):
         from scenes import _collab

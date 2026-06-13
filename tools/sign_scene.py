@@ -53,6 +53,8 @@ def main():
     ap.add_argument("--from", dest="from_", help="開始日 YYYY-MM-DD（任意）")
     ap.add_argument("--max-days", type=int, default=0,
                     help="初回インストールから N 日で失効（0=無期限。until と早い方）")
+    ap.add_argument("--price", type=int, default=0,
+                    help="価格（円。0=無料）。署名対象なので改ざん不可")
     ap.add_argument("--pubkey-id", type=int, default=1)
     ap.add_argument("--key", default=DEFAULT_KEY, help="署名用の秘密鍵 PEM")
     ap.add_argument("-o", "--out", help="出力 .1fmode（既定: <key>.1fmode）")
@@ -86,8 +88,9 @@ def main():
         "key": key,
         "sha256": hashlib.sha256(src).hexdigest(),
         "name": name,
-        "available": available,
+        "available": available,   # 空 = 恒常（期限なし）/ あり = コラボ
         "max_days": args.max_days,
+        "price": args.price,       # 0 = 無料 / >0 = 有料（円）
         "pubkey_id": args.pubkey_id,
     }
     manifest_raw = json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode("utf-8")
