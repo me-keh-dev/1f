@@ -942,69 +942,57 @@ def _generate_willow(height, rng, config=None):
     return trunk_pixels, branch_data, trunk_h
 
 
-# --- 雪だるま（雪の日だけ路傍に現れる） ---
+# --- 雪うさぎ（江戸の風物詩。雪の日だけ路傍に現れる） ---
+# 丸めた雪に、南天(なんてん)の葉を耳、赤い実を目にした伝統的な雪うさぎ。
 SNOW_WHITE = (245, 248, 255)
-SNOW_SHADE = (205, 216, 234)
-SNOWMAN_COAL = (45, 45, 55)
-SNOWMAN_CARROT = (240, 140, 40)
-SNOWMAN_STICK = (120, 90, 55)
-SNOWMAN_SCARF = (210, 70, 70)
+SNOW_SHADE = (212, 222, 238)
+NANTEN_LEAF = (60, 120, 70)    # 南天の葉（耳）
+NANTEN_BERRY = (210, 55, 55)   # 南天の実（赤い目）
 
 
-class Snowman:
-    """まるい二段の雪だるま。石炭の目・人参の鼻・枝の腕・赤いマフラー。"""
-    def __init__(self, base_x, scarf=True):
+class Snowrabbit:
+    """雪うさぎ: 小さく丸い雪の塊＋南天の葉の耳＋赤い実の目。
+    本体は実ドット数を小さく抑え、さらに描画時にも縮小する（小さくかわいく）。"""
+    SCALE = 0.7   # 他オブジェクトより小さく描く
+
+    def __init__(self, base_x, flip=False):
         self.base_x = base_x
-        self.pixels = self._build(scarf)
+        self.flip = flip   # 向き（左右反転）
+        self.pixels = self._build()
 
-    def _build(self, scarf):
-        px = {}  # (dx,dy) -> kind（重なりは後勝ち）
-        # 胴体（下の大きな玉）中心(0, 2.6) 半径3
-        for dy in range(0, 6):
-            for dx in range(-3, 4):
-                if dx * dx + (dy - 2.6) ** 2 <= 9.2:
-                    px[(dx, dy)] = "snow"
-        # 頭（上の玉）中心(0, 8) 半径2.2
-        for dy in range(6, 11):
-            for dx in range(-3, 4):
-                if dx * dx + (dy - 8) ** 2 <= 5.2:
-                    px[(dx, dy)] = "snow"
-        # 右側にうっすら陰
-        for (dx, dy), k in list(px.items()):
-            if k == "snow" and dx >= 2:
-                px[(dx, dy)] = "shade"
-        # マフラー（首元 dy=6）
-        if scarf:
-            for dx in range(-2, 3):
-                px[(dx, 6)] = "scarf"
-            px[(2, 5)] = "scarf"  # 垂れ
-        # 顔: 目（dy=9）・鼻（dy=8 中央やや右）
-        px[(-1, 9)] = "coal"
-        px[(1, 9)] = "coal"
-        px[(0, 8)] = "carrot"
-        # 腕（枝）: 両側に伸びる dy=3〜4
-        for dx in (-4, -5):
-            px[(dx, 4)] = "stick"
-        px[(-6, 5)] = "stick"
-        for dx in (4, 5):
-            px[(dx, 3)] = "stick"
-        px[(6, 4)] = "stick"
-        # ボタン（石炭）
-        px[(0, 3)] = "coal"
-        px[(0, 1)] = "coal"
+    def _build(self):
+        px = {}  # (dx,dy) -> kind
+        # ドーム型の体（下が広く上が丸い・正面向き）
+        dome = {0: range(-3, 4), 1: range(-3, 4), 2: range(-2, 3), 3: range(-1, 2)}
+        for dy, xs in dome.items():
+            for dx in xs:
+                px[(dx, dy)] = "snow"
+        # 底のうっすら陰
+        for dx in range(-3, 4):
+            if (dx, 0) in px:
+                px[(dx, 0)] = "shade"
+        # 目: 南天の赤い実2つ（前面 dy=1）
+        px[(-1, 1)] = "berry"
+        px[(1, 1)] = "berry"
+        # 耳: 南天の葉2枚を上後方へ（V字）
+        for d in ((-1, 4), (-1, 5), (-2, 6)):
+            px[d] = "leaf"
+        for d in ((1, 4), (1, 5), (2, 6)):
+            px[d] = "leaf"
         return px
 
     _COLORS = {
-        "snow": SNOW_WHITE, "shade": SNOW_SHADE, "coal": SNOWMAN_COAL,
-        "carrot": SNOWMAN_CARROT, "stick": SNOWMAN_STICK, "scarf": SNOWMAN_SCARF,
+        "snow": SNOW_WHITE, "shade": SNOW_SHADE,
+        "leaf": NANTEN_LEAF, "berry": NANTEN_BERRY,
     }
 
     def draw(self, painter, ground_y, alpha=255, tint=None, ps=None):
-        ps = ps or PIXEL_SIZE
+        ps = max(1, int((ps or PIXEL_SIZE) * self.SCALE))
         for (dx, dy), kind in self.pixels.items():
+            x = -dx if self.flip else dx
             c = apply_tint(QColor(*self._COLORS[kind]), tint)
             c.setAlpha(alpha)
-            painter.fillRect(int(self.base_x + dx * ps),
+            painter.fillRect(int(self.base_x + x * ps),
                              int(ground_y - (dy + 1) * ps), ps, ps, c)
 
 
@@ -1046,18 +1034,18 @@ class TokaidoScene(BaseScene):
         self._generate_fuji(rng, widget_width, config)
         self._generate_roadside_grass(rng, widget_width, wind, config)
         self._generate_travelers(rng, widget_width, ratio, config)
-        self._generate_snowmen(rng, widget_width)
+        self._generate_snowrabbits(rng, widget_width)
 
-    def _generate_snowmen(self, rng, width):
-        """雪だるまを路傍に1〜2体（雪の日だけ描画）。日替わりseedで位置が変わる"""
-        self.snowmen = []
-        n = rng.choice([1, 1, 2])
-        x0 = self._avoid + 20
-        if width <= x0 + 40:
+    def _generate_snowrabbits(self, rng, width):
+        """雪うさぎを路傍に1〜3羽（雪の日だけ描画）。日替わりseedで位置・向きが変わる"""
+        self.snowrabbits = []
+        n = rng.choice([1, 2, 2, 3])
+        x0 = self._avoid + 16
+        if width <= x0 + 30:
             return
         for _ in range(n):
-            x = rng.randint(x0, width - 30)
-            self.snowmen.append(Snowman(x, scarf=(rng.random() < 0.7)))
+            x = rng.randint(x0, width - 20)
+            self.snowrabbits.append(Snowrabbit(x, flip=(rng.random() < 0.5)))
 
     def _generate_scene(self, rng, width, wind, ratio, config):
         self.hills = []
@@ -1323,16 +1311,26 @@ class TokaidoScene(BaseScene):
             ec = QColor(140, 120, 80, int(120 * a / 255))
             painter.fillRect(rx, ground_y - road_h, step, ps // 2, ec)
 
-        # 雪の日: 道に雪が積もる（白い層＋上端の明るい雪面）
+        # 雪の日: 道に雪が積もる（白い層＋路面より少し盛り上がった凹凸のある雪面）
         if snowing:
+            road_top = ground_y - road_h
             for rx in range(0, self.widget_width, step):
                 a = get_alpha(rx) if get_alpha else 255
-                blanket = apply_tint(QColor(238, 244, 255), tint)
-                blanket.setAlpha(int(205 * a / 255))
-                painter.fillRect(rx, ground_y - road_h, step, road_h, blanket)
-                crest = apply_tint(QColor(252, 254, 255), tint)
-                crest.setAlpha(int(235 * a / 255))
-                painter.fillRect(rx, ground_y - road_h, step, ps, crest)
+                # 路面より上に積もる量（緩やかな波で自然な凹凸・毎フレーム不変）
+                mound = int(ps * (0.6 + 0.6 * (0.5 + 0.5 * math.sin(rx * 0.035))
+                                  + 0.3 * (0.5 + 0.5 * math.sin(rx * 0.011))))
+                top_y = road_top - mound
+                blanket = apply_tint(QColor(240, 246, 255), tint)
+                blanket.setAlpha(int(225 * a / 255))
+                painter.fillRect(rx, top_y, step, road_h + mound, blanket)
+                # 雪面のハイライト（上端の明るい線）
+                crest = apply_tint(QColor(253, 254, 255), tint)
+                crest.setAlpha(int(240 * a / 255))
+                painter.fillRect(rx, top_y, step, max(1, ps // 2), crest)
+                # ほのかな影（雪のくぼみ）
+                shade = apply_tint(QColor(214, 224, 240), tint)
+                shade.setAlpha(int(150 * a / 255))
+                painter.fillRect(rx, top_y + ps, step, max(1, ps // 2), shade)
 
         # Back trees
         road_top_y = ground_y - road_h
@@ -1373,11 +1371,11 @@ class TokaidoScene(BaseScene):
             alpha = get_alpha(int(trav.x)) if get_alpha else 255
             trav.draw(painter, alpha, tint, ps)
 
-        # 雪だるま（雪の日だけ・旅人と同じ前面レイヤー）
+        # 雪うさぎ（雪の日だけ・旅人と同じ前面レイヤー）
         if snowing:
-            for sm in getattr(self, "snowmen", []):
-                alpha = get_alpha(sm.base_x) if get_alpha else 255
-                sm.draw(painter, ground_y, alpha, tint, ps)
+            for sr in getattr(self, "snowrabbits", []):
+                alpha = get_alpha(sr.base_x) if get_alpha else 255
+                sr.draw(painter, ground_y, alpha, tint, ps)
 
         # Front trees
         for tree in self.front_trees:

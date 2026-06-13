@@ -192,66 +192,101 @@ class SnowFlake:
 
 
 class Lightning:
-    """雷: 画面全体の閃光＋空から走るジグザグの稲妻。
-    雷雨(thunderstorm)のときだけ 1/f 的にランダムな間隔で光る。"""
+    """雷: 画面全体の閃光＋フラクタル（midpoint displacement）で生成した
+    本物らしく折れ曲がり分岐する稲妻。雷雨(thunderstorm)のときだけ 1/f 的に光る。
+    稲妻は上端でフェードイン（始点の線が見えない）し、しばらく残ってから消える。"""
+    BOLT_LIFE = 24   # 稲妻の残存フレーム（約90fpsで0.27秒）
+
     def __init__(self):
-        self.flash = 0.0          # 画面フラッシュの強さ 0..1（素早く減衰）
-        self.bolt = None          # 稲妻の折れ線 [(x,y),...]（描いている間だけ）
+        self.flash = 0.0          # 画面フラッシュの強さ 0..1
+        self.bolt = None          # {"main":[(x,y)...], "branches":[[...],...]}
         self.bolt_frame = 0
         self._timer = random.uniform(1.5, 5.0)  # 次の落雷までの秒数
 
     def update(self, dt, screen_width, ground_y):
         if self.flash > 0:
-            self.flash *= 0.82     # 閃光の減衰
-            if self.flash < 0.03:
+            self.flash *= 0.88     # 閃光の減衰（稲妻が残る間ほのかに照らす）
+            if self.flash < 0.02:
                 self.flash = 0.0
         if self.bolt is not None:
             self.bolt_frame += 1
-            if self.bolt_frame > 6:   # 稲妻は一瞬
+            if self.bolt_frame > self.BOLT_LIFE:
                 self.bolt = None
         self._timer -= dt
         if self._timer <= 0:
             self._strike(screen_width, ground_y)
-            # 次までの間隔（たまに連続でゴロゴロ、たいていは間が空く）
+            # 次までの間隔（たまに連続、たいていは間が空く）
             self._timer = random.choice(
-                [random.uniform(0.1, 0.4), random.uniform(2.5, 7.0),
+                [random.uniform(0.1, 0.5), random.uniform(2.5, 7.0),
                  random.uniform(2.5, 7.0)])
 
-    def _strike(self, screen_width, ground_y):
-        self.flash = random.uniform(0.5, 1.0)
-        # 6〜7割は閃光のみ、たまに稲妻ボルトも描く
-        if random.random() < 0.45:
-            x = random.uniform(screen_width * 0.15, screen_width * 0.85)
-            pts = [(x, 0)]
-            y = 0
-            seg = max(6, int(ground_y / 7))
-            while y < ground_y * 0.95:
-                y += random.uniform(seg * 0.6, seg * 1.4)
-                x += random.uniform(-14, 14)
-                pts.append((x, min(y, ground_y)))
-            self.bolt = pts
+    def _fractal(self, x0, y0, x1, y1, disp, depth):
+        """midpoint displacement で2点間を自然なギザギザに分割"""
+        if depth <= 0:
+            return [(x0, y0), (x1, y1)]
+        mx = (x0 + x1) / 2 + random.uniform(-disp, disp)
+        my = (y0 + y1) / 2 + random.uniform(-disp * 0.25, disp * 0.25)
+        left = self._fractal(x0, y0, mx, my, disp * 0.55, depth - 1)
+        right = self._fractal(mx, my, x1, y1, disp * 0.55, depth - 1)
+        return left[:-1] + right
+
+    def _strike(self, w, ground_y):
+        self.flash = random.uniform(0.55, 1.0)
+        if random.random() < 0.6:   # 稲妻ボルト（残りは閃光のみ）
+            x = random.uniform(w * 0.2, w * 0.8)
+            end_x = x + random.uniform(-w * 0.12, w * 0.12)
+            main = self._fractal(x, 0, end_x, ground_y * 0.98,
+                                 max(8, w * 0.05), 5)
+            branches = []
+            # 本物のように途中から枝分かれ（短く・下方向へ）
+            for i in range(2, len(main) - 1):
+                if random.random() < 0.16:
+                    bx, by = main[i]
+                    ex = bx + random.uniform(-w * 0.12, w * 0.12)
+                    ey = by + random.uniform(ground_y * 0.15, ground_y * 0.4)
+                    branches.append(self._fractal(
+                        bx, by, ex, min(ey, ground_y), max(5, w * 0.03), 3))
+            self.bolt = {"main": main, "branches": branches}
             self.bolt_frame = 0
         else:
             self.bolt = None
 
-    def draw(self, painter):
+    def draw(self, painter, ground_y):
         if self.flash > 0:
             a = int(120 * self.flash)
             painter.fillRect(painter.window(), QColor(220, 230, 255, a))
-        if self.bolt and len(self.bolt) > 1:
-            a = max(60, int(255 * (1 - self.bolt_frame / 6.0)))
-            # グロー（太い半透明）＋芯（細い明色）の二重線
-            for width, col in ((5, QColor(150, 180, 255, a // 3)),
-                               (2, QColor(245, 250, 255, a))):
+        if not self.bolt:
+            return
+        life = max(0.0, 1.0 - self.bolt_frame / float(self.BOLT_LIFE))
+        # 最初の数フレームは最も明るく、その後ゆっくり消える
+        intensity = life ** 0.6
+        fade_zone = max(1.0, ground_y * 0.28)   # 上端フェードの帯
+
+        def seg_alpha(y):
+            top = min(1.0, max(0.0, y) / fade_zone)  # 上端ほど透明
+            return intensity * top
+
+        self._draw_poly(painter, self.bolt["main"], seg_alpha, 2, 6, 1.0)
+        for br in self.bolt["branches"]:
+            self._draw_poly(painter, br, seg_alpha, 1, 3, 0.55)
+
+    def _draw_poly(self, painter, pts, seg_alpha, core_w, glow_w, amul):
+        if len(pts) < 2:
+            return
+        for width, base, k in ((glow_w, (150, 180, 255), 0.4),
+                               (core_w, (245, 250, 255), 1.0)):
+            for i in range(len(pts) - 1):
+                x1, y1 = pts[i]
+                x2, y2 = pts[i + 1]
+                a = seg_alpha((y1 + y2) / 2) * amul * k
+                col = QColor(base[0], base[1], base[2],
+                            max(0, min(255, int(255 * a))))
                 pen = painter.pen()
                 pen.setColor(col)
                 pen.setWidth(width)
                 painter.setPen(pen)
-                for i in range(len(self.bolt) - 1):
-                    x1, y1 = self.bolt[i]
-                    x2, y2 = self.bolt[i + 1]
-                    painter.drawLine(int(x1), int(y1), int(x2), int(y2))
-            painter.setPen(Qt.NoPen)
+                painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+        painter.setPen(Qt.NoPen)
 
 
 class WeatherEffect:
@@ -330,4 +365,4 @@ class WeatherEffect:
         for drop in self.drops:
             drop.draw(painter)
         if self.current_state == "thunderstorm":
-            self.lightning.draw(painter)
+            self.lightning.draw(painter, self.ground_y)
