@@ -1884,7 +1884,7 @@ class OverlayManager:
 
     def _push_location(self):
         """現在の観測地点を全オーバーレイのシーンへ渡す（天気と同じ座標を共用）。"""
-        lat, lon = self._geo
+        lat, lon = getattr(self, "_geo", (None, None))
         if lat is None:
             return
         for o in self.overlays:
