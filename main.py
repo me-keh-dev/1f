@@ -1800,14 +1800,32 @@ class OverlayManager:
         if getattr(self, "_last_collab_date", None) == today:
             return
         self._last_collab_date = today
-        # 日付が変わったら失効リストも確認（権利停止・リコール）
+        # 日付が変わったら失効リストとインストール済みの更新も確認
         self._check_revocations()
+        self._check_scene_updates()
         try:
             expired = scenes_registry.rescan()
         except Exception:
             return
         for name in expired:
             self._notify_scene_gone(name, "expired")
+
+    def _check_scene_updates(self):
+        """インストール済みシーンを、カタログの最新版に自動更新する（黙って反映）。
+        作者が配信後にシーンを直して再配信した分が、次回起動で全員に行き渡る。"""
+        from scenes import _collab
+        try:
+            updated = _collab.update_installed(self.config.get("store_catalog_url"))
+        except Exception:
+            return
+        if not updated:
+            return
+        try:
+            scenes_registry.rescan()
+        except Exception:
+            pass
+        for o in self.overlays:
+            o._rebuild_scene()
 
     TRIAL_SECONDS = 10
 
@@ -2315,6 +2333,8 @@ def main():
         _notify_scene_gone(n, "expired") for n in scenes_registry.consume_expired()])
     # 起動後に失効リストを確認（権利停止・リコール。updater と同様オフラインは黙殺）
     QTimer.singleShot(9000, manager._check_revocations)
+    # 起動後にインストール済みシーンを最新版へ自動更新（配信後の修正を反映）
+    QTimer.singleShot(11000, manager._check_scene_updates)
 
     # 画面左下のハンバーガーメニューボタン（トレイと同じメニューを展開）
     hamburger = HamburgerButton(manager, menu)

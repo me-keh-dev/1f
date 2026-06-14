@@ -104,11 +104,16 @@ def main():
         out = os.path.join(SCENES_OUT, key + ".1fmode")
         _sign_scene(src, out, s.get("price", 0), s.get("available"),
                     s.get("max_days", 0), pubkey_id)
+        # mode.py のハッシュ（manifest.sha256 と同値）。インストール済みの
+        # 自動更新判定に使う（中身が変われば全ユーザーが次回起動で取り直す）
+        import hashlib as _hl
+        src_sha = _hl.sha256(open(src, "rb").read()).hexdigest()
         entry = {
             "key": key,
             "name": s.get("name", {}),
             "desc": s.get("desc", {}),
             "price": s.get("price", 0),
+            "sha256": src_sha,
             "url": "{}/scenes/{}.1fmode".format(base, key) if base
                    else "scenes/{}.1fmode".format(key),
         }

@@ -336,6 +336,42 @@ def fetch_and_apply_revocations(url=None):
     return removed
 
 
+def update_installed(catalog_url=None):
+    """インストール済みシーンを、カタログの最新版に自動更新する。
+
+    カタログ各エントリの sha256（mode.py のハッシュ）と、インストール済み
+    パッケージの manifest.sha256 を比較し、違えば再ダウンロードして置き換える。
+    → 配信後（ユーザーがインストール後）でも、作者がシーンを直して再配信すれば
+    次回起動時に全員が自動で最新版になる。期限の起点(first_seen)は維持。
+    returns 更新したシーンの key リスト。"""
+    cat = fetch_catalog(catalog_url)
+    by_key = {c.get("key"): c for c in cat if c.get("key")}
+    if not by_key:
+        return []
+    d = installed_dir()
+    if not os.path.isdir(d):
+        return []
+    updated = []
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".1fmode"):
+            continue
+        try:
+            manifest, _ = load_and_verify(os.path.join(d, fn))
+        except CollabError:
+            continue
+        key = manifest.get("key")
+        c = by_key.get(key)
+        if not c or not c.get("sha256"):
+            continue
+        if c["sha256"] != manifest.get("sha256"):
+            try:
+                install_scene(c["url"])   # 検証して上書き（.state は保持）
+                updated.append(key)
+            except Exception:
+                pass
+    return updated
+
+
 def install_scene(url, dest_name=None):
     """URL（http/https/file）から .1fmode を取得し、検証して installed/ に保存。
     成功すれば manifest を返す。ユーザー操作は「入手」ボタン1つの想定。"""
