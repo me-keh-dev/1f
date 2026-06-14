@@ -51,17 +51,20 @@ class AudioLevelMonitor:
             self._running = False
             return
         last_err = None  # 同じエラーの連続表示を抑制（リトライは続ける）
+        fail = 0         # 連続失敗カウント（録音成功で解除）
         while self._running:
             try:
                 spk = sc.default_speaker()
                 mic = sc.get_microphone(spk.name, include_loopback=True)
-                last_err = None  # 復帰したら次の障害はまた表示する
                 # 約46ms単位で録音してRMSを計算
                 with mic.recorder(samplerate=44100, blocksize=1024) as rec:
                     frames = 0
                     prev_b = 0.0
                     while self._running:
                         data = rec.record(numframes=2048)
+                        if frames == 0:
+                            fail = 0        # 録音成功＝復帰。失敗カウント/表示を解除
+                            last_err = None
                         rms = float(np.sqrt(np.mean(np.square(data))))
                         # 知覚に合わせて平方根で圧縮し0..1へ
                         raw = min(1.0, math.sqrt(rms * 8.0))
@@ -96,9 +99,18 @@ class AudioLevelMonitor:
                         if frames >= 215:
                             break
             except Exception as e:
+                fail += 1
                 # デバイス無し等で毎回同じエラーになるため、変化した時だけ表示
                 if str(e) != last_err:
                     last_err = str(e)
                     print(f"[AUDIO] capture error (retrying quietly): {e}")
                 self.level = 0.0
+                self.bass = 0.0
+                self.bass_hit = 0.0
+                if fail >= 5:
+                    # 恒久的に失敗する環境（soundcard 非対応等）では諦めて停止し、
+                    # 無限リトライをやめる。サウンド連動以外には影響しない。
+                    print("[AUDIO] sound sync disabled: capture unavailable on this system")
+                    self._running = False
+                    break
                 time.sleep(2.0)
