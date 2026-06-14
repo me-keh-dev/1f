@@ -1345,7 +1345,7 @@ class SettingsDialog(QDialog):
         outer.addWidget(self.store_grid_host)
 
         refresh = QPushButton(t("store_refresh"))
-        refresh.clicked.connect(self._reload_store)
+        refresh.clicked.connect(self._on_store_refresh)
         outer.addWidget(refresh)
         outer.addStretch()
 
@@ -1425,6 +1425,12 @@ class SettingsDialog(QDialog):
         """未購入シーンのタイルをクリック → 10秒お試し"""
         if url:
             self.on_apply({"_trial": {"key": key, "url": url}})
+
+    def _on_store_refresh(self):
+        """「更新」ボタン: インストール済みシーンを最新版に取り直し（再起動不要）＋表示更新"""
+        self.on_apply({"_update_scenes": True})   # 自動更新を即実行
+        self._refresh_scene_combo()
+        self._reload_store()
 
     def _on_tile_acquire(self, key, url):
         """無料シーンのタイルをクリック → 入手（署名検証してインストール→所有）"""
@@ -1955,6 +1961,11 @@ class OverlayManager:
         if "ui_skin" in new_config and len(new_config) == 1:
             self.config["ui_skin"] = new_config["ui_skin"]
             self._save_config()
+            return
+
+        # 「更新」ボタン: インストール済みシーンを最新版へ取り直す（再起動不要）
+        if new_config.get("_update_scenes"):
+            self._check_scene_updates()
             return
 
         # 未購入シーンのお試し（一時DL→10秒適用→自動復帰）
