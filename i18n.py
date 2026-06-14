@@ -46,8 +46,8 @@ TEXTS = {
         "auto_update": "起動時に更新を自動確認する",
         "startup_mode": "起動時のモード",
         "startup_random": "起動時にお気に入りからランダムに選ぶ",
-        "startup_random_desc": "右の「シーン」パネルでハート♡を付けたお気に入りの中から、"
-                               "起動のたびに抽選されます（お気に入りが無いときは全シーンから）。"
+        "startup_random_desc": "「シーン」でハート♡を付けたお気に入りの中から、起動のたびに"
+                               "抽選されます（お気に入りが無いときは全シーンから）。"
                                "1つだけお気に入りにすれば、常にそのシーンで起動します。",
         # 人気投票（みんなのお気に入りモード）
         "tab_poll": "人気投票",
@@ -194,10 +194,10 @@ TEXTS = {
         "auto_update": "Check for updates on startup",
         "startup_mode": "Startup Scene",
         "startup_random": "Pick a random favorite at startup",
-        "startup_random_desc": "One of your favorites (hearted ♡ in the Scenes "
-                               "panel) is chosen each time the app starts (all "
-                               "scenes if none). Favorite just one to always "
-                               "start with that scene.",
+        "startup_random_desc": "One of your favorites (hearted ♡ in Scenes) is "
+                               "chosen each time the app starts (all scenes if "
+                               "none). Favorite just one to always start with "
+                               "that scene.",
         # Popularity poll (everyone's favorite scenes)
         "tab_poll": "Poll",
         "stats_optin": "Join the poll (see everyone's favorite scenes)",
