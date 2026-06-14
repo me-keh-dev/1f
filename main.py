@@ -886,10 +886,14 @@ class SettingsDialog(QDialog):
         tol.addWidget(g_wsync)
         if audio_supported():
             tol.addWidget(g_ssync)
-        tol.addWidget(g_lang)
         tol.addWidget(g_skin)
-
         tol.addStretch()
+
+        # 言語は独立カテゴリ（左サイドバー）
+        lang_page = QWidget()
+        _ll = QVBoxLayout(lang_page)
+        _ll.addWidget(g_lang)
+        _ll.addStretch()
 
         # === 保存 ===
         tab_save = QWidget()
@@ -1029,6 +1033,7 @@ class SettingsDialog(QDialog):
         self._add_nav(t("nav_scene_settings"), scene_settings_page, scroll=False)
         self._add_nav(t("tab_env"), tab_env)
         self._add_nav(t("tab_option"), tab_opt)
+        self._add_nav(t("nav_language"), lang_page)
         self._add_nav(t("tab_save"), tab_save)
         self._add_nav(t("tab_poll"), tab_poll)
         self._add_nav(t("tab_gfx_test"), tab_test)

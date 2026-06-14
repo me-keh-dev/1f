@@ -75,6 +75,7 @@ TEXTS = {
         "current_scene": "現在のシーン: {name}　（右の「シーン」から選べます）",
         "nav_scenes": "シーン",
         "nav_scene_settings": "シーン設定",
+        "nav_language": "言語",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -221,6 +222,7 @@ TEXTS = {
         "current_scene": "Current scene: {name}　(pick from the Scenes panel)",
         "nav_scenes": "Scenes",
         "nav_scene_settings": "Scene settings",
+        "nav_language": "Language",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice
