@@ -898,6 +898,9 @@ class SettingsDialog(QDialog):
         _ll.addWidget(g_lang)
         _ll.addStretch()
 
+        # === このアプリについて（About） ===
+        about_page = self._build_about_page()
+
         # === プリセット（シーン用→シーン設定ページ / 環境用→環境ページ に配置） ===
         self.scene_preset_group = QGroupBox(t("scene_preset"))
         g_sp_l = QVBoxLayout(self.scene_preset_group)
@@ -1034,6 +1037,7 @@ class SettingsDialog(QDialog):
         self._add_nav(t("nav_language"), lang_page)
         self._add_nav(t("tab_poll"), tab_poll)
         self._add_nav(t("tab_gfx_test"), tab_test)
+        self._add_nav(t("nav_about"), about_page)
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.sidebar.setCurrentRow(0)   # 既定で「シーン」を表示
 
@@ -1329,6 +1333,60 @@ class SettingsDialog(QDialog):
         name = self.env_combo.currentText()
         if name:
             self.on_load("env", name)
+
+    OPERATOR = "liplico"   # 現在の運営（表示名）。変更可
+    REPO_URL = "https://github.com/me-keh-dev/1f"
+
+    def _build_about_page(self):
+        page = QWidget()
+        v = QVBoxLayout(page)
+        try:
+            from version import CODE_VERSION as ver
+        except Exception:
+            ver = "?"
+        skel = os.environ.get("ONEF_SKELETON_VERSION", "-")
+
+        name = QLabel("1/f")
+        name.setStyleSheet("font-size: 28px; font-weight: 700;")
+        v.addWidget(name)
+        tag = QLabel(t("about_tagline"))
+        tag.setStyleSheet("color: #888;")
+        tag.setWordWrap(True)
+        v.addWidget(tag)
+        ver_l = QLabel(t("about_version").format(ver=ver, skel=skel))
+        ver_l.setStyleSheet("color: #888; font-size: 11px;")
+        v.addWidget(ver_l)
+
+        g = QGroupBox()
+        gl = QVBoxLayout(g)
+        oss = QLabel(t("about_oss"))
+        oss.setWordWrap(True)
+        gl.addWidget(oss)
+        op = QLabel(t("about_operator").format(operator=self.OPERATOR))
+        op.setWordWrap(True)
+        gl.addWidget(op)
+        link = QLabel('<a href="{0}">{0}</a>'.format(self.REPO_URL))
+        link.setOpenExternalLinks(True)
+        link.setStyleSheet("font-size: 12px;")
+        gl.addWidget(link)
+        v.addWidget(g)
+
+        gc = QGroupBox(t("about_credits"))
+        gcl = QVBoxLayout(gc)
+        for key in ("about_credit_pooh", "about_credit_weather",
+                    "about_credit_ui"):
+            lbl = QLabel("・" + t(key))
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet("color: #666; font-size: 11px;")
+            gcl.addWidget(lbl)
+        v.addWidget(gc)
+
+        priv = QLabel(t("about_privacy"))
+        priv.setWordWrap(True)
+        priv.setStyleSheet("color: #888; font-size: 11px;")
+        v.addWidget(priv)
+        v.addStretch()
+        return page
 
     # --- シーンストア（アイコングリッド: ライブプレビュー・クリック再生・お試し） ---
     def _build_store_tab(self):
