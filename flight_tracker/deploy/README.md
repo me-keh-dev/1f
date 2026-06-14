@@ -34,7 +34,19 @@ sudo bash deploy/deploy.sh
 
 **メモリ保護**: 各 unit に `MemoryMax`（API/collector 200M, バッチ 256M）+ `Nice` を設定済み（2GB 共用機を守る）。
 
-## 3. 公開（手動・共用インフラに触れるため運用者が実施）
+## 実際の本番構成（2026-06-15 デプロイ済み）
+
+公開URL: **https://flightapi.lipli.co** ／ 方式＝**Path A（直接Aレコード＋VPSでTLS終端、Cloudflareトンネル不使用）**。
+lipli.co は Google Cloud DNS 管理（cfargotunnel CNAME は使えない）ため、以下で構成:
+- Google Cloud DNS: **A レコード `flightapi.lipli.co → 160.251.182.90`**
+- nginx 新規サイト `/etc/nginx/sites-available/flightapi`（`server_name flightapi.lipli.co` → `proxy_pass http://127.0.0.1:5002`、既存サイト不変）
+- TLS: `certbot --nginx -d flightapi.lipli.co --redirect`（Let's Encrypt・自動更新・flightapiブロックのみ変更）
+- 確認済み: 外部 `https://flightapi.lipli.co/healthz` 200・HTTP→HTTPS 301・既存 furikome/ns2db/umami 無傷
+
+ロールバック（公開のみ解除）: `rm /etc/nginx/sites-enabled/flightapi` → `nginx -t && systemctl reload nginx`、
+証明書削除は `certbot delete --cert-name flightapi.lipli.co`、A レコード削除は Google Cloud DNS。
+
+## 3. （参考）別ホスト名で Cloudflare Tunnel 経由にする場合
 
 API は 127.0.0.1:5002。外部公開は **既存の Cloudflare Tunnel に ingress を1行追加**するのが最も無干渉。
 
