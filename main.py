@@ -2349,7 +2349,6 @@ def main():
         nonlocal settings_dialog
         toggle_action.setText(f"{t('toggle')} ({hotkey_label})")
         settings_action.setText(t("settings"))
-        regen_action.setText(t("regenerate"))
         quit_action.setText(t("quit"))
         tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
         if settings_dialog and settings_dialog.isVisible():
@@ -2369,9 +2368,6 @@ def main():
     settings_action = QAction(t("settings"))
     settings_action.triggered.connect(open_settings)
     menu.addAction(settings_action)
-    regen_action = QAction(t("regenerate"))
-    regen_action.triggered.connect(lambda: manager.apply_config({"seed": random.randint(0, 999999)}))
-    menu.addAction(regen_action)
     menu.addSeparator()
     quit_action = QAction(t("quit"))
     quit_action.triggered.connect(lambda: (hotkey.cleanup(), app.quit()))

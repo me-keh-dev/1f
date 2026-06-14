@@ -38,7 +38,7 @@ OUT_DIR = os.path.join(ROOT, "dist_update")
 CF_PROJECT = "1f-updates"
 BASE_URL = "https://1f-updates.pages.dev"
 # このコードが動作するのに必要な最小スケルトン版
-MIN_SKELETON = 1
+MIN_SKELETON = 2
 
 
 def sha256_file(path):
