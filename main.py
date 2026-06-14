@@ -2220,8 +2220,6 @@ class OverlayManager:
             self._fs_confirm = getattr(self, '_fs_confirm', 0) + 1
         else:
             self._fs_confirm = 0
-        if self._fs_confirm == 1:
-            print(f"[FS] Fullscreen detected (confirming...)")
         # Require 3 consecutive detections (3 seconds) to avoid false triggers on click
         if self._fs_confirm >= 3 and not self._fullscreen_hidden:
             self._fullscreen_hidden = True

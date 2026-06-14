@@ -148,8 +148,17 @@ def is_fullscreen_active():
     mi.cbSize = ctypes.sizeof(MONITORINFO)
     ctypes.windll.user32.GetMonitorInfoW(hmon, ctypes.byref(mi))
     mon = mi.rcMonitor
-    return (rect.left <= mon.left and rect.top <= mon.top and
-            rect.right >= mon.right and rect.bottom >= mon.bottom)
+    covers = (rect.left <= mon.left and rect.top <= mon.top and
+              rect.right >= mon.right and rect.bottom >= mon.bottom)
+    if not covers:
+        return False
+    # タイトルバー付き（WS_CAPTION）のウィンドウ＝通常/最大化のアプリ窓は
+    # 全画面とみなさない（ターミナルやIDEの最大化を誤検出しないため）。
+    # 本物の全画面（ゲーム・動画のフルスクリーン）はキャプションを外すので検出される。
+    GWL_STYLE = -16
+    WS_CAPTION = 0x00C00000
+    style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_STYLE)
+    return not (style & WS_CAPTION)
 
 # --- スタートアップ ---
 def _startup_shortcut_path():

@@ -3,4 +3,4 @@
 リリース時にここを上げ、tools/publish_update.py で code.zip と
 version.json を生成してサーバへ配置する。
 """
-CODE_VERSION = "2.12.8"
+CODE_VERSION = "2.12.9"
