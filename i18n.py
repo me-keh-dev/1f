@@ -76,6 +76,8 @@ TEXTS = {
         "nav_scenes": "シーン",
         "nav_scene_settings": "シーン設定",
         "nav_language": "言語",
+        "scene_regen": "別の配置にする",
+        "scene_regen_desc": "同じ設定のまま、草や物の配置をランダムに作り直します。",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -223,6 +225,8 @@ TEXTS = {
         "nav_scenes": "Scenes",
         "nav_scene_settings": "Scene settings",
         "nav_language": "Language",
+        "scene_regen": "Shuffle layout",
+        "scene_regen_desc": "Re-randomize the arrangement of grass and objects, keeping your settings.",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice

@@ -895,18 +895,9 @@ class SettingsDialog(QDialog):
         _ll.addWidget(g_lang)
         _ll.addStretch()
 
-        # === 保存 ===
+        # === 保存（プリセットの保存・読込） ===
         tab_save = QWidget()
         tsl = QVBoxLayout(tab_save)
-
-        btn_row = QHBoxLayout()
-        regen_btn = QPushButton(t("regenerate"))
-        regen_btn.clicked.connect(self._on_regenerate)
-        apply_btn = QPushButton(t("apply"))
-        apply_btn.clicked.connect(self._on_apply)
-        btn_row.addWidget(regen_btn)
-        btn_row.addWidget(apply_btn)
-        tsl.addLayout(btn_row)
 
         self.scene_preset_group = QGroupBox(t("scene_preset"))
         g_sp_l = QVBoxLayout(self.scene_preset_group)
@@ -1021,12 +1012,19 @@ class SettingsDialog(QDialog):
 
         ttl.addStretch()
 
-        # === シーン設定ページ（選択中シーンの設定を内側タブでまとめる） ===
+        # === シーン設定ページ（選択中シーンの設定＋配置の引き直し） ===
         self._scene_inner = QTabWidget()
         scene_settings_page = QWidget()
         ssl = QVBoxLayout(scene_settings_page)
         ssl.setContentsMargins(0, 0, 0, 0)
         ssl.addWidget(self._scene_inner)
+        regen_btn = QPushButton(t("scene_regen"))
+        regen_btn.clicked.connect(self._on_regenerate)
+        ssl.addWidget(regen_btn)
+        regen_desc = QLabel(t("scene_regen_desc"))
+        regen_desc.setStyleSheet("color: #888; font-size: 11px;")
+        regen_desc.setWordWrap(True)
+        ssl.addWidget(regen_desc)
 
         # === サイドバー＋ページを組み立て（Chrome設定風のカテゴリ順） ===
         self._add_nav(t("nav_scenes"), self._store_page, scroll=False)
