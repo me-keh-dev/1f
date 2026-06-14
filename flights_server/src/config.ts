@@ -25,7 +25,16 @@ export const config = {
   adsblolBaseUrl: str("ADSBLOL_BASE_URL", "https://api.adsb.lol/v2"),
   maxQueryRadiusNm: Math.min(250, Math.max(1, num("MAX_QUERY_RADIUS_NM", 250))),
   maxAgeSec: Math.max(1, num("MAX_AGE_SEC", 60)),
+
+  // WS のクライアントへの push 間隔（外部ポーリングとは別物。表示の滑らかさは
+  // クライアント補間が担うので、外部周期より短くてよい）。
+  wsPushIntervalMs: Math.max(200, num("WS_PUSH_INTERVAL_MS", 1000)),
+  // REST で要求された bbox を poller 対象に保つ寿命（再要求が無ければ解除）。
+  restRegisterTtlMs: Math.max(5000, num("REST_REGISTER_TTL_MS", 30_000)),
+
   publicDomain: str("PUBLIC_DOMAIN", "example.com"),
+  // CORS 許可オリジン（カンマ区切り。"*" で全許可。CF前段でも保険として）
+  corsOrigins: str("CORS_ORIGINS", "*"),
 } as const;
 
 export type Config = typeof config;
