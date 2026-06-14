@@ -1,0 +1,25 @@
+{
+  "name": "flights-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aviation data backend for the 1/f flights scene. Aggregates adsb.lol (ODbL 1.0) server-side and serves clients. M1: shared rate-limited round-robin poller + normalize + memory cache.",
+  "license": "MPL-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "undici": "^6.19.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.14.0"
+  }
+}
