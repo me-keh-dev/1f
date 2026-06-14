@@ -895,10 +895,7 @@ class SettingsDialog(QDialog):
         _ll.addWidget(g_lang)
         _ll.addStretch()
 
-        # === 保存（プリセットの保存・読込） ===
-        tab_save = QWidget()
-        tsl = QVBoxLayout(tab_save)
-
+        # === プリセット（シーン用→シーン設定ページ / 環境用→環境ページ に配置） ===
         self.scene_preset_group = QGroupBox(t("scene_preset"))
         g_sp_l = QVBoxLayout(self.scene_preset_group)
         sp_row1 = QHBoxLayout()
@@ -914,7 +911,6 @@ class SettingsDialog(QDialog):
         sp_row2.addWidget(self.scene_preset_combo, 1)
         sp_row2.addWidget(load_scene_btn)
         g_sp_l.addLayout(sp_row2)
-        tsl.addWidget(self.scene_preset_group)
 
         g_save_env = QGroupBox(t("env_preset"))
         g_se_l = QVBoxLayout(g_save_env)
@@ -931,9 +927,8 @@ class SettingsDialog(QDialog):
         se_row2.addWidget(self.env_combo, 1)
         se_row2.addWidget(load_env_btn)
         g_se_l.addLayout(se_row2)
-        tsl.addWidget(g_save_env)
-
-        tsl.addStretch()
+        # 環境ページ（tab_env）の末尾の伸縮の前に環境プリセットを差し込む
+        tel.insertWidget(tel.count() - 1, g_save_env)
 
         # === 人気投票 ===
         tab_poll = QWidget()
@@ -1025,6 +1020,8 @@ class SettingsDialog(QDialog):
         regen_desc.setStyleSheet("color: #888; font-size: 11px;")
         regen_desc.setWordWrap(True)
         ssl.addWidget(regen_desc)
+        # この配置を保存・読込（再配置→保存→読込が1ページで完結）
+        ssl.addWidget(self.scene_preset_group)
 
         # === サイドバー＋ページを組み立て（Chrome設定風のカテゴリ順） ===
         self._add_nav(t("nav_scenes"), self._store_page, scroll=False)
@@ -1032,7 +1029,6 @@ class SettingsDialog(QDialog):
         self._add_nav(t("tab_env"), tab_env)
         self._add_nav(t("tab_option"), tab_opt)
         self._add_nav(t("nav_language"), lang_page)
-        self._add_nav(t("tab_save"), tab_save)
         self._add_nav(t("tab_poll"), tab_poll)
         self._add_nav(t("tab_gfx_test"), tab_test)
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
