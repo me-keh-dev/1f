@@ -1779,6 +1779,11 @@ class OverlayManager:
         self.weather_monitor.signal.updated.connect(self._on_weather_update)
         if self.config.get("weather_enabled", True):
             self.weather_monitor.start()
+        # 観測地点(緯度経度)を天気と同じIP位置情報で取得し、シーンへ共用
+        # （星空など）。天気エフェクトがOFFでも一度だけ取得する。
+        self._geo = (None, None)
+        import threading as __th
+        __th.Thread(target=self._fetch_location, daemon=True).start()
 
         self.user_visible = True
         self._fullscreen_hidden = False
@@ -1801,6 +1806,11 @@ class OverlayManager:
 
     def _on_weather_update(self, state):
         """天気更新時に全画面のエフェクトを更新"""
+        # 観測地点が更新されていれば星空などへ反映（天気と同じ座標）
+        lat, lon = self.weather_monitor.get_location(fetch=False)
+        if lat is not None:
+            self._geo = (lat, lon)
+            self._push_location()
         for o in self.overlays:
             o.weather_fx.set_wind_speed(state.wind_speed or 0)
             o.weather_fx.set_weather(state.weather_state)
@@ -1816,6 +1826,28 @@ class OverlayManager:
         else:
             self.wind_sim.set_wind(user_wind)
 
+    def _fetch_location(self):
+        """IP位置情報で観測地点を取得（バックグラウンド）。取得後にシーンへ反映。"""
+        try:
+            lat, lon = self.weather_monitor.get_location(fetch=True)
+        except Exception:
+            lat, lon = None, None
+        if lat is not None:
+            self._geo = (lat, lon)
+            self._push_location()
+
+    def _push_location(self):
+        """現在の観測地点を全オーバーレイのシーンへ渡す（天気と同じ座標を共用）。"""
+        lat, lon = self._geo
+        if lat is None:
+            return
+        for o in self.overlays:
+            if getattr(o, "scene", None) is not None:
+                try:
+                    o.scene.set_location(lat, lon)
+                except Exception:
+                    pass
+
     def _create_overlays(self):
         for o in self.overlays:
             o.close()
@@ -1823,6 +1855,7 @@ class OverlayManager:
         for screen in QApplication.screens():
             overlay = ScreenOverlay(screen, self.config, self.wind_sim)
             self.overlays.append(overlay)
+        self._push_location()
 
     def _report_usage(self):
         """現在のモードの利用を記録（オプトイン時のみ）。
@@ -2038,6 +2071,7 @@ class OverlayManager:
                 self._notify_scene_gone(name, "expired")
             for o in self.overlays:
                 o._rebuild_scene()
+            self._push_location()
             return
 
         # テストモード（他の処理をスキップ）
@@ -2077,6 +2111,7 @@ class OverlayManager:
             o.config = self.config
             o._position_window()
             o._rebuild_scene()
+        self._push_location()
         # 天気ON/OFF制御
         if self.config.get("weather_enabled", True):
             if not self.weather_monitor._running:

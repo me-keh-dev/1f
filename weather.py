@@ -169,6 +169,17 @@ class WeatherMonitor:
         self.user_lon = None
         self._location_fetched_at = None  # 再取得を強制
 
+    def get_location(self, fetch=True):
+        """観測地点(lat, lon)を返す。天気監視が動いていなくても、
+        星空など他機能から位置を共用できるようにする公開API。
+        fetch=True なら未取得時にIP位置情報を取得（ブロッキング）。"""
+        if fetch and self._cached_lat is None:
+            try:
+                self._ensure_location()
+            except Exception:
+                pass
+        return self._cached_lat, self._cached_lon
+
     # --- 内部ループ ---
     def _loop(self):
         # 位置情報を取得

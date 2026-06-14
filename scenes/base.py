@@ -58,10 +58,18 @@ class BaseScene:
     """All scenes implement these methods"""
 
     weather_state = "clear"
+    geo_lat = None
+    geo_lon = None
 
     def set_weather(self, state):
         """現在の天気を伝える（毎tick、ScreenOverlayから）"""
         self.weather_state = state or "clear"
+
+    def set_location(self, lat, lon):
+        """観測地点の緯度・経度を伝える（天気と同じIP位置情報を共用）。
+        既定は no-op。実際の星空などで使うシーンが上書きする。"""
+        self.geo_lat = lat
+        self.geo_lon = lon
 
     @property
     def is_raining(self):
