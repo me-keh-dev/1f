@@ -749,7 +749,7 @@ class SettingsDialog(QDialog):
         self.fade_mode_combo.addItem(t("fade_mode_around"), "around")
         self.fade_mode_combo.addItem(t("fade_mode_whole"), "whole")
         self.fade_mode_combo.setCurrentIndex(
-            1 if self.config.get("mouse_fade_mode", "around") == "whole" else 0)
+            1 if self.config.get("mouse_fade_mode", "whole") == "whole" else 0)
         fade_mode_row.addWidget(self.fade_mode_combo)
         gml.addLayout(fade_mode_row)
         self.fade_inner_slider = self._add_slider(gml, t("fade_center"), 0, 200, self.config.get("mouse_fade_inner", 30))
@@ -1664,7 +1664,7 @@ class BackgroundOverlay(QWidget):
                     t_val = (dist - inner_r) / fade_r
                     return int(min_alpha + (255 - min_alpha) * t_val)
                 return 255
-            if po.config.get("mouse_fade_mode", "around") == "whole":
+            if po.config.get("mouse_fade_mode", "whole") == "whole":
                 _W = self.width()
                 _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
                          default=255)
@@ -1778,7 +1778,7 @@ class ScreenOverlay(QWidget):
                     t_val = (dist - inner_r) / fade_r
                     return int(min_alpha + (255 - min_alpha) * t_val)
                 return 255
-            if self.config.get("mouse_fade_mode", "around") == "whole":
+            if self.config.get("mouse_fade_mode", "whole") == "whole":
                 # 全体を透過: 帯幅で最小値を取り、全列を一律に薄くする（全シーン共通）
                 _W = self.width()
                 _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
@@ -1801,7 +1801,7 @@ class OverlayManager:
         "scatter_count": 20, "scatter_density": 20,
         "wind": 52, "slim_ratio": 74, "flower_ratio": 44,
         "palette_indices": [0],
-        "mouse_fade_enabled": True, "mouse_fade_mode": "around",
+        "mouse_fade_enabled": True, "mouse_fade_mode": "whole",
         "mouse_fade_inner": 100,
         "mouse_fade_range": 120, "mouse_fade_alpha": 0,
         "seed": 535401,
