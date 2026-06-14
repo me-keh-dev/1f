@@ -1,10 +1,10 @@
 """
 天気常時監視モジュール — WeatherMonitor
-IP位置情報(ip-api.com) + 天気予報(Open-Meteo) を組み合わせた低負荷ポーリング
+IP位置情報(ipwho.is) + 天気予報(Open-Meteo) を組み合わせた低負荷ポーリング
 
-API:
-  - ip-api.com : 無料・登録不要（位置情報）
-  - Open-Meteo : 無料・登録不要（天気予報）
+API（いずれも無料・登録不要・HTTPS）:
+  - ipwho.is   : 位置情報（https・APIキー不要）
+  - Open-Meteo : 天気予報（https・APIキー不要）
 """
 import threading
 import time
@@ -28,8 +28,8 @@ RAIN_WEATHER_CODE_MIN = 51     # WMOコード51以上 = 霧雨/雨系
 RAIN_PROBABILITY_THRESHOLD = 50  # 降水確率50%以上
 PRE_RAIN_LOOKAHEAD_HOURS = 2   # 先読み時間（時間）
 
-# 位置情報
-LOCATION_API_URL = "http://ip-api.com/json/?fields=lat,lon,city,country,status"
+# 位置情報（無料・APIキー不要・HTTPS。success/latitude/longitude/city/country を返す）
+LOCATION_API_URL = "https://ipwho.is/?fields=success,latitude,longitude,city,country"
 LOCATION_CACHE_DURATION = 24 * 60 * 60  # 24時間キャッシュ
 
 # 天気API
@@ -221,9 +221,10 @@ class WeatherMonitor:
             req.add_header("User-Agent", "1f/2.0")
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
-            if data.get("status") == "success":
-                self._cached_lat = data["lat"]
-                self._cached_lon = data["lon"]
+            # ipwho.is: 成功時 success=true, latitude/longitude を返す
+            if data.get("success") and data.get("latitude") is not None:
+                self._cached_lat = data["latitude"]
+                self._cached_lon = data["longitude"]
                 self._cached_city = data.get("city", "")
                 self._cached_country = data.get("country", "")
                 self._location_fetched_at = time.time()
