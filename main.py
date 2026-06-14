@@ -743,6 +743,15 @@ class SettingsDialog(QDialog):
         self.mouse_fade_btn.setChecked(self.config.get("mouse_fade_enabled", True))
         self.mouse_fade_btn.toggled.connect(lambda c: self.mouse_fade_btn.setText("ON" if c else "OFF"))
         gml.addWidget(self.mouse_fade_btn)
+        fade_mode_row = QHBoxLayout()
+        fade_mode_row.addWidget(QLabel(t("fade_mode")))
+        self.fade_mode_combo = QComboBox()
+        self.fade_mode_combo.addItem(t("fade_mode_around"), "around")
+        self.fade_mode_combo.addItem(t("fade_mode_whole"), "whole")
+        self.fade_mode_combo.setCurrentIndex(
+            1 if self.config.get("mouse_fade_mode", "around") == "whole" else 0)
+        fade_mode_row.addWidget(self.fade_mode_combo)
+        gml.addLayout(fade_mode_row)
         self.fade_inner_slider = self._add_slider(gml, t("fade_center"), 0, 200, self.config.get("mouse_fade_inner", 30))
         self.fade_range_slider = self._add_slider(gml, t("fade_range"), 10, 500, self.config.get("mouse_fade_range", 120))
         self.fade_alpha_slider = self._add_slider(gml, t("fade_alpha"), 0, 200, self.config.get("mouse_fade_alpha", 15))
@@ -1220,6 +1229,7 @@ class SettingsDialog(QDialog):
             "startup_random": self.startup_random_check.isChecked(),
             "stats_optin": self.stats_optin_check.isChecked(),
             "mouse_fade_enabled": self.mouse_fade_btn.isChecked(),
+            "mouse_fade_mode": self.fade_mode_combo.currentData(),
             "mouse_fade_inner": self.fade_inner_slider.value(),
             "mouse_fade_range": self.fade_range_slider.value(),
             "mouse_fade_alpha": self.fade_alpha_slider.value(),
@@ -1339,8 +1349,8 @@ class SettingsDialog(QDialog):
     # （scenes.get_preset_keys で取得）
     # 環境設定のキー
     ENV_KEYS = [
-        "wind", "sway_speed", "mouse_fade_enabled", "mouse_fade_inner",
-        "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
+        "wind", "sway_speed", "mouse_fade_enabled", "mouse_fade_mode",
+        "mouse_fade_inner", "mouse_fade_range", "mouse_fade_alpha", "lighting_mode",
         "weather_enabled", "wind_sync_enabled", "wind_sync_limit",
         "sound_sync_enabled", "sound_sync_gain", "sound_bass_gain",
         "startup_random", "scene_favorites",
@@ -1654,6 +1664,11 @@ class BackgroundOverlay(QWidget):
                     t_val = (dist - inner_r) / fade_r
                     return int(min_alpha + (255 - min_alpha) * t_val)
                 return 255
+            if po.config.get("mouse_fade_mode", "around") == "whole":
+                _W = self.width()
+                _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
+                         default=255)
+                get_alpha = lambda base_x, _m=_m: _m
         po.scene.draw_background(painter, po.ground_y, tint, get_alpha)
         painter.end()
 
@@ -1763,6 +1778,12 @@ class ScreenOverlay(QWidget):
                     t_val = (dist - inner_r) / fade_r
                     return int(min_alpha + (255 - min_alpha) * t_val)
                 return 255
+            if self.config.get("mouse_fade_mode", "around") == "whole":
+                # 全体を透過: 帯幅で最小値を取り、全列を一律に薄くする（全シーン共通）
+                _W = self.width()
+                _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
+                         default=255)
+                get_alpha = lambda base_x, _m=_m: _m
         if self.scene:
             self.scene.draw(painter, self.ground_y, tint, get_alpha)
         if self.config.get("weather_enabled", True):
@@ -1780,7 +1801,8 @@ class OverlayManager:
         "scatter_count": 20, "scatter_density": 20,
         "wind": 52, "slim_ratio": 74, "flower_ratio": 44,
         "palette_indices": [0],
-        "mouse_fade_enabled": True, "mouse_fade_inner": 100,
+        "mouse_fade_enabled": True, "mouse_fade_mode": "around",
+        "mouse_fade_inner": 100,
         "mouse_fade_range": 120, "mouse_fade_alpha": 0,
         "seed": 535401,
     }
