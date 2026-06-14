@@ -61,10 +61,13 @@ for k, _ in SCENE_MODES:
     dlg._update_tabs_for_scene(k)
     n_tabs = len(dlg._scene_tabs.get(k, []))
     check(n_tabs >= 1, f"{k}: has {n_tabs} settings tab(s)")
-    # 先頭タブが当該シーンのものになっている
-    first = dlg.tabs.widget(0)
-    check(any(first is w for w, _ in dlg._scene_tabs[k]),
-          f"{k}: scene tab is inserted first")
+    # シーン設定ページの内側タブが当該シーンの設定になっている
+    check(dlg._scene_inner.count() == n_tabs,
+          f"{k}: scene-settings inner tab count = {dlg._scene_inner.count()}")
+    if n_tabs:
+        first = dlg._scene_inner.widget(0)
+        check(any(first is w for w, _ in dlg._scene_tabs[k]),
+              f"{k}: scene tab shown in scene-settings page")
     # preset_keys は gather 出力（+seed）に含まれる
     missing = [p for p in get_preset_keys(k)
                if p != "seed" and p not in cfg]
@@ -102,8 +105,8 @@ dlg2 = main.SettingsDialog(
     on_save=lambda c, d: None,
     on_load=lambda c, n: None,
 )
-check(dlg2.tabs.tabText(0) == "Deep Sea Settings",
-      f"en shark tab label = {dlg2.tabs.tabText(0)}")
+check(dlg2._scene_inner.tabText(0) == "Deep Sea Settings",
+      f"en shark tab label = {dlg2._scene_inner.tabText(0)}")
 set_language("ja")
 
 print()

@@ -307,41 +307,67 @@ class NoWheelSlider(QSlider):
     def wheelEvent(self, event):
         event.ignore()
 
-# --- 設定画面のスキン（QSSテーマ） ---
+# --- 設定画面のスキン（QSSテーマ・モダンWeb UI風） ---
+_FONT_STACK = ('"Segoe UI Variable", "Segoe UI", "Yu Gothic UI", '
+               '"Hiragino Sans", "Noto Sans JP", sans-serif')
+
+
 def _make_qss(c):
-    """色セット c から設定ダイアログ用の QSS を生成する"""
+    """色セット c からモダンな設定ダイアログ用の QSS を生成する"""
+    c = dict(c, font=_FONT_STACK)
     return """
+    * {{ font-family: {font}; font-size: 13px; color: {text}; }}
     QDialog {{ background: {bg}; }}
-    QLabel {{ color: {text}; background: transparent; }}
-    QTabWidget::pane {{ border: 1px solid {border}; border-radius: 8px;
-        background: {panel}; top: -1px; }}
-    QTabBar::tab {{ background: {bg}; color: {text}; padding: 6px 12px;
-        border-top-left-radius: 8px; border-top-right-radius: 8px;
-        margin-right: 2px; }}
-    QTabBar::tab:selected {{ background: {panel}; color: {text};
-        border: 1px solid {border}; border-bottom: 2px solid {accent}; }}
-    QTabBar::tab:hover {{ background: {panel}; }}
+    QLabel {{ background: transparent; }}
+
+    /* 左カテゴリのサイドバー */
+    QListWidget#settings_sidebar {{ background: {bg}; border: none;
+        outline: 0; padding: 8px 6px; }}
+    QListWidget#settings_sidebar::item {{ padding: 9px 12px; border-radius: 8px;
+        margin: 2px 0; color: {text}; }}
+    QListWidget#settings_sidebar::item:hover {{ background: {hover}; }}
+    QListWidget#settings_sidebar::item:selected {{ background: {accent_soft};
+        color: {accent_text}; font-weight: 600; }}
+
+    /* セクションをカード風に */
     QGroupBox {{ background: {panel}; border: 1px solid {border};
-        border-radius: 8px; margin-top: 10px; padding-top: 10px;
-        font-weight: 600; color: {text}; }}
-    QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+        border-radius: 12px; margin-top: 16px; padding: 14px 14px 10px 14px;
+        font-weight: 600; }}
+    QGroupBox::title {{ subcontrol-origin: margin; left: 14px; top: 2px;
+        padding: 0 4px; color: {muted}; font-size: 12px; }}
+
     QPushButton {{ background: {accent}; color: {on_accent}; border: none;
-        border-radius: 6px; padding: 6px 12px; }}
+        border-radius: 8px; padding: 7px 14px; font-weight: 600; }}
     QPushButton:hover {{ background: {accent_hover}; }}
     QPushButton:pressed, QPushButton:checked {{ background: {accent_hover}; }}
-    QComboBox {{ background: {field}; color: {text}; border: 1px solid {border};
-        border-radius: 6px; padding: 3px 8px; }}
+
+    QComboBox {{ background: {field}; border: 1px solid {border};
+        border-radius: 8px; padding: 6px 10px; min-height: 18px; }}
     QComboBox:hover {{ border-color: {accent}; }}
-    QComboBox QAbstractItemView {{ background: {field}; color: {text};
-        selection-background-color: {accent}; selection-color: {on_accent}; }}
-    QCheckBox {{ color: {text}; spacing: 6px; background: transparent; }}
+    QComboBox::drop-down {{ border: none; width: 22px; }}
+    QComboBox QAbstractItemView {{ background: {field}; border: 1px solid {border};
+        border-radius: 8px; padding: 4px;
+        selection-background-color: {accent_soft};
+        selection-color: {accent_text}; outline: 0; }}
+
+    QCheckBox {{ spacing: 8px; background: transparent; padding: 2px 0; }}
     QScrollArea {{ border: none; background: transparent; }}
-    QScrollArea > QWidget > QWidget {{ background: {panel}; }}
-    QSlider::groove:horizontal {{ height: 4px; background: {groove};
-        border-radius: 2px; }}
-    QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 2px; }}
+    QScrollArea > QWidget > QWidget {{ background: transparent; }}
+    QStackedWidget {{ background: {bg}; }}
+
+    QSlider::groove:horizontal {{ height: 5px; background: {groove};
+        border-radius: 3px; }}
+    QSlider::sub-page:horizontal {{ background: {accent}; border-radius: 3px; }}
     QSlider::handle:horizontal {{ background: {field}; border: 2px solid {accent};
-        width: 14px; height: 14px; margin: -6px 0; border-radius: 9px; }}
+        width: 15px; height: 15px; margin: -6px 0; border-radius: 9px; }}
+    QSlider::handle:horizontal:hover {{ background: {accent_soft}; }}
+
+    QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
+    QScrollBar::handle:vertical {{ background: {border}; border-radius: 5px;
+        min-height: 24px; }}
+    QScrollBar::handle:vertical:hover {{ background: {muted}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
     """.format(**c)
 
 
@@ -349,15 +375,21 @@ UI_SKINS = {
     "natural": _make_qss(dict(
         bg="#eef2ef", panel="#fbfcfb", field="#ffffff", text="#36413a",
         border="#dde3df", groove="#d8dfda", accent="#6bb758",
-        accent_hover="#5aa648", on_accent="#ffffff")),
+        accent_hover="#5aa648", on_accent="#ffffff",
+        hover="#e2e8e3", accent_soft="#e3f1de", accent_text="#2f6a2a",
+        muted="#7c857f")),
     "dark": _make_qss(dict(
-        bg="#2b2f33", panel="#363b40", field="#3f464c", text="#e6ebe8",
-        border="#474e54", groove="#4a5258", accent="#6bb758",
-        accent_hover="#7cc869", on_accent="#10140f")),
+        bg="#23272b", panel="#2e3338", field="#3a4147", text="#e6ebe8",
+        border="#454c52", groove="#454c52", accent="#6bb758",
+        accent_hover="#7cc869", on_accent="#10140f",
+        hover="#31373c", accent_soft="#33463a", accent_text="#9fe08c",
+        muted="#98a1a0")),
     "sakura": _make_qss(dict(
         bg="#fbeef2", panel="#fffafc", field="#ffffff", text="#5a4750",
         border="#f0d9e1", groove="#f2dde4", accent="#e58aa6",
-        accent_hover="#d97a98", on_accent="#ffffff")),
+        accent_hover="#d97a98", on_accent="#ffffff",
+        hover="#f6e2ea", accent_soft="#fbe0e9", accent_text="#b85878",
+        muted="#9b8088")),
 }
 DEFAULT_SKIN = "natural"
 
@@ -648,10 +680,8 @@ class SettingsDialog(QDialog):
         from PyQt5.QtWidgets import QSplitter
         self._apply_skin()   # 設定画面のスキン（テーマ）を適用
         layout = QVBoxLayout(self)
-        title = QLabel(t("settings_title"))
-        title.setFont(QFont("Meiryo", 12, QFont.Bold))
-        title.setAlignment(Qt.AlignCenter)
-        layout.addWidget(title)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         # シーン選択は右の「シーン」パネル（グリッド）で行うため、選択用の
         # プルダウンは表示しない。ただし現在シーンの管理・設定タブ切替・プリセット
@@ -665,20 +695,17 @@ class SettingsDialog(QDialog):
 
         self._initial_scene = self.config.get("scene_mode", "grass")
 
-        # 左右レイアウト
+        # Chrome設定風: 左カテゴリのサイドバー＋右ページ（スタック）
+        from PyQt5.QtWidgets import QListWidget, QStackedWidget
         hbox = QHBoxLayout()
         layout.addLayout(hbox)
-
-        # 左: メイン設定タブ
-        self.tabs = tabs = QTabWidget()
-        tabs.setMinimumWidth(380)
-        hbox.addWidget(tabs, 1)
-
-        # 右: オプション・テスト・シーン（アイコングリッド）タブ
-        # シーンタイル3つ＋余白がスクロールせず横に並ぶ幅を確保
-        tabs2 = QTabWidget()
-        tabs2.setMinimumWidth(440)
-        hbox.addWidget(tabs2, 1)
+        self.sidebar = QListWidget()
+        self.sidebar.setFixedWidth(150)
+        self.sidebar.setObjectName("settings_sidebar")
+        hbox.addWidget(self.sidebar)
+        self.pages = QStackedWidget()
+        self.pages.setMinimumWidth(480)   # シーンタイル3列が横に並ぶ幅
+        hbox.addWidget(self.pages, 1)
 
         # === シーン別設定タブ（各シーンモジュールが build_settings で提供） ===
         # key -> [(widget, タブ名), ...]。表示は _update_tabs_for_scene が行う
@@ -746,10 +773,9 @@ class SettingsDialog(QDialog):
         self.auto_update_check.toggled.connect(self._on_slider_changed)
         g_sl.addWidget(self.auto_update_check)
         tel.addWidget(g_startup)
+        tel.addStretch()
 
-        tabs.addTab(tab_env, t("tab_env"))
-
-        # === タブ4: オプション ===
+        # === オプション ===
         tab_opt = QWidget()
         tol = QVBoxLayout(tab_opt)
 
@@ -864,9 +890,8 @@ class SettingsDialog(QDialog):
         tol.addWidget(g_skin)
 
         tol.addStretch()
-        tabs2.addTab(tab_opt, t("tab_option"))
 
-        # === タブ5: 保存 ===
+        # === 保存 ===
         tab_save = QWidget()
         tsl = QVBoxLayout(tab_save)
 
@@ -914,9 +939,8 @@ class SettingsDialog(QDialog):
         tsl.addWidget(g_save_env)
 
         tsl.addStretch()
-        tabs.addTab(tab_save, t("tab_save"))
 
-        # === タブ: 人気投票 ===
+        # === 人気投票 ===
         tab_poll = QWidget()
         tpl = QVBoxLayout(tab_poll)
         self.stats_optin_check = QCheckBox(t("stats_optin"))
@@ -954,12 +978,10 @@ class SettingsDialog(QDialog):
             self.poll_status.setText(t("stats_loading"))
             stats.fetch_stats(self.config.get("stats_url"),
                               self.stats_received.emit)
-        tabs.addTab(tab_poll, t("tab_poll"))
+        # === シーン（アイコングリッド） ===
+        self._store_page = self._build_store_tab()
 
-        # === タブ: シーンストア（右ペインの先頭・デフォルト表示） ===
-        self._build_store_tab(tabs2)
-
-        # === 2段目: グラフィックテスト ===
+        # === グラフィックテスト ===
         tab_test = QWidget()
         ttl = QVBoxLayout(tab_test)
 
@@ -994,12 +1016,39 @@ class SettingsDialog(QDialog):
         ttl.addWidget(g_ltest)
 
         ttl.addStretch()
-        tabs2.addTab(tab_test, t("tab_gfx_test"))
 
-        # 初期シーンに応じてタブ表示を調整
+        # === シーン設定ページ（選択中シーンの設定を内側タブでまとめる） ===
+        self._scene_inner = QTabWidget()
+        scene_settings_page = QWidget()
+        ssl = QVBoxLayout(scene_settings_page)
+        ssl.setContentsMargins(0, 0, 0, 0)
+        ssl.addWidget(self._scene_inner)
+
+        # === サイドバー＋ページを組み立て（Chrome設定風のカテゴリ順） ===
+        self._add_nav(t("nav_scenes"), self._store_page, scroll=False)
+        self._add_nav(t("nav_scene_settings"), scene_settings_page, scroll=False)
+        self._add_nav(t("tab_env"), tab_env)
+        self._add_nav(t("tab_option"), tab_opt)
+        self._add_nav(t("tab_save"), tab_save)
+        self._add_nav(t("tab_poll"), tab_poll)
+        self._add_nav(t("tab_gfx_test"), tab_test)
+        self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.sidebar.setCurrentRow(0)   # 既定で「シーン」を表示
+
         self._update_tabs_for_scene(self._initial_scene)
-        # シーングリッド3列が見える初期サイズ
-        self.resize(900, 580)
+        self.resize(860, 600)
+
+    def _add_nav(self, label, widget, scroll=True):
+        """サイドバーに1カテゴリ＋対応ページを追加（必要ならスクロール包み）"""
+        from PyQt5.QtWidgets import QScrollArea
+        if scroll:
+            sa = QScrollArea()
+            sa.setWidgetResizable(True)
+            sa.setFrameShape(QScrollArea.NoFrame)
+            sa.setWidget(widget)
+            widget = sa
+        self.pages.addWidget(widget)
+        self.sidebar.addItem(label)
 
     def _on_sound_sync_toggled(self, checked):
         self.sound_sync_btn.setText("ON" if checked else "OFF")
@@ -1222,15 +1271,15 @@ class SettingsDialog(QDialog):
         self.on_apply({"scene_mode": scene})
 
     def _update_tabs_for_scene(self, scene):
-        """シーンに応じてタブを切り替え（現在シーンのタブを先頭に挿す）"""
-        tabs = self.tabs
-        all_scene_widgets = {w for pairs in self._scene_tabs.values()
-                             for w, _ in pairs}
-        for i in range(tabs.count() - 1, -1, -1):
-            if tabs.widget(i) in all_scene_widgets:
-                tabs.removeTab(i)
-        for i, (widget, label) in enumerate(self._scene_tabs.get(scene, [])):
-            tabs.insertTab(i, widget, label)
+        """「シーン設定」ページの内側タブを、選択中シーンの設定に切り替える"""
+        inner = self._scene_inner
+        while inner.count():
+            inner.removeTab(0)   # widget は _scene_tabs が保持（破棄しない）
+        pairs = self._scene_tabs.get(scene, [])
+        for widget, label in pairs:
+            inner.addTab(widget, label)
+        # タブが1枚だけならタブバーは隠してすっきり（Chrome風）
+        inner.tabBar().setVisible(len(pairs) > 1)
 
     def _on_lighting_changed(self):
         mode = self.lighting_combo.currentData()
@@ -1280,7 +1329,7 @@ class SettingsDialog(QDialog):
             self.on_load("env", name)
 
     # --- シーンストア（アイコングリッド: ライブプレビュー・クリック再生・お試し） ---
-    def _build_store_tab(self, tabs):
+    def _build_store_tab(self):
         from PyQt5.QtWidgets import QScrollArea, QGridLayout
         tab = QWidget()
         outer = QVBoxLayout(tab)
@@ -1300,15 +1349,14 @@ class SettingsDialog(QDialog):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
         scroll.setWidget(tab)
         holder = QWidget()
         hl = QVBoxLayout(holder)
         hl.setContentsMargins(0, 0, 0, 0)
         hl.addWidget(scroll)
-        # 右ペインの先頭に置き、設定を開いたとき最初にショップが見える
-        tabs.insertTab(0, holder, t("tab_store"))
-        tabs.setCurrentIndex(0)
         self._reload_store()
+        return holder
 
     def _clear_layout(self, layout):
         while layout.count():
@@ -2197,12 +2245,12 @@ def main():
         tray.setToolTip(t("tooltip").format(hotkey=hotkey_label))
         if settings_dialog and settings_dialog.isVisible():
             pos = settings_dialog.pos()
-            tab_i = settings_dialog.tabs.currentIndex()
+            row = settings_dialog.sidebar.currentRow()
             settings_dialog.close()
             settings_dialog = None
             open_settings()
             settings_dialog.move(pos)
-            settings_dialog.tabs.setCurrentIndex(tab_i)
+            settings_dialog.sidebar.setCurrentRow(max(row, 0))
 
     menu = QMenu()
     hotkey_label = "Cmd+Ctrl+Shift+W" if sys.platform == "darwin" else "Win+Ctrl+Shift+W"
