@@ -458,7 +458,7 @@ class SceneTile(QWidget):
     HEART_R = 13   # ハートボタンの当たり半径
 
     def __init__(self, key, label, owned, price, url, on_play, on_trial,
-                 favorited=False, on_favorite=None, parent=None):
+                 favorited=False, on_favorite=None, on_acquire=None, parent=None):
         super().__init__(parent)
         self.key = key
         self.label = label
@@ -467,6 +467,7 @@ class SceneTile(QWidget):
         self.url = url
         self.on_play = on_play
         self.on_trial = on_trial
+        self.on_acquire = on_acquire
         self.favorited = favorited
         self.on_favorite = on_favorite
         self._hover = False
@@ -558,8 +559,10 @@ class SceneTile(QWidget):
             return
         if self.owned:
             self.on_play(self.key)
-        else:
-            self.on_trial(self.key, self.url)
+        elif self.price > 0:
+            self.on_trial(self.key, self.url)        # 有料 → お試し10秒
+        elif self.on_acquire:
+            self.on_acquire(self.key, self.url)      # 無料 → 入手（所有）
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -1390,7 +1393,9 @@ class SettingsDialog(QDialog):
             tiles.append(SceneTile(
                 c.get("key"), nm, False, int(c.get("price") or 0), c.get("url"),
                 self._on_tile_play, self._on_tile_trial,
-                favorited=(c.get("key") in favs), on_favorite=self._on_tile_favorite))
+                favorited=(c.get("key") in favs),
+                on_favorite=self._on_tile_favorite,
+                on_acquire=self._on_tile_acquire))
         # お気に入りを先頭に（メルカリのお気に入り上位表示風）
         tiles.sort(key=lambda tl: not tl.favorited)
         # グリッド配置（3列）
@@ -1420,6 +1425,24 @@ class SettingsDialog(QDialog):
         """未購入シーンのタイルをクリック → 10秒お試し"""
         if url:
             self.on_apply({"_trial": {"key": key, "url": url}})
+
+    def _on_tile_acquire(self, key, url):
+        """無料シーンのタイルをクリック → 入手（署名検証してインストール→所有）"""
+        from PyQt5.QtWidgets import QMessageBox
+        from scenes import _collab
+        if not url:
+            return
+        try:
+            _collab.install_scene(url)
+        except Exception as e:
+            QMessageBox.warning(self, t("tab_store"),
+                                t("store_get_failed").format(err=str(e)))
+            return
+        self.on_apply({"_rescan": True})   # 一覧に追加・オーバーレイ更新
+        self._refresh_scene_combo()
+        self._reload_store()               # 所有タイルに変わる
+        # 入手したシーンをそのまま再生
+        self._on_tile_play(key)
 
     def _on_install(self, url):
         from PyQt5.QtWidgets import QMessageBox

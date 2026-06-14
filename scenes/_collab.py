@@ -42,6 +42,10 @@ MODE_FORMAT = 1
 # 既定取得先。version.json と同じ Cloudflare Pages。未配置(404)なら何もしない。
 DEFAULT_REVOKE_URL = "https://1f-updates.pages.dev/revoked.json"
 
+# ストアの配布カタログの既定取得先（config の store_catalog_url で上書き可）。
+# 未配置(404)なら空＝ストアには所有シーンだけが並ぶ。
+DEFAULT_CATALOG_URL = "https://1f-updates.pages.dev/catalog.json"
+
 
 def _verify_rsa(msg, sig, pubkey):
     """RSA-PKCS#1 v1.5 / SHA-256 署名検証（純標準ライブラリ）"""
@@ -268,6 +272,7 @@ def fetch_catalog(url):
     """配布カタログ（JSON 配列）を取得する。各要素:
       {key, name:{ja,en}, desc:{ja,en}, available:{from,until}, url, price?}
     取得失敗・未設定は空リスト（ストア未稼働でも UI が壊れない）。"""
+    url = url or DEFAULT_CATALOG_URL
     if not url:
         return []
     import urllib.request
