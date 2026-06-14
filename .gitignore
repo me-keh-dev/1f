@@ -14,6 +14,20 @@ debug.py
 .venv/
 venv/
 .env
+# ===== 秘密情報は絶対にコミットしない（OSS公開リポジトリ）=====
+.ssh/
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+id_ecdsa*
+*_key
+CONOHA_ACCESS.md
+CONOHA*.md
+*.secret
+secrets/
+flight_tracker/*.db
+flight_tracker/logs/
 dist_update/
 .wrangler/
 _MEI*/
