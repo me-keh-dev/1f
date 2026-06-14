@@ -27,6 +27,7 @@ CONOHA*.md
 *.secret
 secrets/
 flight_tracker/*.db
+flight_tracker/airports.csv
 flight_tracker/logs/
 dist_update/
 .wrangler/
