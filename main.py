@@ -1019,10 +1019,15 @@ class SettingsDialog(QDialog):
         ssl = QVBoxLayout(scene_settings_page)
         ssl.setContentsMargins(0, 0, 0, 0)
         ssl.addWidget(self._scene_inner)
+        btn_row = QHBoxLayout()
         regen_btn = QPushButton(t("scene_regen"))
         regen_btn.clicked.connect(self._on_regenerate)
-        ssl.addWidget(regen_btn)
-        regen_desc = QLabel(t("scene_regen_desc"))
+        btn_row.addWidget(regen_btn)
+        reset_btn = QPushButton(t("scene_reset"))
+        reset_btn.clicked.connect(self._on_reset_defaults)
+        btn_row.addWidget(reset_btn)
+        ssl.addLayout(btn_row)
+        regen_desc = QLabel(t("scene_regen_desc") + "  /  " + t("scene_reset_desc"))
         regen_desc.setStyleSheet("color: #888; font-size: 11px;")
         regen_desc.setWordWrap(True)
         ssl.addWidget(regen_desc)
@@ -1296,6 +1301,36 @@ class SettingsDialog(QDialog):
         cfg["seed"] = random.randint(0, 999999)
         self.on_apply(cfg)
 
+    def _on_reset_defaults(self):
+        """選択中シーンの設定を、おすすめの初期値に戻す。
+        仕組み: そのシーンのキー（preset_keys＋scale_key）を config から外すと、
+        build_settings の config.get(key, 既定) が既定値を返す。設定ウィジェットを
+        作り直して既定値で表示し、適用する。"""
+        scene = self.scene_combo.currentData()
+        keys = set(get_preset_keys(scene) or [])
+        sk = get_scale_key(scene)
+        if sk:
+            keys.add(sk)
+        for k in keys:
+            self.config.pop(k, None)
+        # このシーンの設定ウィジェットを既定値で作り直す
+        info = get_scene_info(scene)
+        builder = info.get("build_settings") if info else None
+        if builder:
+            old = self._scene_tabs.get(scene, [])
+            try:
+                self._scene_tabs[scene] = builder(self)
+            except Exception:
+                import traceback
+                traceback.print_exc()
+                self._scene_tabs[scene] = old
+                old = []
+            self._update_tabs_for_scene(scene)
+            for w, _label in old:
+                w.deleteLater()
+        # 既定値を適用（シーン再構築）
+        self.on_apply(self._gather_config())
+
     def _on_apply(self):
         cfg = self._gather_config()
         self.on_apply(cfg)
@@ -1456,10 +1491,21 @@ class SettingsDialog(QDialog):
                 on_acquire=self._on_tile_acquire))
         # お気に入りを先頭に（メルカリのお気に入り上位表示風）
         tiles.sort(key=lambda tl: not tl.favorited)
-        # グリッド配置（3列）
+        # グリッド配置（3列）。各タイルの下にシーン名のキャプション（iPhoneアプリ風）
         cols = 3
         for i, tile in enumerate(tiles):
-            self.store_grid.addWidget(tile, i // cols, i % cols)
+            cell = QWidget()
+            cv = QVBoxLayout(cell)
+            cv.setContentsMargins(0, 0, 0, 0)
+            cv.setSpacing(3)
+            cv.addWidget(tile, 0, Qt.AlignHCenter)
+            cap = QLabel(tile.label)
+            cap.setAlignment(Qt.AlignHCenter)
+            cap.setWordWrap(True)
+            cap.setFixedWidth(SceneTile.THUMB_W)
+            cap.setStyleSheet("font-size: 12px; font-weight: 500;")
+            cv.addWidget(cap, 0, Qt.AlignHCenter)
+            self.store_grid.addWidget(cell, i // cols, i % cols, Qt.AlignTop)
 
     def _on_tile_favorite(self, key, on):
         """ハートのトグル: お気に入りを config に保存（再描画はしない）"""

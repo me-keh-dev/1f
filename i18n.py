@@ -88,6 +88,8 @@ TEXTS = {
         "about_privacy": "プライバシー: 個人を特定する情報は収集しません。匿名の利用統計・エラー報告はオプトイン（任意）です。",
         "scene_regen": "別の配置にする",
         "scene_regen_desc": "同じ設定のまま、草や物の配置をランダムに作り直します。",
+        "scene_reset": "おすすめ設定に戻す",
+        "scene_reset_desc": "このシーンの設定を、おすすめの初期値に戻します。",
         "store_not_ready": "購入機能は準備中です。もうしばらくお待ちください。",
         "store_get_failed": "入手に失敗しました: {err}",
         # コラボシーンの期限終了通知
@@ -247,6 +249,8 @@ TEXTS = {
         "about_privacy": "Privacy: no personally identifying information is collected. Anonymous usage stats and error reports are opt-in.",
         "scene_regen": "Shuffle layout",
         "scene_regen_desc": "Re-randomize the arrangement of grass and objects, keeping your settings.",
+        "scene_reset": "Reset to defaults",
+        "scene_reset_desc": "Restore this scene's settings to the recommended defaults.",
         "store_not_ready": "Purchasing is not available yet. Please wait a little longer.",
         "store_get_failed": "Failed to get: {err}",
         # Collab scene expiry notice
