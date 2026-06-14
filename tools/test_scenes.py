@@ -37,7 +37,7 @@ def check(cond, msg):
 print("== registered scenes ==")
 keys = [i["key"] for i in scene_registry()]
 print(" ", keys)
-check(keys[:7] == ["grass", "aquarium", "tokaido", "pooh", "takibi",
+check(keys[:6] == ["grass", "aquarium", "tokaido", "takibi",
                    "skating", "shark"],
       "public modes keep the legacy fixed order")
 

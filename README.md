@@ -46,7 +46,7 @@
 
 #### 仮説の射程：「意味の有無」ではなく「能動的関与の要否」
 
-本アプリは草のほか、水槽・キャンプ・風船などの**テーマ**も提供します。これらは意味的・表象的なコンテンツを含みます。開発者の体験的な見立てとして、集中を妨げるかどうかを分けるのは「意味の有無」よりも **「能動的な関与・目標追跡を要求するか否か」** ではないか、と考えています。
+本アプリは草のほか、水槽・キャンプなどの**テーマ**も提供します。これらは意味的・表象的なコンテンツを含みます。開発者の体験的な見立てとして、集中を妨げるかどうかを分けるのは「意味の有無」よりも **「能動的な関与・目標追跡を要求するか否か」** ではないか、と考えています。
 
 - **受動的に眺められるもの**（揺れる草のような抽象的なゆらぎ、ぼんやり眺める水槽など）は、意味を含んでいても集中を妨げにくい**かもしれない**。
 - **能動的な関与を要する刺激**（集中して行うゲーム、視聴を要する動画など）は集中を妨げると考えられ、**射程外**です。
@@ -183,7 +183,7 @@ We separate the inspiration from its limits honestly, and treat the effect as an
 
 #### Scope of the hypothesis: not "meaning" but "whether active engagement is required"
 
-Beyond grass, the app offers themes such as an aquarium, a campsite, and balloons, which contain meaningful/representational content. As a developer's experiential guess, what seems to separate "distracting" from "not distracting" may be **whether a stimulus demands active engagement / goal-tracking**, rather than whether it carries meaning:
+Beyond grass, the app offers themes such as an aquarium and a campsite, which contain meaningful/representational content. As a developer's experiential guess, what seems to separate "distracting" from "not distracting" may be **whether a stimulus demands active engagement / goal-tracking**, rather than whether it carries meaning:
 
 - Things you can **watch passively** (swaying grass, an aquarium you glance at) might not break focus even if they are meaningful.
 - Stimuli that **demand active engagement** (a game you concentrate on, a video you have to watch) are thought to harm focus and are **out of scope**.

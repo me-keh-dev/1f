@@ -5,7 +5,7 @@
 // POST /errlog {ver, skeleton, platform, os, log} → 匿名エラーログを保存
 // 保存するのは匿名ID（uuid4 hex）とモード名だけ。個人情報なし。
 
-const SCENES = ["grass", "aquarium", "tokaido", "pooh", "takibi", "skating", "shark"];
+const SCENES = ["grass", "aquarium", "tokaido", "takibi", "skating", "shark"];
 
 export default {
   async fetch(req, env) {

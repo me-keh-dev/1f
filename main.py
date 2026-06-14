@@ -1408,8 +1408,7 @@ class SettingsDialog(QDialog):
 
         gc = QGroupBox(t("about_credits"))
         gcl = QVBoxLayout(gc)
-        for key in ("about_credit_pooh", "about_credit_weather",
-                    "about_credit_ui"):
+        for key in ("about_credit_weather", "about_credit_ui"):
             lbl = QLabel("・" + t(key))
             lbl.setWordWrap(True)
             lbl.setStyleSheet("color: #666; font-size: 11px;")

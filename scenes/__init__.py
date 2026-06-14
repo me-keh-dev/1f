@@ -36,7 +36,7 @@ from i18n import register_texts
 DEFAULT_SCENE = "grass"
 
 # 旧来の固定順を維持するための表示順（SCENE["order"]）
-# grass=10, aquarium=20, tokaido=30, pooh=40, takibi=50, skating=60, shark=70
+# grass=10, aquarium=20, tokaido=30, takibi=50, skating=60, shark=70
 
 _REGISTRY = {}   # key -> SCENE辞書（"module"を追記）
 
