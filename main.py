@@ -660,12 +660,8 @@ class SettingsDialog(QDialog):
         self.scene_combo.hide()
         self._refresh_scene_combo(self.config.get("scene_mode", "grass"))
         self.scene_combo.currentIndexChanged.connect(self._on_scene_changed)
-        # 現在のシーン名だけ控えめに表示
-        self.current_scene_label = QLabel()
-        self.current_scene_label.setAlignment(Qt.AlignCenter)
-        self.current_scene_label.setStyleSheet("color:#888; font-size:11px;")
-        layout.addWidget(self.current_scene_label)
-        self._update_current_scene_label()
+        # 上部のシーン選択文言は表示しない（選択は右の「シーン」パネルで）
+        self.current_scene_label = None
 
         self._initial_scene = self.config.get("scene_mode", "grass")
 
@@ -1289,8 +1285,7 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         outer = QVBoxLayout(tab)
         desc = QLabel(t("store_desc"))
-        desc.setStyleSheet("color: #666; font-size: 10px;")
-        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 16px; font-weight: 600;")
         outer.addWidget(desc)
 
         self.store_grid_host = QWidget()

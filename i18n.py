@@ -55,8 +55,7 @@ TEXTS = {
         "stats_privacy": "送信されるのは匿名IDとお気に入りモードだけです。",
         # シーンストア
         "tab_store": "シーン",
-        "store_desc": "コラボや限定のシーンを入手・管理できます。入手したシーンは"
-                      "シーンモードの一覧に追加され、期間限定のものは終了日に自動で消えます。",
+        "store_desc": "シーンを選択",
         "store_available": "入手できるシーン",
         "store_owned": "入手済みのシーン",
         "store_refresh": "更新",
@@ -200,9 +199,7 @@ TEXTS = {
         "stats_privacy": "Only an anonymous ID and your favorite scenes are sent.",
         # Scene store
         "tab_store": "Scenes",
-        "store_desc": "Get and manage collab / limited scenes. Acquired scenes "
-                      "are added to the scene list; limited-time ones disappear "
-                      "automatically on their end date.",
+        "store_desc": "Choose a scene",
         "store_available": "Available scenes",
         "store_owned": "Your scenes",
         "store_refresh": "Refresh",
