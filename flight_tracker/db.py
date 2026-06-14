@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS raw_positions (
 );
 CREATE INDEX IF NOT EXISTS idx_raw_icao24    ON raw_positions(icao24);
 CREATE INDEX IF NOT EXISTS idx_raw_timestamp ON raw_positions(timestamp);
+CREATE INDEX IF NOT EXISTS idx_raw_collected ON raw_positions(collected_at);
 
 CREATE TABLE IF NOT EXISTS flight_routes (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -99,6 +99,48 @@ def route_detail(rid):
     return jsonify(out)
 
 
+@app.get("/api/live")
+def live():
+    """最新スナップショット（直近ポーリング）の飛行中機体。クライアントの
+    ライブ地図用。bbox=lat_min,lon_min,lat_max,lon_max（任意・経度は反子午線可）。
+    フィールドは小さく: i=icao24 c=callsign o=country la/lo=緯度経度
+    al=気圧高度(m) v=速度(m/s) tr=真方位(deg) t=OpenSky時刻(unix)。"""
+    try:
+        limit = min(5000, max(1, int(request.args.get("limit", "2000"))))
+    except ValueError:
+        return jsonify(error="limit must be integer"), 400
+
+    where = ["on_ground = 0", "latitude IS NOT NULL", "longitude IS NOT NULL",
+             "collected_at = (SELECT MAX(collected_at) FROM raw_positions)"]
+    params = []
+    bbox = request.args.get("bbox")
+    if bbox:
+        try:
+            la1, lo1, la2, lo2 = [float(x) for x in bbox.split(",")]
+        except (ValueError, TypeError):
+            return jsonify(error="bbox=lat_min,lon_min,lat_max,lon_max"), 400
+        lo, hi = min(la1, la2), max(la1, la2)
+        where.append("latitude BETWEEN ? AND ?"); params += [lo, hi]
+        if lo1 <= lo2:                       # 通常
+            where.append("longitude BETWEEN ? AND ?"); params += [lo1, lo2]
+        else:                                # 反子午線をまたぐ
+            where.append("(longitude >= ? OR longitude <= ?)"); params += [lo1, lo2]
+
+    sql = ("SELECT icao24,callsign,origin_country,latitude,longitude,"
+           "baro_altitude,velocity,true_track,timestamp FROM raw_positions "
+           "WHERE " + " AND ".join(where) + " LIMIT ?")
+    params.append(limit)
+    db = _db()
+    snap = db.execute("SELECT MAX(collected_at) m FROM raw_positions").fetchone()["m"]
+    rows = db.execute(sql, params).fetchall()
+    ac = [{"i": r["icao24"], "c": (r["callsign"] or "").strip(),
+           "o": r["origin_country"], "la": r["latitude"], "lo": r["longitude"],
+           "al": r["baro_altitude"], "v": r["velocity"], "tr": r["true_track"],
+           "t": r["timestamp"]} for r in rows]
+    return jsonify(count=len(ac), snapshot=snap, aircraft=ac,
+                   attribution=ATTRIBUTION)
+
+
 @app.get("/api/stats")
 def stats():
     db = _db()
