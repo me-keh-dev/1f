@@ -266,6 +266,19 @@ SPIN_POSES = ["spin", "spin_sit", "spin_camel", "spin_donut", "spin_biellmann"]
 # 背景・氷の色（夜の凍った湖）。実際のリンクの氷は白に近い
 ICE_COLOR = (208, 220, 232)
 ICE_EDGE = (240, 248, 255)
+
+
+def _temper_ice_tint(tint, k=0.30):
+    """明け方・夕焼けの暖色tintで氷（リンク）が真っ赤になりすぎないよう、
+    暖色のときだけ氷面用に彩度を少し落とす（明るさ=平均は保つ）。
+    寒色（夜の青）はそのまま。"""
+    if tint is None:
+        return None
+    r, g, b = tint
+    if r <= b:                       # 寒色寄り（夜）は触らない
+        return tint
+    m = (r + g + b) / 3.0
+    return (r + (m - r) * k, g + (m - g) * k, b + (m - b) * k)
 BANK_COLOR = (170, 185, 205)
 TREE_COLOR = (16, 28, 42)
 TREE_SNOW = (175, 192, 215)
@@ -814,15 +827,16 @@ class SkatingScene(BaseScene):
             painter.fillRect(x, bank_top - bump, seg, self.bank_h + bump, c)
             x += seg
 
-        # 氷面
+        # 氷面（明け方・夕焼けは赤を少し抑えた専用tint）
+        ice_tint = _temper_ice_tint(tint)
         x = 0
         while x < self.width:
             alpha = get_alpha(x) if get_alpha else 255
-            c = apply_tint(QColor(*ICE_COLOR), tint)
+            c = apply_tint(QColor(*ICE_COLOR), ice_tint)
             c.setAlpha(alpha)
             painter.fillRect(x, ice_top, seg, self.ice_h, c)
             # 氷の上端のハイライト
-            e = apply_tint(QColor(*ICE_EDGE), tint)
+            e = apply_tint(QColor(*ICE_EDGE), ice_tint)
             e.setAlpha(int(alpha * 0.55))
             painter.fillRect(x, ice_top, seg, max(1, ps // 2), e)
             x += seg
@@ -833,7 +847,7 @@ class SkatingScene(BaseScene):
                       math.sin(self.t * 0.008 + k * 2.1) * self.width * 0.15))
             alpha = get_alpha(gx) if get_alpha else 255
             a = int(alpha * (0.10 + 0.08 * math.sin(self.t * 0.02 + k)))
-            c = apply_tint(QColor(*ICE_EDGE), tint)
+            c = apply_tint(QColor(*ICE_EDGE), ice_tint)
             c.setAlpha(max(0, a))
             painter.fillRect(gx, ice_top + ps, 14 * ps, self.ice_h - 2 * ps, c)
 
