@@ -1,0 +1,25 @@
+[Unit]
+Description=Flight Tracker - read-only query API (gunicorn, 127.0.0.1 only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flighttrk
+Group=flighttrk
+WorkingDirectory=/opt/flight-tracker
+Environment=FT_DB=/opt/flight-tracker/flight_tracker.db
+# 127.0.0.1 のみ。公開は Cloudflare Tunnel / nginx 経由（外部bindしない）
+ExecStart=/opt/flight-tracker/venv/bin/gunicorn -w 2 -b 127.0.0.1:5002 --timeout 30 app:app
+Restart=on-failure
+RestartSec=10
+MemoryMax=200M
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flight-tracker
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

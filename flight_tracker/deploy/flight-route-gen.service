@@ -1,0 +1,18 @@
+[Unit]
+Description=Flight Tracker - route generator (landing detection -> flight_routes)
+
+[Service]
+Type=oneshot
+User=flighttrk
+Group=flighttrk
+WorkingDirectory=/opt/flight-tracker
+Environment=FT_DB=/opt/flight-tracker/flight_tracker.db
+Environment=FT_AIRPORTS_CSV=/opt/flight-tracker/airports.csv
+ExecStart=/opt/flight-tracker/venv/bin/python /opt/flight-tracker/route_generator.py
+MemoryMax=256M
+Nice=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flight-tracker
+ProtectHome=true

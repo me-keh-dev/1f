@@ -1,0 +1,26 @@
+[Unit]
+Description=Flight Tracker - OpenSky positions collector (1/f Flight Live View)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flighttrk
+Group=flighttrk
+WorkingDirectory=/opt/flight-tracker
+Environment=FT_DB=/opt/flight-tracker/flight_tracker.db
+Environment=POLL_INTERVAL_SEC=600
+ExecStart=/opt/flight-tracker/venv/bin/python /opt/flight-tracker/positions_collector.py
+Restart=on-failure
+RestartSec=30
+# 共用2GB VPSを守る: メモリ上限・低優先度・隔離
+MemoryMax=200M
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flight-tracker
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=Flight Tracker - delete old raw_positions + VACUUM
+
+[Service]
+Type=oneshot
+User=flighttrk
+Group=flighttrk
+WorkingDirectory=/opt/flight-tracker
+Environment=FT_DB=/opt/flight-tracker/flight_tracker.db
+Environment=FT_RAW_RETENTION_DAYS=3
+ExecStart=/opt/flight-tracker/venv/bin/python /opt/flight-tracker/cleanup.py
+MemoryMax=256M
+Nice=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flight-tracker
+ProtectHome=true
