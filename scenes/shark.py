@@ -651,10 +651,12 @@ class Bubble:
         if self.alpha <= 0:
             self.alive = False
 
-    def draw(self, painter):
+    def draw(self, painter, fade_mul=1.0):
         if self.alive:
-            painter.fillRect(int(self.x), int(self.y), self.size, self.size,
-                             QColor(190, 226, 250, self.alpha))
+            a = int(self.alpha * fade_mul)
+            if a > 0:
+                painter.fillRect(int(self.x), int(self.y), self.size, self.size,
+                                 QColor(190, 226, 250, a))
 
 
 # --- マリンスノー（左右に舞いながらゆっくり沈む白い粒） ---
@@ -677,10 +679,10 @@ class SnowFleck:
         self.dvx *= 0.95
         self.dvy *= 0.95
 
-    def draw(self, painter, bottom_y):
-        # 海底に近づくと薄れて消える
+    def draw(self, painter, bottom_y, fade_mul=1.0):
+        # 海底に近づくと薄れて消える（＋マウス接近フェード fade_mul）
         fade = max(0.0, min(1.0, (bottom_y - self.y) / 20.0))
-        a = int(self.alpha * fade)
+        a = int(self.alpha * fade * fade_mul)
         if a > 0:
             painter.fillRect(int(self.x), int(self.y), self.size, self.size,
                              QColor(214, 230, 240, a))
@@ -949,7 +951,7 @@ class SharkScene(BaseScene):
             self.schools.draw(painter, a_at, tint, ps)
         # マリンスノー（奥のオブジェクトと手前のオブジェクトの間）
         for f in self.snow:
-            f.draw(painter, ground_y - 2 * ps)
+            f.draw(painter, ground_y - 2 * ps, a_at(f.x) / 255.0)
         for c in self.corals:
             if c.depth <= 0.5:
                 c.draw(painter, ground_y, a_at(c.base_x), tint, ps)
@@ -962,7 +964,7 @@ class SharkScene(BaseScene):
 
         # 泡（最前面）
         for b in self.bubbles:
-            b.draw(painter)
+            b.draw(painter, a_at(b.x) / 255.0)
 
 
 # ---------------------------------------------------------------------------
