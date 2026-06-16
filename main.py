@@ -2436,6 +2436,25 @@ class GlobeHotspot(QWidget):
         if shift != self._clickable:
             self._clickable = shift
             set_clickable(int(self.winId()), shift)
+            self.update()       # 合図の描画を更新（描画ピクセルが無いとクリックを受けない）
+
+    def paintEvent(self, event):
+        # Shift中だけ薄く塗る＝クリックを受け取れる（完全透明だと素通り）＋押せる合図
+        if not self._clickable:
+            return
+        p = QPainter(self)
+        try:
+            p.setRenderHint(QPainter.Antialiasing, True)
+            w = self.width()
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(120, 180, 255, 22))          # ほぼ透明だがヒット可能
+            p.drawEllipse(1, 1, w - 2, w - 2)
+            pen = QPen(QColor(150, 215, 255, 180)); pen.setWidthF(max(2.0, w * 0.05))
+            p.setPen(pen); p.setBrush(Qt.NoBrush)
+            p.drawEllipse(3, 3, w - 6, w - 6)              # 「クリックできます」の枠
+        finally:
+            if p.isActive():
+                p.end()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and is_shift_pressed():
