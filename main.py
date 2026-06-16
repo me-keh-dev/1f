@@ -135,6 +135,33 @@ def _setup_crash_logging():
     _th.excepthook = _thread_hook
 
 
+_last_rt_log = [0.0]
+
+
+def _log_runtime_exc(where):
+    """描画/更新ループで握りつぶした例外を記録する。これらは固まらせず続行するが、
+    後で原因を追えるよう error.log にも残す（毎フレーム出ても肥大しないようスロットル）。"""
+    import traceback
+    traceback.print_exc()
+    try:
+        import time as _t
+        now = _t.monotonic()
+        if now - _last_rt_log[0] < 5.0:    # スパム防止: 5秒に1回まで書き出す
+            return
+        _last_rt_log[0] = now
+        import datetime as _dt
+        try:
+            from version import CODE_VERSION as _ver
+        except Exception:
+            _ver = "?"
+        with open(os.path.join(_log_dir(), "error.log"), "a", encoding="utf-8") as f:
+            f.write("\n[{} v{} caught:{}]\n".format(
+                _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), _ver, where))
+            traceback.print_exc(file=f)
+    except Exception:
+        pass
+
+
 def _collect_error_logs():
     """前回までに記録されたエラーログを読み、匿名化して返す（なければ None）。
     crash.log は起動時に faulthandler が開くため、今読める内容＝前回以前の分。
@@ -1669,8 +1696,13 @@ class BackgroundOverlay(QWidget):
                 _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
                          default=255)
                 get_alpha = lambda base_x, _m=_m: _m
-        po.scene.draw_background(painter, po.ground_y, tint, get_alpha)
-        painter.end()
+        try:
+            po.scene.draw_background(painter, po.ground_y, tint, get_alpha)
+        except Exception:
+            _log_runtime_exc("draw_background")
+        finally:
+            if painter.isActive():
+                painter.end()
 
 
 class ScreenOverlay(QWidget):
@@ -1734,18 +1766,22 @@ class ScreenOverlay(QWidget):
                 self.bg_overlay = None
 
     def update_scene(self):
-        if self.scene:
-            # 天気をシーンに伝える（雨なら旅人が傘をさす等）
-            state = (self.weather_fx.current_state
-                     if self.config.get("weather_enabled", True) else "clear")
-            self.scene.set_weather(state)
-            # Pass mouse position for interactive physics
-            mx, my = get_cursor_pos()
-            wx, wy = self.x(), self.y()
-            local_mx = mx - wx
-            local_my = my - wy
-            self.scene.update(self.wind_sim, mouse_pos=(local_mx, local_my))
-        self.weather_fx.update()
+        try:
+            if self.scene:
+                # 天気をシーンに伝える（雨なら旅人が傘をさす等）
+                state = (self.weather_fx.current_state
+                         if self.config.get("weather_enabled", True) else "clear")
+                self.scene.set_weather(state)
+                # Pass mouse position for interactive physics
+                mx, my = get_cursor_pos()
+                wx, wy = self.x(), self.y()
+                local_mx = mx - wx
+                local_my = my - wy
+                self.scene.update(self.wind_sim, mouse_pos=(local_mx, local_my))
+            self.weather_fx.update()
+        except Exception:   # 更新例外で repaint がスキップされ固まらないように
+            _log_runtime_exc("update_scene")
+        # 描画要求は例外があっても必ず出す（アニメーションを止めない）
         self.update()
         if self.bg_overlay:
             self.bg_overlay.update()
@@ -1784,11 +1820,16 @@ class ScreenOverlay(QWidget):
                 _m = min((get_alpha(x) for x in range(0, _W + 1, max(24, _W // 56))),
                          default=255)
                 get_alpha = lambda base_x, _m=_m: _m
-        if self.scene:
-            self.scene.draw(painter, self.ground_y, tint, get_alpha)
-        if self.config.get("weather_enabled", True):
-            self.weather_fx.draw(painter)
-        painter.end()
+        try:
+            if self.scene:
+                self.scene.draw(painter, self.ground_y, tint, get_alpha)
+            if self.config.get("weather_enabled", True):
+                self.weather_fx.draw(painter)
+        except Exception:   # 1フレームの描画例外で全シーンが固まらないように
+            _log_runtime_exc("paintEvent")
+        finally:
+            if painter.isActive():   # end漏れ＝以降 QPainter(self) が全失敗→永久フリーズ
+                painter.end()
 
 
 # --- マルチモニター対応マネージャー ---
@@ -2255,19 +2296,22 @@ class OverlayManager:
         dt = now - self.last_time
         self.last_time = now
         sway_speed = self.config.get("sway_speed", 50) / 50.0
-        # サウンド連動: スピーカー出力の音量を揺らぎの強さにブレンド
-        if self.config.get("sound_sync_enabled", False):
-            gain = self.config.get("sound_sync_gain", 50) / 50.0
-            self.wind_sim.sound_level = min(2.0, self.audio_monitor.level * gain)
-            bass_gain = self.config.get("sound_bass_gain", 100) / 100.0
-            # 持続レベルではなくオンセットパルス: ドン!の瞬間だけ反応する
-            self.wind_sim.sound_bass = min(2.0, self.audio_monitor.bass_hit * bass_gain)
-        else:
-            self.wind_sim.sound_level = 0.0
-            self.wind_sim.sound_bass = 0.0
-        self.wind_sim.update(dt * sway_speed)
+        try:
+            # サウンド連動: スピーカー出力の音量を揺らぎの強さにブレンド
+            if self.config.get("sound_sync_enabled", False):
+                gain = self.config.get("sound_sync_gain", 50) / 50.0
+                self.wind_sim.sound_level = min(2.0, self.audio_monitor.level * gain)
+                bass_gain = self.config.get("sound_bass_gain", 100) / 100.0
+                # 持続レベルではなくオンセットパルス: ドン!の瞬間だけ反応する
+                self.wind_sim.sound_bass = min(2.0, self.audio_monitor.bass_hit * bass_gain)
+            else:
+                self.wind_sim.sound_level = 0.0
+                self.wind_sim.sound_bass = 0.0
+            self.wind_sim.update(dt * sway_speed)
+        except Exception:   # 前段の例外で全オーバーレイ更新がスキップされないように
+            _log_runtime_exc("manager_tick")
         for o in self.overlays:
-            o.update_scene()
+            o.update_scene()   # 各 update_scene は内部で例外保護済み
 
 
 class HamburgerButton(QWidget):
