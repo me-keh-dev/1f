@@ -1895,6 +1895,7 @@ class OverlayManager:
 
         self.user_visible = True
         self._fullscreen_hidden = False
+        self._space_view = None       # 全画面の宇宙ビュー（Shift+地球儀クリック）
 
         # 利用記録（人気投票オプトイン時のみ、1モード×1日につき1回）
         self._usage_sent = set()
@@ -2291,6 +2292,20 @@ class OverlayManager:
             self._fullscreen_hidden = False
             self.show_all()
 
+    def open_space_view(self, screen, scene):
+        """全画面の宇宙ビューを開く（Shift+地球儀クリックから）。多重起動はしない。"""
+        if getattr(self, "_space_view", None) is not None:
+            return
+        try:
+            self._space_view = SpaceView(screen, scene, self.config)
+            self._space_view.destroyed.connect(lambda *a: self._clear_space_view())
+        except Exception:
+            _log_runtime_exc("open_space_view")
+            self._space_view = None
+
+    def _clear_space_view(self):
+        self._space_view = None
+
     def _tick(self):
         now = time.monotonic()
         dt = now - self.last_time
@@ -2312,6 +2327,122 @@ class OverlayManager:
             _log_runtime_exc("manager_tick")
         for o in self.overlays:
             o.update_scene()   # 各 update_scene は内部で例外保護済み
+
+
+class SpaceView(QWidget):
+    """Shift+地球儀クリックで開く全画面の宇宙ビュー（不透明）。星空＋大きな地球。
+    どこをクリックしても・Escでも・どのキーでも閉じる（不透明窓なので確実に脱出）。"""
+
+    def __init__(self, screen, scene, config):
+        super().__init__()
+        self.scene = scene
+        self.config = config
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setCursor(Qt.BlankCursor)
+        self.setGeometry(screen.geometry())
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self.update)
+        self._timer.start(33)
+        self.showFullScreen()
+        self.raise_()
+        self.activateWindow()
+        self.setFocus()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        try:
+            p.setRenderHint(QPainter.Antialiasing, True)
+            p.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            sc = self.scene
+            if sc is not None and hasattr(sc, "draw_space_view"):
+                sc.draw_space_view(p, self.width(), self.height())
+            else:
+                p.fillRect(self.rect(), QColor(4, 6, 14))
+        except Exception:
+            _log_runtime_exc("space_view")
+        finally:
+            if p.isActive():
+                p.end()
+
+    def _dismiss(self):
+        if self._timer:
+            self._timer.stop()
+            self._timer = None
+        self.close()
+
+    def mousePressEvent(self, event):
+        self._dismiss()
+
+    def keyPressEvent(self, event):
+        self._dismiss()        # Esc でも他のどのキーでも閉じる
+
+    def closeEvent(self, event):
+        if self._timer:
+            self._timer.stop()
+            self._timer = None
+        self.scene = None
+        super().closeEvent(event)
+
+
+class GlobeHotspot(QWidget):
+    """ISSシーンの地球儀の上に重なる透明な当たり判定窓。Shiftを押している間だけ
+    クリック可能になり、クリックで全画面の宇宙ビューを開く（ハンバーガーと同じ安全方式＝
+    通常時はクリック透過でデスクトップ操作を妨げない）。ISS以外のシーンでは隠れる。"""
+
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self._clickable = False
+        self.hide()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._tick)
+        self.timer.start(80)
+
+    def _target(self):
+        m = self.manager
+        if not m.user_visible or m._fullscreen_hidden or m._space_view is not None:
+            return None
+        for o in m.overlays:
+            sc = getattr(o, "scene", None)
+            if sc is not None and hasattr(sc, "_globe_geom") \
+                    and getattr(sc, "show_globe", False):
+                try:
+                    cx, cy, r = sc._globe_geom()
+                except Exception:
+                    return None
+                if r < 10:
+                    return None
+                return o, sc, cx, cy, r
+        return None
+
+    def _tick(self):
+        tgt = self._target()
+        if tgt is None:
+            if self.isVisible():
+                self.hide()
+            return
+        o, sc, cx, cy, r = tgt
+        gx, gy, sz = o.x() + int(cx - r), o.y() + int(cy - r), int(r * 2)
+        if (self.x(), self.y(), self.width()) != (gx, gy, sz):
+            self.setGeometry(gx, gy, sz, sz)
+        if not self.isVisible():
+            self.show()
+            QTimer.singleShot(50, lambda: set_clickable(int(self.winId()), self._clickable))
+        shift = bool(is_shift_pressed())
+        if shift != self._clickable:
+            self._clickable = shift
+            set_clickable(int(self.winId()), shift)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and is_shift_pressed():
+            tgt = self._target()
+            if tgt is not None:
+                o, sc, cx, cy, r = tgt
+                self.manager.open_space_view(o.screen, sc)
 
 
 class HamburgerButton(QWidget):
@@ -2547,6 +2678,8 @@ def main():
 
     # 画面左下のハンバーガーメニューボタン（トレイと同じメニューを展開）
     hamburger = HamburgerButton(manager, menu)
+    # ISS地球儀の Shift+クリック → 全画面の宇宙ビュー（透明な当たり判定窓・通常は透過）
+    globe_hotspot = GlobeHotspot(manager)
 
     sys.exit(app.exec_())
 
