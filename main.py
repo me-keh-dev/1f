@@ -1822,6 +1822,11 @@ class ScreenOverlay(QWidget):
                 get_alpha = lambda base_x, _m=_m: _m
         try:
             if self.scene:
+                # Shift中は地球儀(インセット)をフェードさせずボタンとして残す（ISSのみ使用）
+                try:
+                    self.scene._keep_globe = is_shift_pressed()
+                except Exception:
+                    pass
                 self.scene.draw(painter, self.ground_y, tint, get_alpha)
             if self.config.get("weather_enabled", True):
                 self.weather_fx.draw(painter)
@@ -2441,28 +2446,20 @@ class GlobeHotspot(QWidget):
             self.update()       # Shift中は地球儀ボタンを描き続ける（マーカーの明滅等）
 
     def paintEvent(self, event):
-        # Shift中だけ、地球儀そのものをフル不透明で描く＝ボタンのように残る。
-        # （タスクバーの地球＝シーン本体は通常どおりフェードする。ここはその上に重なる別窓）
+        # Shift中だけ薄く塗ってクリックを受け取れるようにする＋「押せる」合図の枠。
+        # 地球儀そのものはシーン本体が _keep_globe でフル不透明に描く（ここでは描かない＝二重防止）。
         if not self._clickable:
             return                              # 通常時は完全透明＝下の地球儀がそのまま見える
-        tgt = self._target()
-        if tgt is None:
-            return
-        o, sc, cx, cy, r = tgt
         p = QPainter(self)
         try:
             p.setRenderHint(QPainter.Antialiasing, True)
-            p.setRenderHint(QPainter.SmoothPixmapTransform, True)
-            ccx, ccy = self.width() / 2.0, self.height() / 2.0
-            try:
-                sc._draw_globe_at(p, ccx, ccy, float(r))   # 地球儀をフル不透明で
-            except Exception:
-                p.setPen(Qt.NoPen); p.setBrush(QColor(120, 180, 255, 40))
-                p.drawEllipse(int(ccx - r), int(ccy - r), int(2 * r), int(2 * r))
-            pen = QPen(QColor(150, 215, 255, 200)); pen.setWidthF(max(2.0, r * 0.07))
+            w = self.width()
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(120, 180, 255, 20))          # ほぼ透明だがヒット可能
+            p.drawEllipse(2, 2, w - 4, w - 4)
+            pen = QPen(QColor(150, 215, 255, 180)); pen.setWidthF(max(2.0, w * 0.045))
             p.setPen(pen); p.setBrush(Qt.NoBrush)
-            p.drawEllipse(int(ccx - r - 2), int(ccy - r - 2),
-                          int(2 * r + 4), int(2 * r + 4))   # 「クリックできます」の枠
+            p.drawEllipse(4, 4, w - 8, w - 8)              # 「クリックできます」の枠
         finally:
             if p.isActive():
                 p.end()
