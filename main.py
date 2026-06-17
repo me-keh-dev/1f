@@ -2426,9 +2426,11 @@ class GlobeHotspot(QWidget):
 
     def _tick(self):
         tgt = self._target()
-        if tgt is None:
+        # Shiftを押している間だけ表示（押していない時は完全に隠す＝枠が残らない・クリック素通り）
+        if tgt is None or not is_shift_pressed():
             if self.isVisible():
                 self.hide()
+                self._clickable = False
             return
         o, sc, cx, cy, r = tgt
         m = 6                                  # 地球儀の縁・グローが収まる余白
@@ -2437,13 +2439,9 @@ class GlobeHotspot(QWidget):
             self.setGeometry(gx, gy, sz, sz)
         if not self.isVisible():
             self.show()
-            QTimer.singleShot(50, lambda: set_clickable(int(self.winId()), self._clickable))
-        shift = bool(is_shift_pressed())
-        if shift != self._clickable:
-            self._clickable = shift
-            set_clickable(int(self.winId()), shift)
-        if self._clickable:
-            self.update()       # Shift中は地球儀ボタンを描き続ける（マーカーの明滅等）
+            self._clickable = True
+            QTimer.singleShot(30, lambda: set_clickable(int(self.winId()), True))
+        self.update()           # 「押せる」枠を描き続ける
 
     def paintEvent(self, event):
         # Shift中だけ薄く塗ってクリックを受け取れるようにする＋「押せる」合図の枠。
