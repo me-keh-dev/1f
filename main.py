@@ -664,18 +664,22 @@ class SceneTile(QWidget):
         p.end()
 
     def _draw_heart(self, p, cx, cy, s, filled):
-        """小さなハート（2円＋三角の合成）。filled=赤塗り / それ以外=白枠"""
+        """小さなハート（ベジェ曲線）。filled=赤塗り / それ以外=白枠"""
         heart = QPainterPath()
-        heart.addEllipse(QPoint(int(cx - s * 0.5), int(cy - s * 0.35)),
-                         s * 0.6, s * 0.6)
-        heart.addEllipse(QPoint(int(cx + s * 0.5), int(cy - s * 0.35)),
-                         s * 0.6, s * 0.6)
-        tri = QPainterPath()
-        tri.moveTo(cx - s * 1.0, cy - s * 0.1)
-        tri.lineTo(cx + s * 1.0, cy - s * 0.1)
-        tri.lineTo(cx, cy + s * 1.05)
-        tri.closeSubpath()
-        heart = heart.united(tri)
+        # 下の頂点から開始し、左右対称にベジェ曲線で描く
+        heart.moveTo(cx, cy + s * 0.9)
+        heart.cubicTo(cx - s * 0.1, cy + s * 0.55,
+                      cx - s * 1.1, cy + s * 0.2,
+                      cx - s * 1.0, cy - s * 0.35)
+        heart.cubicTo(cx - s * 0.9, cy - s * 0.9,
+                      cx - s * 0.15, cy - s * 0.8,
+                      cx, cy - s * 0.35)
+        heart.cubicTo(cx + s * 0.15, cy - s * 0.8,
+                      cx + s * 0.9, cy - s * 0.9,
+                      cx + s * 1.0, cy - s * 0.35)
+        heart.cubicTo(cx + s * 1.1, cy + s * 0.2,
+                      cx + s * 0.1, cy + s * 0.55,
+                      cx, cy + s * 0.9)
         if filled:
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(255, 70, 95))   # お気に入り＝赤いハート
