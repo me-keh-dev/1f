@@ -1675,7 +1675,7 @@ class BackgroundOverlay(QWidget):
         else:
             tint = None
         get_alpha = None
-        if po.config.get("mouse_fade_enabled", True) and not is_shift_pressed():
+        if po.config.get("mouse_fade_enabled", True):
             mx, my = get_cursor_pos()
             inner_r = po.config.get("mouse_fade_inner", 30)
             fade_r = po.config.get("mouse_fade_range", 120)
@@ -1797,9 +1797,7 @@ class ScreenOverlay(QWidget):
         else:
             tint = None
         get_alpha = None
-        # Shiftを押している間はマウス接近フェードをしない（地球儀のShift+クリック等のため、
-        # マウスを近づけてもシーンが消えない）
-        fade_enabled = self.config.get("mouse_fade_enabled", True) and not is_shift_pressed()
+        fade_enabled = self.config.get("mouse_fade_enabled", True)
         if fade_enabled:
             mx, my = get_cursor_pos()
             inner_r = self.config.get("mouse_fade_inner", 30)
@@ -2428,7 +2426,8 @@ class GlobeHotspot(QWidget):
                 self.hide()
             return
         o, sc, cx, cy, r = tgt
-        gx, gy, sz = o.x() + int(cx - r), o.y() + int(cy - r), int(r * 2)
+        m = 6                                  # 地球儀の縁・グローが収まる余白
+        gx, gy, sz = o.x() + int(cx - r) - m, o.y() + int(cy - r) - m, int(r * 2) + 2 * m
         if (self.x(), self.y(), self.width()) != (gx, gy, sz):
             self.setGeometry(gx, gy, sz, sz)
         if not self.isVisible():
@@ -2438,22 +2437,32 @@ class GlobeHotspot(QWidget):
         if shift != self._clickable:
             self._clickable = shift
             set_clickable(int(self.winId()), shift)
-            self.update()       # 合図の描画を更新（描画ピクセルが無いとクリックを受けない）
+        if self._clickable:
+            self.update()       # Shift中は地球儀ボタンを描き続ける（マーカーの明滅等）
 
     def paintEvent(self, event):
-        # Shift中だけ薄く塗る＝クリックを受け取れる（完全透明だと素通り）＋押せる合図
+        # Shift中だけ、地球儀そのものをフル不透明で描く＝ボタンのように残る。
+        # （タスクバーの地球＝シーン本体は通常どおりフェードする。ここはその上に重なる別窓）
         if not self._clickable:
+            return                              # 通常時は完全透明＝下の地球儀がそのまま見える
+        tgt = self._target()
+        if tgt is None:
             return
+        o, sc, cx, cy, r = tgt
         p = QPainter(self)
         try:
             p.setRenderHint(QPainter.Antialiasing, True)
-            w = self.width()
-            p.setPen(Qt.NoPen)
-            p.setBrush(QColor(120, 180, 255, 22))          # ほぼ透明だがヒット可能
-            p.drawEllipse(1, 1, w - 2, w - 2)
-            pen = QPen(QColor(150, 215, 255, 180)); pen.setWidthF(max(2.0, w * 0.05))
+            p.setRenderHint(QPainter.SmoothPixmapTransform, True)
+            ccx, ccy = self.width() / 2.0, self.height() / 2.0
+            try:
+                sc._draw_globe_at(p, ccx, ccy, float(r))   # 地球儀をフル不透明で
+            except Exception:
+                p.setPen(Qt.NoPen); p.setBrush(QColor(120, 180, 255, 40))
+                p.drawEllipse(int(ccx - r), int(ccy - r), int(2 * r), int(2 * r))
+            pen = QPen(QColor(150, 215, 255, 200)); pen.setWidthF(max(2.0, r * 0.07))
             p.setPen(pen); p.setBrush(Qt.NoBrush)
-            p.drawEllipse(3, 3, w - 6, w - 6)              # 「クリックできます」の枠
+            p.drawEllipse(int(ccx - r - 2), int(ccy - r - 2),
+                          int(2 * r + 4), int(2 * r + 4))   # 「クリックできます」の枠
         finally:
             if p.isActive():
                 p.end()
