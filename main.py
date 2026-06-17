@@ -1675,7 +1675,7 @@ class BackgroundOverlay(QWidget):
         else:
             tint = None
         get_alpha = None
-        if po.config.get("mouse_fade_enabled", True):
+        if po.config.get("mouse_fade_enabled", True) and not is_shift_pressed():
             mx, my = get_cursor_pos()
             inner_r = po.config.get("mouse_fade_inner", 30)
             fade_r = po.config.get("mouse_fade_range", 120)
@@ -1797,7 +1797,9 @@ class ScreenOverlay(QWidget):
         else:
             tint = None
         get_alpha = None
-        fade_enabled = self.config.get("mouse_fade_enabled", True)
+        # Shiftを押している間はマウス接近フェードをしない（地球儀のShift+クリック等のため、
+        # マウスを近づけてもシーンが消えない）
+        fade_enabled = self.config.get("mouse_fade_enabled", True) and not is_shift_pressed()
         if fade_enabled:
             mx, my = get_cursor_pos()
             inner_r = self.config.get("mouse_fade_inner", 30)
